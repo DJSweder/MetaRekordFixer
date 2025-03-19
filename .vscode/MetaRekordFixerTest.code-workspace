@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/.archive": true,
+			"**/.winres": true,
+			"**/dist": true,
+			"desktop.ini": true,
+			"master.db": true,
+			"**/.vscode": true
+		}
+	}
+}

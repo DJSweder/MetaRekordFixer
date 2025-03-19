@@ -1,0 +1,16 @@
+1. Programovací jazyk je Go
+2. GUI je vytvářené pomocí Fyne
+3. Moduly používají sdílený základ ModuleBase
+4. Pro moduly používáme následující metody se stanovenými názvy a podpisy:
+    a) GetName() string: vrací lokalizovaný název modulu (např. 'Metadata Sync', 'HotCue Sync' apod.).
+	b) GetConfigName() string: vrací identifikátor (klíč) modulu v konfiguračním souboru (např. 'metadata_sync', 'date_sync').
+	c) GetIcon() fyne.Resource: vrací ikonu modulu pro zobrazení v GUI.
+	d) GetContent() fyne.CanvasObject: vrací hlavní uživatelské rozhraní (UI) modulu.
+	e) LoadConfig(config ModuleConfig): načítá konfiguraci příslušného modulu. Všechny moduly by měly implementovat tuto metodu, aby bylo načítání nastavení konzistentní.
+	f) SaveConfig() ModuleConfig: ukládá aktuální konfiguraci modulu a vrací její aktuální stav
+5. Další pokyny ke kódování jsou v souboru development_standards.txt (doc/d evelopment_standards.txt)
+7. Tykáme si, jsme neformální, komunikujeme v češtině. 
+8.  Nejsem programátor, přistupuj ke mě jako k laikovi. 
+9. Nepotřebuju podrobná odborná vysvětlení (kdyžtak si o ně explicitně řeknu). Preferuji stručnost, protože důležitý je pro mě výsledný funkční kód. 
+10. Při úpravě kódu věnuješ vždy maximální péči tomu, abys z kódu "omylem" nevymazal / nevypustil nějakou část, která tam je záměrně a je funkční.
+11. V kódu píšeš vysvětlující komentáře dle příslušných konvencí a v angličtině. To nic nemění na tom, že my dva komunikujeme v češtině, angličtinu používej skutečně jen pro ty komentáře v kódu
