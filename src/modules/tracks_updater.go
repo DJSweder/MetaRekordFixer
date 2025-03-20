@@ -19,7 +19,6 @@ import (
 // Implements the standard Module interface
 type TracksUpdater struct {
 	*common.ModuleBase
-	configMgr      *common.ConfigManager
 	dbMgr          *common.DBManager
 	playlistSelect *widget.Select
 	folderPath     *widget.Entry
@@ -210,7 +209,7 @@ func (m *TracksUpdater) addStatus(message string, replace bool) {
 func (m *TracksUpdater) Start() {
 	// Save configuration before starting the process
 	m.SaveConfig()
-	
+
 	// Disable the button during processing
 	m.submitBtn.Disable()
 	defer func() {
@@ -231,6 +230,12 @@ func (m *TracksUpdater) Start() {
 				// In case of panic
 				m.CloseProgressDialog()
 				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
+			}
+		}()
+		defer func() {
+			if err := m.dbMgr.Finalize(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.finalize"), err),
+					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
 			}
 		}()
 
@@ -261,13 +266,6 @@ func (m *TracksUpdater) Start() {
 			context := common.NewErrorContext(m.GetConfigName(), "Database Connection")
 			context.Severity = common.ErrorWarning
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
-			return
-		}
-		defer m.dbMgr.Finalize()
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
 			return
 		}
 

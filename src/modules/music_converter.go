@@ -487,8 +487,8 @@ func (m *MusicConverterModule) initializeUI() {
 	// Create scrollable container with fixed minimum size
 	scroll := container.NewVScroll(mainBox)
 	scroll.SetMinSize(fyne.NewSize(600, 600))
-	// Pack scroll into MaxContainer for proper expansion
-	m.mainContent = container.NewMax(scroll)
+	// Pack scroll into Stack container for proper expansion
+	m.mainContent = container.NewStack(scroll)
 
 	// Initial format visibility update
 	if m.targetFormat != nil && m.targetFormat.Selected != "" {

@@ -22,7 +22,6 @@ import (
 // MetadataSyncModule handles metadata synchronization between different file formats.
 type MetadataSyncModule struct {
 	*common.ModuleBase // Embedded pointer to shared base
-	configMgr          *common.ConfigManager
 	dbMgr              *common.DBManager
 	entrySourceFolder  *widget.Entry
 	checkRecursive     *widget.Check
@@ -171,7 +170,7 @@ func (m *MetadataSyncModule) initializeUI() {
 func (m *MetadataSyncModule) syncMetadata() {
 	// Save configuration before starting the process
 	m.SaveConfig()
-	
+
 	// Disable the button and set icon after completion
 	m.btnSync.Disable()
 	defer func() {
@@ -230,7 +229,12 @@ func (m *MetadataSyncModule) syncMetadata() {
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
 			return
 		}
-		defer m.dbMgr.Finalize()
+		defer func() {
+			if err := m.dbMgr.Finalize(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("metsync.err.finalize"), err),
+					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
+			}
+		}()
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -377,7 +381,6 @@ func (m *MetadataSyncModule) syncMetadata() {
 		// Mark done and update progress
 		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("metsync.status.completed"), totalDbFiles))
 
-		// Mark the progress dialog as completed instead of closing it
 		m.CompleteProgressDialog()
 	}()
 }

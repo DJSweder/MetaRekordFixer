@@ -1,22 +1,22 @@
 package modules
 
 import (
-	"MetaRekordFixer/common"
-	"MetaRekordFixer/locales"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
-
 	"time"
-
-	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"MetaRekordFixer/common"
+	"MetaRekordFixer/locales"
+
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
@@ -70,6 +70,7 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 	return m
 }
 
+// GetName returns the localized name of this module.
 func (m *HotCueSyncModule) GetName() string {
 	return locales.Translate("hotcuesync.mod.name")
 }
@@ -79,6 +80,7 @@ func (m *HotCueSyncModule) GetConfigName() string {
 	return "hotcue_sync"
 }
 
+// GetIcon returns the module's icon resource.
 func (m *HotCueSyncModule) GetIcon() fyne.Resource {
 	return theme.MediaPlayIcon()
 }
@@ -119,9 +121,8 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		),
 	)
 
-	// Predeclare submit button.
-	var submitBtn *widget.Button
 	// Create a button with a dynamic icon.
+	var submitBtn *widget.Button
 	submitBtn = widget.NewButtonWithIcon(locales.Translate("hotcuesync.button.start"), nil, func() {
 		// Save configuration before synchronization.
 		m.SaveConfig()
@@ -132,8 +133,6 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 			} else {
 				// Set the icon to a checkmark upon successful completion.
 				submitBtn.SetIcon(theme.ConfirmIcon())
-				// Odstraněno zobrazení informačního dialogu, protože progress bar již zobrazuje informaci o dokončení
-				// dialog.ShowInformation(locales.Translate("hotcuesync.success.title"), locales.Translate("hotcuesync.success.msg"), m.Window)
 			}
 		}()
 	})
@@ -156,9 +155,6 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		widget.NewSeparator(),
 		standardForm,
 		container.NewHBox(layout.NewSpacer(), submitBtn),
-		// Odstraněno: progress bar a status label, protože jsou nahrazeny dialogem s progress barem
-		// m.Progress,
-		// m.Status,
 	)
 
 	return content
@@ -278,11 +274,6 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 
 // initializeUI sets up the user interface components.
 func (m *HotCueSyncModule) initializeUI() {
-	// Odstraněno: inicializace progress baru a status labelu, protože jsou nahrazeny dialogem s progress barem
-	// m.Progress = widget.NewProgressBar()
-	// m.Status = widget.NewLabel("")
-	// m.Status.Alignment = fyne.TextAlignCenter
-
 	// Initialize source type selector
 	m.sourceType = widget.NewSelect([]string{
 		locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)),
@@ -389,13 +380,6 @@ func (m *HotCueSyncModule) initializeUI() {
 				err := m.synchronizeHotCues()
 				if err != nil {
 					common.ShowError(err, m.Window)
-				} else {
-					// Odstraněno zobrazení informačního dialogu, protože progress bar již zobrazuje informaci o dokončení
-					// dialog.ShowInformation(
-					// 	locales.Translate("hotcuesync.success.title"),
-					// 	locales.Translate("hotcuesync.success.msg"),
-					// 	m.Window,
-					// )
 				}
 			}()
 		},
@@ -408,9 +392,6 @@ func (m *HotCueSyncModule) initializeUI() {
 		widget.NewSeparator(),
 		standardForm,
 		widget.NewSeparator(),
-		// Odstraněno: progress bar a status label, protože jsou nahrazeny dialogem s progress barem
-		// m.Progress,
-		// m.Status,
 	))
 
 	// Set initial values for source and target type without triggering change handlers
@@ -424,8 +405,7 @@ func (m *HotCueSyncModule) initializeUI() {
 func (m *HotCueSyncModule) updateControlsState() {
 	// Load playlists if needed and not initializing
 	if len(m.playlists) == 0 && !m.IsInitializing {
-		err := m.loadPlaylists()
-		if err != nil {
+		if err := m.loadPlaylists(); err != nil {
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Load Playlists")
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
@@ -1028,6 +1008,8 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 	return nil
 }
 
+// synchronizeHotCues performs the main hot cue synchronization process.
+// It copies hot cues from source tracks to matching target tracks.
 func (m *HotCueSyncModule) synchronizeHotCues() error {
 	// Disable the button during processing
 	m.submitBtn.Disable()
@@ -1100,16 +1082,24 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		}
 
 		// Ensure database connection is properly closed when done
-		defer m.dbMgr.Finalize()
+		defer func() {
+			if err := m.dbMgr.Finalize(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.finalize"), err),
+					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
+			}
+		}()
 
 		// Ensure transaction is rolled back on error
 		defer func() {
 			if err != nil {
-				m.dbMgr.RollbackTransaction()
+				if rollbackErr := m.dbMgr.RollbackTransaction(); rollbackErr != nil {
+					m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.rollback"), rollbackErr),
+						common.NewErrorContext(m.GetConfigName(), "Transaction Rollback"), m.Window, m.Status)
+				}
 			}
 		}()
 
-		// Použijeme podědující pro úspěšné a přeskočené soubory
+		// Track successful and skipped files
 		successCount := 0
 		skippedCount := 0
 
@@ -1138,7 +1128,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 				return
 			}
 
-			// Pokud nejsou nalezeny žádné cílové skladby, přeskočíme tento soubor
+			// Skip if no target tracks found
 			if len(targetTracks) == 0 {
 				skippedCount++
 				continue
@@ -1175,10 +1165,10 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			return
 		}
 
-		// Zobrazíme souhrnnou zprávu
+		// Create summary message
 		summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), successCount, skippedCount)
 
-		// Aktualizace stavové zprávy
+		// Update status message
 		m.UpdateProgressStatus(1.0, summaryMessage)
 
 		// Mark the progress dialog as completed instead of closing it

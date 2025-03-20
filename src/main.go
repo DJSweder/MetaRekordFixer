@@ -85,7 +85,9 @@ func (rt *RekordboxTools) Run() {
 	rt.mainWindow.ShowAndRun()
 	// Ensure database connections are properly closed
 	if rt.dbManager != nil {
-		rt.dbManager.Finalize()
+		if err := rt.dbManager.Finalize(); err != nil {
+			rt.logger.Printf("Error finalizing database: %v", err)
+		}
 	}
 }
 
