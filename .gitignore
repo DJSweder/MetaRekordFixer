@@ -475,29 +475,6 @@ dist/release/winget_github_token.txt
 .winres/icon.png
 .winres/icon16.png
 .winres/winres.json
-doc_internal/development_standards.md
-doc_internal/development_standards.pdf
-doc_internal/development_standards.txt
-doc_internal/directory_tree.pdf
-doc_internal/directory_tree.png
-doc_internal/disclaimer-english.rtf
-doc_internal/locale_keys_export.csv
-doc_internal/locale_keys_export.py
-doc_internal/locale_keys_usage.py
-doc_internal/localisation & colors.xlsm
-doc_internal/metadata_map.csv
-doc_internal/metadata_map.xlsx
-doc_internal/Refactoring/2_phase_result_deep_analysis.md
-doc_internal/Refactoring/2_phase_result_R1.md
-doc_internal/Refactoring/locale_correction.md
-doc_internal/Refactoring/locale_keys_analysis.xlsm
-doc_internal/Refactoring/refactored_source_code.pdf
-doc_internal/Refactoring/refactored_source_code.txt
-doc_internal/Refactoring/refactoring_result.md
-doc_internal/Refactoring/refactoring_result.txt
-doc_internal/Refactoring/refactoring_result_complete.docx
-doc_internal/source_code.pdf
-doc_internal/source_code.txt
 temp/02 date_sync.jpg
 temp/03 hotcue_sync.jpg
 temp/03_hotcue_sync_v4.jpg
@@ -524,3 +501,5 @@ temp/sample_djmdPlaylist.csv
 temp/sample_djmdSongPlaylist.csv
 temp/save_settings.jpg
 temp/start.jpg
+src/golangci-lint.html
+.aiexclude
