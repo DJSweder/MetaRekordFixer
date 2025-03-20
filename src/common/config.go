@@ -92,7 +92,7 @@ func (mgr *ConfigManager) loadConfig() error {
 	defer mgr.mutex.Unlock()
 
 	if !FileExists(mgr.configPath) {
-		return fmt.Errorf(locales.Translate("common.config.filenotfound"))
+		return fmt.Errorf(locales.Translate("common.config.filenotfound"), mgr.configPath)
 	}
 
 	data, err := os.ReadFile(mgr.configPath)

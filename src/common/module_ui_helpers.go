@@ -327,7 +327,7 @@ func CreateStandardModuleLayout(description string, content fyne.CanvasObject, s
 
 	// Add submit button with right alignment if provided
 	if submitButton != nil {
-		buttonBox := fyne.NewContainerWithLayout(layout.NewHBoxLayout(), layout.NewSpacer(), submitButton)
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), submitButton)
 		mainContainer.Add(buttonBox)
 	}
 

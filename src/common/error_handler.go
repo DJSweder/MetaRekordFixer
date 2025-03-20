@@ -51,7 +51,6 @@ func NewErrorContext(module, operation string) ErrorContext {
 // ErrorHandler provides centralized error handling
 type ErrorHandler struct {
 	logger      *log.Logger
-	lastError   error
 	lastContext ErrorContext
 	isLogging   bool
 }
@@ -103,18 +102,18 @@ func (h *ErrorHandler) HandleError(err error, context ErrorContext, window fyne.
 	case ErrorInfo:
 		dialog.ShowInformation(context.Operation, err.Error(), window)
 	case ErrorWarning, ErrorCritical:
-		h.showCustomErrorDialog(err, context, window)
+		h.showCustomErrorDialog(err, window)
 	case ErrorFatal:
-		h.showFatalErrorDialog(err, context, window)
+		h.showFatalErrorDialog(err, window)
 	}
 }
 
 // showCustomErrorDialog shows a custom error dialog with more details
-func (h *ErrorHandler) showCustomErrorDialog(err error, context ErrorContext, window fyne.Window) {
+func (h *ErrorHandler) showCustomErrorDialog(err error, window fyne.Window) {
 	message := widget.NewLabel(err.Error())
 	message.Wrapping = fyne.TextWrapWord
 
-	detailsLabel := widget.NewLabel(fmt.Sprintf("Module: %s\nOperation: %s", context.Module, context.Operation))
+	detailsLabel := widget.NewLabel(fmt.Sprintf("Module: %s\nOperation: %s", h.lastContext.Module, h.lastContext.Operation))
 	detailsLabel.Wrapping = fyne.TextWrapWord
 
 	content := container.NewVBox(
@@ -125,9 +124,9 @@ func (h *ErrorHandler) showCustomErrorDialog(err error, context ErrorContext, wi
 
 	showStackTraceBtn := widget.NewButtonWithIcon(locales.Translate("common.button.showdetails"), theme.InfoIcon(), nil)
 
-	if context.StackTrace != "" {
+	if h.lastContext.StackTrace != "" {
 		stackTraceArea := widget.NewMultiLineEntry()
-		stackTraceArea.SetText(context.StackTrace)
+		stackTraceArea.SetText(h.lastContext.StackTrace)
 		stackTraceArea.Disable()
 
 		showStackTraceBtn.OnTapped = func() {
@@ -154,7 +153,7 @@ func (h *ErrorHandler) showCustomErrorDialog(err error, context ErrorContext, wi
 }
 
 // showFatalErrorDialog shows a dialog for fatal errors
-func (h *ErrorHandler) showFatalErrorDialog(err error, context ErrorContext, window fyne.Window) {
+func (h *ErrorHandler) showFatalErrorDialog(err error, window fyne.Window) {
 	message := widget.NewLabel(fmt.Sprintf(locales.Translate("common.dialog.fatal"), err))
 	message.Wrapping = fyne.TextWrapWord
 

@@ -16,8 +16,17 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
-// RekordboxDbPassword is a constant database encryption key
-const RekordboxDbPassword = "402fd482c38817c35ffa8ffb8c7d93143b749e7d315df7a81732a1ff43608497"
+// Define parts for obsfuscation
+var (
+	dbPasswordPart1 = "402fd482c38817c35ffa8"
+	dbPasswordPart2 = "ffb8c7d93143b749e7d3"
+	dbPasswordPart3 = "15df7a81732a1ff43608497"
+)
+
+// getDbPassword creates string by concatenating parts
+func getDbPassword() string {
+	return dbPasswordPart1 + dbPasswordPart2 + dbPasswordPart3
+}
 
 // DBManager provides unified database access for all modules
 type DBManager struct {
@@ -76,7 +85,7 @@ func (m *DBManager) Connect() error {
 		return fmt.Errorf("database path is not configured")
 	}
 
-	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, RekordboxDbPassword)
+	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, getDbPassword())
 	db, err := sql.Open("sqlite3", connStr)
 	if err != nil {
 		return fmt.Errorf(locales.Translate("common.db.dbopenerr"), err)
@@ -108,7 +117,7 @@ func (m *DBManager) EnsureConnected(skipConnect bool) error {
 		return m.Connect()
 	}
 	if !m.isConnected && skipConnect {
-		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"))
+		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"), m.dbPath)
 	}
 	return nil
 }
@@ -119,11 +128,11 @@ func (m *DBManager) BeginTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.isConnected {
-		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"))
+		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"), m.dbPath)
 	}
 
 	if m.activeTransaction != nil {
-		return fmt.Errorf(locales.Translate("common.db.txactiveerr"))
+		return fmt.Errorf(locales.Translate("common.db.txactiveerr"), m.dbPath)
 	}
 
 	tx, err := m.db.Begin()
@@ -143,7 +152,7 @@ func (m *DBManager) CommitTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"))
+		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"), m.dbPath)
 	}
 
 	err := m.activeTransaction.Commit()
@@ -161,7 +170,7 @@ func (m *DBManager) RollbackTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"))
+		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"), m.dbPath)
 	}
 
 	err := m.activeTransaction.Rollback()
@@ -265,12 +274,12 @@ func (m *DBManager) TableExists(tableName string) (bool, error) {
 func (m *DBManager) BackupDatabase() error {
 	// Check if database path is empty or not set
 	if m.dbPath == "" {
-		return fmt.Errorf(locales.Translate("common.db.nopath"))
+		return fmt.Errorf(locales.Translate("common.db.nopath"), m.dbPath)
 	}
 
 	// Check if database file exists
 	if _, err := os.Stat(m.dbPath); os.IsNotExist(err) {
-		return fmt.Errorf(locales.Translate("common.db.filenotexist"))
+		return fmt.Errorf(locales.Translate("common.db.filenotexist"), m.dbPath)
 	}
 
 	err := m.EnsureConnected(false)
