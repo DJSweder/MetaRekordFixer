@@ -35,6 +35,17 @@ type DateSyncModule struct {
 	customDateUpdateBtn *widget.Button
 }
 
+// CustomCalendar implements a custom calendar widget for date selection
+type CustomCalendar struct {
+	widget.BaseWidget
+	yearSelect   *widget.Select
+	monthSelect  *widget.Select
+	daysGrid     *fyne.Container
+	onSelected   func(time.Time)
+	currentYear  int
+	currentMonth time.Month
+}
+
 // NewDateSyncModule creates a new instance of DateSyncModule.
 func NewDateSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *DateSyncModule {
 	m := &DateSyncModule{
@@ -196,6 +207,124 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	return cfg
 }
 
+// NewCustomCalendar creates a new custom calendar widget
+func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
+	c := &CustomCalendar{
+		onSelected: callback,
+		daysGrid:   container.New(layout.NewGridLayout(7)),
+	}
+
+	c.ExtendBaseWidget(c)
+	now := time.Now()
+	c.currentYear = now.Year()
+	c.currentMonth = now.Month()
+
+	years := make([]string, 51)
+	for i := 0; i < 51; i++ {
+		years[i] = fmt.Sprintf("%d", now.Year()-25+i)
+	}
+
+	months := []string{
+		locales.Translate("datesync.month.jan"),
+		locales.Translate("datesync.month.feb"),
+		locales.Translate("datesync.month.mar"),
+		locales.Translate("datesync.month.apr"),
+		locales.Translate("datesync.month.may"),
+		locales.Translate("datesync.month.jun"),
+		locales.Translate("datesync.month.jul"),
+		locales.Translate("datesync.month.aug"),
+		locales.Translate("datesync.month.sep"),
+		locales.Translate("datesync.month.okt"),
+		locales.Translate("datesync.month.nov"),
+		locales.Translate("datesync.month.dec"),
+	}
+
+	c.yearSelect = widget.NewSelect(years, func(s string) {
+		year := 0
+		fmt.Sscanf(s, "%d", &year)
+		c.currentYear = year
+		c.updateDays()
+	})
+	c.monthSelect = widget.NewSelect(months, func(s string) {
+		months := map[string]time.Month{
+			locales.Translate("datesync.month.jan"): time.January,
+			locales.Translate("datesync.month.feb"): time.February,
+			locales.Translate("datesync.month.mar"): time.March,
+			locales.Translate("datesync.month.apr"): time.April,
+			locales.Translate("datesync.month.may"): time.May,
+			locales.Translate("datesync.month.jun"): time.June,
+			locales.Translate("datesync.month.jul"): time.July,
+			locales.Translate("datesync.month.aug"): time.August,
+			locales.Translate("datesync.month.sep"): time.September,
+			locales.Translate("datesync.month.okt"): time.October,
+			locales.Translate("datesync.month.nov"): time.November,
+			locales.Translate("datesync.month.dec"): time.December,
+		}
+
+		c.currentMonth = months[s]
+		c.updateDays()
+	})
+
+	c.yearSelect.SetSelected(fmt.Sprintf("%d", now.Year()))
+	c.monthSelect.SetSelected(months[now.Month()-1])
+	c.updateDays()
+	return c
+}
+
+// updateDays updates the day grid in the calendar
+func (c *CustomCalendar) updateDays() {
+	if c.daysGrid == nil {
+		return
+	}
+
+	c.daysGrid.Objects = []fyne.CanvasObject{}
+
+	days := []string{
+		locales.Translate("datesync.day.mon"),
+		locales.Translate("datesync.day.tue"),
+		locales.Translate("datesync.day.wed"),
+		locales.Translate("datesync.day.thu"),
+		locales.Translate("datesync.day.fri"),
+		locales.Translate("datesync.day.sat"),
+		locales.Translate("datesync.day.sun"),
+	}
+
+	for _, day := range days {
+		c.daysGrid.Add(widget.NewLabel(day))
+	}
+
+	firstDay := time.Date(c.currentYear, c.currentMonth, 1, 0, 0, 0, 0, time.Local)
+	lastDay := firstDay.AddDate(0, 1, -1)
+	weekday := int(firstDay.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+
+	for i := 1; i < weekday; i++ {
+		c.daysGrid.Add(widget.NewLabel(""))
+	}
+
+	for day := 1; day <= lastDay.Day(); day++ {
+		currentDay := day
+		dayBtn := widget.NewButton(fmt.Sprintf("%d", day), func() {
+			date := time.Date(c.currentYear, c.currentMonth, currentDay, 0, 0, 0, 0, time.Local)
+			if c.onSelected != nil {
+				c.onSelected(date)
+			}
+		})
+		c.daysGrid.Add(dayBtn)
+	}
+
+	c.Refresh()
+}
+
+// CreateRenderer implements the fyne.Widget interface
+func (c *CustomCalendar) CreateRenderer() fyne.WidgetRenderer {
+	header := container.NewHBox(c.monthSelect, c.yearSelect)
+	content := container.NewVBox(header, c.daysGrid)
+	return widget.NewSimpleRenderer(content)
+}
+
 // initializeUI sets up the user interface components
 func (m *DateSyncModule) initializeUI() {
 	// Initialize UI components for configuration
@@ -245,27 +374,33 @@ func (m *DateSyncModule) initializeUI() {
 
 	// Calendar date selection
 	calendarBtn := widget.NewButtonWithIcon("", theme.HistoryIcon(), func() {
-		// Create a date picker dialog
-		dateEntry := widget.NewEntry()
-		dateEntry.SetText(m.datePicker.Text)
+		// Declaration of the dialog variable
+		var calendarDialog dialog.Dialog
 
-		var d dialog.Dialog
-		d = dialog.NewCustom(
-			locales.Translate("datesync.dialog.datesel"),
-			locales.Translate("datesync.dialog.close"),
-			container.NewVBox(
-				widget.NewLabel(locales.Translate("datesync.enter.date")),
-				dateEntry,
-				widget.NewButton(locales.Translate("datesync.btn.apply"), func() {
-					m.datePicker.SetText(dateEntry.Text)
-					m.SaveConfig()
-					d.Hide()
-				}),
-			),
+		// Create a new custom calendar
+		calendar := NewCustomCalendar(func(date time.Time) {
+			m.datePicker.SetText(date.Format("2006-01-02"))
+			m.SaveConfig()
+			// Dialog bude zavřen automaticky po výběru data
+			calendarDialog.Hide()
+		})
+
+		// Create the calendar content
+		calendarContent := container.NewVBox(
+			widget.NewLabel(locales.Translate("datesync.calendar.label")),
+			calendar,
+		)
+
+		// Calendar dialog initialization
+		calendarDialog = dialog.NewCustomWithoutButtons(
+			locales.Translate("datesync.dialog.header"),
+			calendarContent,
 			m.Window,
 		)
-		d.Resize(fyne.NewSize(300, 200))
-		d.Show()
+
+		// Nastavíme velikost dialogu a zobrazíme ho
+		calendarDialog.Resize(fyne.NewSize(350, 400))
+		calendarDialog.Show()
 	})
 
 	// Assemble the layout
