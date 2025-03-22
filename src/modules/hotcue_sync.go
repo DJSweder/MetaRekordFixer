@@ -504,7 +504,14 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	if err != nil {
 		return err
 	}
-	defer m.dbMgr.Finalize()
+
+	// Make sure to close the database connection when done
+	defer func() {
+		if finalizeErr := m.dbMgr.Close(); finalizeErr != nil {
+			// Místo m.logger použijeme fmt.Printf nebo nic nelogujeme vůbec
+			fmt.Printf("Error closing database connection: %v\n", finalizeErr)
+		}
+	}()
 
 	// Query playlists from the database
 	rows, err := m.dbMgr.Query(`
@@ -1025,7 +1032,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 	}
 
 	// Show a progress dialog
-	m.ShowProgressDialog(locales.Translate("hotcuesync.diag.header"))
+	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
 
 	go func() {
 		defer func() {
@@ -1083,9 +1090,9 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 
 		// Ensure database connection is properly closed when done
 		defer func() {
-			if err := m.dbMgr.Finalize(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.finalize"), err),
-					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
+			if err := m.dbMgr.Close(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", err),
+					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()
 

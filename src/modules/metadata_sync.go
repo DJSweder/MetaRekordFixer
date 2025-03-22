@@ -185,7 +185,7 @@ func (m *MetadataSyncModule) syncMetadata() {
 	}
 
 	// Show a progress dialog
-	m.ShowProgressDialog(locales.Translate("metsync.diag.header"))
+	m.ShowProgressDialog(locales.Translate("metsync.dialog.header"))
 
 	go func() {
 		defer func() {
@@ -229,10 +229,12 @@ func (m *MetadataSyncModule) syncMetadata() {
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
 			return
 		}
+
+		// Ensure database connection is properly closed when done
 		defer func() {
-			if err := m.dbMgr.Finalize(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("metsync.err.finalize"), err),
-					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
+			if err := m.dbMgr.Close(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf("Error finalizing database: %v", err),
+					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()
 

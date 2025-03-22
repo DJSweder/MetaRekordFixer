@@ -525,7 +525,7 @@ func (m *DateSyncModule) synchronizeDates() {
 		m.standardUpdateBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
-	m.ShowProgressDialog(locales.Translate("datesync.diag.header"))
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
 
 	go func() {
 		defer func() {
@@ -582,8 +582,13 @@ func (m *DateSyncModule) synchronizeDates() {
 			return
 		}
 
-		// Make sure to finalize the database connection when we're done
-		defer m.dbMgr.Finalize()
+		// Make sure to close the database connection when we're done
+		defer func() {
+			if closeErr := m.dbMgr.Close(); closeErr != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", closeErr),
+					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
+			}
+		}()
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -735,8 +740,13 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 			return
 		}
 
-		// Make sure to finalize the database connection when we're done
-		defer m.dbMgr.Finalize()
+		// Make sure to close the database connection when we're done
+		defer func() {
+			if closeErr := m.dbMgr.Close(); closeErr != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", closeErr),
+					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
+			}
+		}()
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {

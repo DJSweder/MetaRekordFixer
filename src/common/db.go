@@ -97,6 +97,19 @@ func (m *DBManager) Connect() error {
 		return fmt.Errorf(locales.Translate("common.db.dbconnecterr"), err)
 	}
 
+	// Set pragmas to disable WAL mode and optimize performance
+	_, err = db.Exec("PRAGMA journal_mode=DELETE")
+	if err != nil {
+		db.Close()
+		return fmt.Errorf("failed to set journal mode: %w", err)
+	}
+
+	_, err = db.Exec("PRAGMA synchronous=FULL")
+	if err != nil {
+		db.Close()
+		return fmt.Errorf("failed to set synchronous mode: %w", err)
+	}
+
 	m.db = db
 	m.isConnected = true
 	m.logger.Printf("Connected to database: %s", m.dbPath)
@@ -282,31 +295,14 @@ func (m *DBManager) BackupDatabase() error {
 		return fmt.Errorf(locales.Translate("common.db.filenotexist"), m.dbPath)
 	}
 
-	err := m.EnsureConnected(false)
-	if err != nil {
-		return err
-	}
-
-	// Close the database connection before creating a backup
-	err = m.Close()
-	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.backupcloseerr"), err)
-	}
-
 	// Generate the backup file name with the current timestamp
 	backupFileName := fmt.Sprintf("master_backup_%s.db", time.Now().Format("2006-01-02@15_04_05"))
 	backupPath := filepath.Join(filepath.Dir(m.dbPath), backupFileName)
 
 	// Copy the database file to the backup location
-	err = CopyFile(m.dbPath, backupPath)
+	err := CopyFile(m.dbPath, backupPath)
 	if err != nil {
 		return fmt.Errorf(locales.Translate("common.db.backupcopyerr"), err)
-	}
-
-	// Reconnect to the database after creating the backup
-	err = m.Connect()
-	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.backupreconnecterr"), err)
 	}
 
 	m.logger.Printf("Database backup created: %s", backupPath)
@@ -365,13 +361,29 @@ func (m *DBManager) Finalize() error {
 		return nil
 	}
 
+	// If there's an active transaction, roll it back
 	if m.activeTransaction != nil {
 		m.logger.Printf("Rolling back active transaction during finalization")
 		m.activeTransaction.Rollback()
 		m.activeTransaction = nil
 	}
 
-	err := m.db.Close()
+	// Force synchronization before closing - helps with removing .db-shm and .db-wal files
+	_, err := m.db.Exec("PRAGMA wal_checkpoint(FULL)")
+	if err != nil {
+		m.logger.Printf("Warning: Failed to execute WAL checkpoint: %v", err)
+		// Continue despite error
+	}
+
+	// Optimize the database to clean up prepared statements
+	_, err = m.db.Exec("PRAGMA optimize")
+	if err != nil {
+		m.logger.Printf("Warning: Failed to optimize database: %v", err)
+		// Continue despite error
+	}
+
+	// Close the database connection
+	err = m.db.Close()
 	if err != nil {
 		return fmt.Errorf(locales.Translate("common.db.dbcloseerr"), err)
 	}
@@ -382,5 +394,3 @@ func (m *DBManager) Finalize() error {
 
 	return nil
 }
-
-// Úpravy podle doporučení v refactoring_result.txt
