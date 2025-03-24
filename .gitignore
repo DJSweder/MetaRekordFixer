@@ -503,3 +503,6 @@ temp/save_settings.jpg
 temp/start.jpg
 src/golangci-lint.html
 .aiexclude
+.vscode/MetaRekordFixerTest.code-workspace
+.vscode/MetaRekordFixer.code-workspace
+.vscode/MetaRekordFixerTest.code-workspace
