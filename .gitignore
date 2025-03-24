@@ -506,3 +506,4 @@ src/golangci-lint.html
 .vscode/MetaRekordFixerTest.code-workspace
 .vscode/MetaRekordFixer.code-workspace
 .vscode/MetaRekordFixerTest.code-workspace
+dist/release/sha.txt
