@@ -166,7 +166,7 @@ func (h *ErrorHandler) showFatalErrorDialog(err error, window fyne.Window) {
 	)
 
 	customDialog := dialog.NewCustom(
-		locales.Translate("common.dialog.fatal_title"),
+		locales.Translate("common.dialog.fatalerror"),
 		"",
 		content,
 		window,

@@ -62,12 +62,6 @@ func NewDBManager(dbPath string, logger *log.Logger, errorHandler *ErrorHandler)
 		manager.logger = log.New(os.Stdout, "DB: ", log.LstdFlags)
 	}
 
-	// Removed automatic connection - will connect only when needed
-	// err = manager.Connect()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	return manager, nil
 }
 
@@ -393,4 +387,175 @@ func (m *DBManager) Finalize() error {
 	m.logger.Printf("Database connection finalized: %s", m.dbPath)
 
 	return nil
+}
+
+// GetTracksBasedOnFolder retrieves all tracks from a specific folder
+func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, error) {
+	err := m.EnsureConnected(false)
+	if err != nil {
+		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+	}
+
+	// Convert path to database format
+	dbPath := ToDbPath(folderPath, true)
+
+	query := `
+        SELECT 
+            c.ID, 
+            c.FolderPath, 
+            c.FileNameL, 
+            c.StockDate, 
+            c.DateCreated, 
+            c.ColorID, 
+            c.DJPlayCount
+        FROM djmdContent c
+        WHERE c.FolderPath LIKE ? COLLATE BINARY  -- Přidáno COLLATE BINARY pro case-sensitive porovnávání
+        ORDER BY c.FileNameL
+    `
+
+	rows, err := m.Query(query, dbPath+"%")
+	if err != nil {
+		return nil, fmt.Errorf(locales.Translate("common.db.foldertrackserr"), err)
+	}
+	defer rows.Close()
+
+	var tracks []TrackItem
+	for rows.Next() {
+		var track TrackItem
+		err := rows.Scan(
+			&track.ID,
+			&track.FolderPath,
+			&track.FileNameL,
+			&track.StockDate,
+			&track.DateCreated,
+			&track.ColorID,
+			&track.DJPlayCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(locales.Translate("common.db.trackscanerr"), err)
+		}
+		tracks = append(tracks, track)
+	}
+
+	return tracks, nil
+}
+
+// GetTracksBasedOnPlaylist retrieves all tracks from a specific playlist
+func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, error) {
+	err := m.EnsureConnected(false)
+	if err != nil {
+		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+	}
+
+	query := `
+        SELECT 
+            c.ID, 
+            c.FolderPath, 
+            c.FileNameL, 
+            c.StockDate, 
+            c.DateCreated, 
+            c.ColorID, 
+            c.DJPlayCount
+        FROM djmdContent c
+        JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
+        WHERE sp.PlaylistID = ?
+        ORDER BY c.FileNameL
+    `
+
+	rows, err := m.Query(query, playlistID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query tracks in playlist: %w", err)
+	}
+	defer rows.Close()
+
+	var tracks []TrackItem
+	for rows.Next() {
+		var track TrackItem
+		err := rows.Scan(
+			&track.ID,
+			&track.FolderPath,
+			&track.FileNameL,
+			&track.StockDate,
+			&track.DateCreated,
+			&track.ColorID,
+			&track.DJPlayCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to scan track row: %w", err)
+		}
+		tracks = append(tracks, track)
+	}
+
+	return tracks, nil
+}
+
+// GetTrackHotCues retrieves all hot cues for a specific track
+func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, error) {
+	err := m.EnsureConnected(false)
+	if err != nil {
+		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+	}
+
+	query := `
+        SELECT 
+            ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, 
+            OutMsec, OutFrame, OutMpegFrame, OutMpegAbs, 
+            Kind, Color, ColorTableIndex, ActiveLoop, Comment, 
+            BeatLoopSize, CueMicrosec, InPointSeekInfo, OutPointSeekInfo, 
+            ContentUUID, UUID, rb_data_status, rb_local_data_status, 
+            rb_local_deleted, rb_local_synced
+        FROM djmdCue
+        WHERE ContentID = ?
+    `
+
+	rows, err := m.Query(query, trackID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query hot cues: %w", err)
+	}
+	defer rows.Close()
+
+	var hotCues []map[string]interface{}
+
+	// Load column names, this is needed for dynamic mapping
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get column names: %w", err)
+	}
+
+	for rows.Next() {
+		// Create dynamic slice for values
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+
+		for i := range columns {
+			valuePtrs[i] = &values[i]
+		}
+
+		err := rows.Scan(valuePtrs...)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to scan row: %w", err)
+		}
+
+		// Create a map for the hot cue
+		hotCue := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+			hotCue[col] = val
+		}
+
+		hotCues = append(hotCues, hotCue)
+	}
+
+	return hotCues, nil
+}
+
+// TrackItem represents a track from the djmdContent table with basic metadata
+type TrackItem struct {
+	ID          string
+	FolderPath  string
+	FileNameL   string
+	StockDate   sql.NullString
+	DateCreated sql.NullString
+	ColorID     sql.NullInt64
+	DJPlayCount sql.NullInt64
 }

@@ -1,10 +1,8 @@
 package modules
 
 import (
-	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -507,8 +505,7 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 
 	// Make sure to close the database connection when done
 	defer func() {
-		if finalizeErr := m.dbMgr.Close(); finalizeErr != nil {
-			// Místo m.logger použijeme fmt.Printf nebo nic nelogujeme vůbec
+		if finalizeErr := m.dbMgr.Finalize(); finalizeErr != nil {
 			fmt.Printf("Error closing database connection: %v\n", finalizeErr)
 		}
 	}()
@@ -588,382 +585,210 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 }
 
 // getSourceTracks retrieves source tracks from the database based on the selected source type.
-func (m *HotCueSyncModule) getSourceTracks() ([]struct {
-	ID          string
-	FolderPath  string
-	FileName    string
-	StockDate   sql.NullString
-	DateCreated sql.NullString
-	ColorID     sql.NullInt64
-	DJPlayCount sql.NullInt64
-}, error) {
+func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 	// Debug output at the start of loading source tracks
 	fmt.Printf("Starting to load source tracks...\n")
 	fmt.Printf("Source type: %s\n", m.sourceType.Selected)
-	fmt.Printf("Target type: %s\n", m.targetType.Selected)
 
-	// Prepare query based on source type
-	var query string
-	var args []interface{}
-	var playlistID string
+	var tracks []common.TrackItem
+	var err error
 
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
 		// Source is a folder
 		folderPath := m.sourceFolderEntry.Text
 		if folderPath == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.nosrcfolder"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosrcfolder"))
 		}
 
-		// Convert path to database format
-		dbPath := common.ToDbPath(folderPath, true)
-
-		// Debug output for folder path
-		fmt.Printf("Querying tracks in folder path: %s\n", dbPath)
-
-		// Query tracks in the folder
-		query = `
-			SELECT c.ID, c.FolderPath, c.FileNameL, c.StockDate, c.DateCreated, c.ColorID, c.DJPlayCount
-			FROM djmdContent c
-			WHERE c.FolderPath LIKE ?
-		`
-		args = append(args, dbPath+"%")
+		// Debug output
 		fmt.Printf("Loading source tracks from folder: %s\n", folderPath)
+
+		tracks, err = m.dbMgr.GetTracksBasedOnFolder(folderPath)
+		if err != nil {
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.loadtrackdata"))
+		}
 	} else {
 		// Source is a playlist
 		if m.sourcePlaylistSelect.Selected == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.nosrcplaylist"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosrcplaylist"))
 		}
 
-		// Nejprve zkusíme najít playlist podle ID v konfiguraci
-		playlistID = m.sourcePlaylistSelect.Selected
+		// Find playlist ID
+		var playlistID string
 
-		// Pokud to není ID, zkusíme najít podle cesty
-		if _, err := strconv.ParseInt(playlistID, 10, 64); err != nil {
-			// Není to číslo, takže to není ID - hledáme podle cesty
-			playlistID = ""
-			for _, p := range m.playlists {
-				if p.Path == m.sourcePlaylistSelect.Selected {
-					playlistID = p.ID
-					fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
-					break
-				}
+		// First try to find the playlist by path
+		for _, p := range m.playlists {
+			if p.Path == m.sourcePlaylistSelect.Selected {
+				playlistID = p.ID
+				fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
+				break
 			}
-		} else {
-			// Je to číslo, takže to je ID - vypíšeme informaci
-			fmt.Printf("Using direct PlaylistID: %s\n", playlistID)
 		}
 
 		if playlistID == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.playlistnotfound"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
 		}
 
-		// Debug output for playlist ID
-		fmt.Printf("Querying tracks for playlist ID: %s\n", playlistID)
-
-		// Query tracks in the playlist
-		query = `
-			SELECT c.ID, c.FolderPath, c.FileNameL, c.StockDate, c.DateCreated, c.ColorID, c.DJPlayCount
-			FROM djmdContent c
-			JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
-			WHERE sp.PlaylistID = ?
-		`
-		args = append(args, playlistID)
+		// Debug output
 		fmt.Printf("Loading source tracks from playlist ID: %s\n", playlistID)
-	}
 
-	// Debug output for the query and arguments
-	fmt.Printf("Executing query:\n%s with args: %v\n", query, args)
-	// Execute the query
-	rows, err := m.dbMgr.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// Process results
-	var sourceTracks []struct {
-		ID          string
-		FolderPath  string
-		FileName    string
-		StockDate   sql.NullString
-		DateCreated sql.NullString
-		ColorID     sql.NullInt64
-		DJPlayCount sql.NullInt64
-	}
-
-	for rows.Next() {
-		var track struct {
-			ID          string
-			FolderPath  string
-			FileName    string
-			StockDate   sql.NullString
-			DateCreated sql.NullString
-			ColorID     sql.NullInt64
-			DJPlayCount sql.NullInt64
+		tracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
+		if err != nil {
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.loadtrackdata"))
 		}
-
-		if err := rows.Scan(
-			&track.ID,
-			&track.FolderPath,
-			&track.FileName,
-			&track.StockDate,
-			&track.DateCreated,
-			&track.ColorID,
-			&track.DJPlayCount,
-		); err != nil {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.loadtrackdata"), err)
-		}
-
-		// Debug output for track
-		fmt.Printf("Loaded source track: ID=%s, FolderPath=%s, FileName=%s\n", track.ID, track.FolderPath, track.FileName)
-
-		sourceTracks = append(sourceTracks, track)
 	}
 
-	if len(sourceTracks) == 0 {
+	if len(tracks) == 0 {
 		return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosourcetracks"))
 	}
 
-	return sourceTracks, nil
+	// Debug output for list of count of loaded tracks
+	fmt.Printf("Loaded %d source tracks\n", len(tracks))
+
+	return tracks, nil
 }
 
 // getTargetTracks retrieves target tracks from the database based on the selected target type.
-func (m *HotCueSyncModule) getTargetTracks(sourceTrack struct {
-	ID          string
-	FolderPath  string
-	FileName    string
-	StockDate   sql.NullString
-	DateCreated sql.NullString
-	ColorID     sql.NullInt64
-	DJPlayCount sql.NullInt64
-}) ([]struct {
+func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]struct {
 	ID       string
 	FileName string
 }, error) {
 	// Debug output for the target type
 	fmt.Printf("Target type: %s\n", m.targetType.Selected)
 
-	// Extrahujeme relativní cestu bez přípony pro porovnání
+	// Extract the file name from the source track's folder path without extension
 	fileName := filepath.Base(sourceTrack.FolderPath)
 	relativePathWithoutExt := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 	fmt.Printf("Source track relative path (without extension): %s\n", relativePathWithoutExt)
 
-	// Prepare query based on target type
-	var query string
-	var args []interface{}
+	var targetTracks []common.TrackItem
+	var err error
 
 	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
 		// Target is a folder
 		targetFolderPath := m.targetFolderEntry.Text
 		if targetFolderPath == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.notgtfolder"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.notgtfolder"))
 		}
 
-		// Convert path to database format
-		dbPath := common.ToDbPath(targetFolderPath, true)
-
 		// Debug output for folder path
-		fmt.Printf("Querying tracks in target folder path: %s\n", dbPath)
+		fmt.Printf("Loading target tracks from folder: %s\n", targetFolderPath)
 
-		// Získáme všechny soubory v cílové složce
-		query = `
-			SELECT c.ID, c.FileNameL, c.FolderPath
-			FROM djmdContent c
-			WHERE c.FolderPath LIKE ?
-			AND c.ID <> ?
-			ORDER BY c.FileNameL
-		`
-		args = append(args, dbPath+"%", sourceTrack.ID)
+		targetTracks, err = m.dbMgr.GetTracksBasedOnFolder(targetFolderPath)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.loadtrackdata"), err)
+		}
 	} else {
 		// Target is a playlist
 		if m.targetPlaylistSelect.Selected == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.notgtplaylist"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.notgtplaylist"))
 		}
 
 		// Find playlist ID
 		var playlistID string
 
-		// Nejprve zkusíme najít playlist podle ID v konfiguraci
-		playlistID = m.targetPlaylistSelect.Selected
-
-		// Pokud to není ID, zkusíme najít podle cesty
-		if _, err := strconv.ParseInt(playlistID, 10, 64); err != nil {
-			// Není to číslo, takže to není ID - hledáme podle cesty
-			for _, p := range m.playlists {
-				if p.Path == m.targetPlaylistSelect.Selected {
-					playlistID = p.ID
-					fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
-					break
-				}
+		// First try to find the playlist by path
+		for _, p := range m.playlists {
+			if p.Path == m.targetPlaylistSelect.Selected {
+				playlistID = p.ID
+				fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
+				break
 			}
-		} else {
-			// Je to číslo, takže to je ID - vypíšeme informaci
-			fmt.Printf("Using direct PlaylistID: %s\n", playlistID)
 		}
 
 		if playlistID == "" {
-			return nil, fmt.Errorf(locales.Translate("hotcuesync.err.playlistnotfound"))
+			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
 		}
 
 		// Debug output for playlist ID
-		fmt.Printf("Querying tracks for playlist ID: %s\n", playlistID)
+		fmt.Printf("Loading target tracks from playlist ID: %s\n", playlistID)
 
-		// Získáme všechny soubory v playlistu
-		query = `
-			SELECT c.ID, c.FileNameL, c.FolderPath
-			FROM djmdContent c
-			JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
-			WHERE sp.PlaylistID = ?
-			AND c.ID <> ?
-			ORDER BY c.FileNameL
-		`
-		args = append(args, playlistID, sourceTrack.ID)
+		targetTracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.loadtrackdata"), err)
+		}
 	}
 
-	// Debug output for the query and arguments
-	fmt.Printf("Executing query: %s with args: %v\n", query, args)
-	// Execute the query
-	rows, err := m.dbMgr.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// Process results
-	var targetTracks []struct {
+	// Prepare final result slice
+	var result []struct {
 		ID       string
 		FileName string
 	}
 
-	// Přidáme debugovací výpisy pro všechna nalezená soubory
-	fmt.Printf("DEBUG: Hledáme shodu pro zdrojový soubor: %s\n", relativePathWithoutExt)
-	fmt.Printf("DEBUG: Všechna nalezená soubory v cíli:\n")
+	// Debug output for target tracks
+	fmt.Printf("DEBUG: Finding match for source file: %s\n", relativePathWithoutExt)
+	fmt.Printf("DEBUG: All files found in target:\n")
 
-	for rows.Next() {
-		var track struct {
-			ID         string
-			FileName   string
-			FolderPath string
-		}
-		if err := rows.Scan(&track.ID, &track.FileName, &track.FolderPath); err != nil {
-			return nil, err
+	// Omit the source track from the destination
+	for _, track := range targetTracks {
+		if track.ID == sourceTrack.ID {
+			continue
 		}
 
-		// Získáme relativní cestu cílového souboru bez přípony
+		// Get the relative path of the target file without the extension
 		targetFileName := filepath.Base(track.FolderPath)
 		targetRelativePathWithoutExt := strings.TrimSuffix(targetFileName, filepath.Ext(targetFileName))
 		fmt.Printf("DEBUG: - %s (ID: %s)\n", targetRelativePathWithoutExt, track.ID)
 
-		// Porovnáme relativní cesty (bez přípony) - použijeme case-insensitive porovnání
-		// a také zkontrolujeme, zda jedna cesta neobsahuje druhou
-		if strings.EqualFold(targetRelativePathWithoutExt, relativePathWithoutExt) ||
-			strings.Contains(strings.ToLower(targetRelativePathWithoutExt), strings.ToLower(relativePathWithoutExt)) ||
-			strings.Contains(strings.ToLower(relativePathWithoutExt), strings.ToLower(targetRelativePathWithoutExt)) {
+		// Compare relative paths (without extension) using case-sensitive comparison
+		if targetRelativePathWithoutExt == relativePathWithoutExt {
 			fmt.Printf("MATCH FOUND: Source=%s, Target=%s\n", relativePathWithoutExt, targetRelativePathWithoutExt)
-			targetTracks = append(targetTracks, struct {
+			result = append(result, struct {
 				ID       string
 				FileName string
 			}{
 				ID:       track.ID,
-				FileName: track.FileName,
+				FileName: track.FileNameL,
 			})
 		}
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	if len(targetTracks) == 0 {
-		// Místo vracení chyby jen vypíšeme informaci a vrátíme prázdný seznam
-		fmt.Printf(locales.Translate("hotcuesync.warning.notgttracks")+": %s\n", fileName)
+	if len(result) == 0 {
+		// No matching target tracks found
+		fmt.Printf(locales.Translate("hotcuesync.err.notgttracks")+": %s\n", fileName)
 		return []struct {
 			ID       string
 			FileName string
 		}{}, nil
 	}
 
-	return targetTracks, nil
+	return result, nil
 }
 
 // copyHotCues copies hot cues from the source track to the target track.
 func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 	fmt.Printf("    Copying hot cues from source ID %s to target ID %s\n", sourceID, targetID)
 
-	// Query hot cues for the source track
-	rows, err := m.dbMgr.Query(`
-		SELECT 
-			ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
-			OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
-			InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
-			rb_local_deleted, rb_local_synced
-		FROM djmdCue 
-		WHERE ContentID = ?
-	`, sourceID)
+	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
 	if err != nil {
 		fmt.Printf("    Error querying hot cues: %v\n", err)
-		return fmt.Errorf(locales.Translate("hotcuesync.err.querycues"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
 	}
-	defer rows.Close()
 
-	// Použijeme podědující pro sledování počtu zpracovaných hot cues
+	// Counter for tracking the number of hot cues
 	hotCueCount := 0
 
 	// Process each hot cue
-	for rows.Next() {
-		// Define a struct to hold the hot cue data
-		var cue struct {
-			ID                   string
-			ContentID            string
-			InMsec               sql.NullInt64
-			InFrame              sql.NullInt64
-			InMpegFrame          sql.NullInt64
-			InMpegAbs            sql.NullInt64
-			OutMsec              sql.NullInt64
-			OutFrame             sql.NullInt64
-			OutMpegFrame         sql.NullInt64
-			OutMpegAbs           sql.NullInt64
-			Kind                 sql.NullInt64
-			Color                sql.NullInt64
-			ColorTableIndex      sql.NullInt64
-			ActiveLoop           sql.NullInt64
-			Comment              sql.NullString
-			BeatLoopSize         sql.NullInt64
-			CueMicrosec          sql.NullInt64
-			InPointSeekInfo      sql.NullString
-			OutPointSeekInfo     sql.NullString
-			ContentUUID          sql.NullString
-			UUID                 sql.NullString
-			rb_data_status       sql.NullInt64
-			rb_local_data_status sql.NullInt64
-			rb_local_deleted     sql.NullInt64
-			rb_local_synced      sql.NullInt64
-		}
-
-		// Scan the row into the struct
-		err := rows.Scan(
-			&cue.ID, &cue.ContentID, &cue.InMsec, &cue.InFrame, &cue.InMpegFrame, &cue.InMpegAbs, &cue.OutMsec, &cue.OutFrame, &cue.OutMpegFrame,
-			&cue.OutMpegAbs, &cue.Kind, &cue.Color, &cue.ColorTableIndex, &cue.ActiveLoop, &cue.Comment, &cue.BeatLoopSize,
-			&cue.CueMicrosec, &cue.InPointSeekInfo, &cue.OutPointSeekInfo, &cue.ContentUUID, &cue.UUID, &cue.rb_data_status,
-			&cue.rb_local_data_status, &cue.rb_local_deleted, &cue.rb_local_synced,
-		)
-		if err != nil {
-			fmt.Printf("    Error scanning hot cue: %v\n", err)
-			return fmt.Errorf(locales.Translate("hotcuesync.err.scancues"), err)
-		}
-
-		// Zvýšíme podědující
+	for _, hotCue := range hotCues {
+		// Increase the hot cue counter
 		hotCueCount++
 
-		// Výpis informací o hot cue
-		fmt.Printf("    Processing hot cue %d: ID=%s, Kind=%v\n",
-			hotCueCount, cue.ID, cue.Kind.Int64)
+		// Get the Kind value from the hot cue
+		kind, ok := hotCue["Kind"]
+		if !ok {
+			fmt.Printf("    Warning: Hot cue without Kind value found\n")
+			continue
+		}
+
+		// List the hot cue details
+		fmt.Printf("    Processing hot cue %d: ID=%v, Kind=%v\n",
+			hotCueCount, hotCue["ID"], kind)
 
 		// Delete existing hot cues with the same Kind value in the target track
-		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, cue.Kind)
+		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, kind)
 		if err != nil {
 			fmt.Printf("    Error deleting existing hot cue: %v\n", err)
-			return fmt.Errorf(locales.Translate("hotcuesync.err.deletecue"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.deletecue"), err)
 		}
 
 		// Generate a new ID for the hot cue in the target track
@@ -971,7 +796,7 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		err = m.dbMgr.QueryRow("SELECT COALESCE(MAX(CAST(ID AS INTEGER)), 0) FROM djmdCue").Scan(&maxID)
 		if err != nil {
 			fmt.Printf("    Error getting max ID: %v\n", err)
-			return fmt.Errorf(locales.Translate("hotcuesync.err.maxidcheck"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.maxidcheck"), err)
 		}
 		maxID++
 		newID := fmt.Sprintf("%d", maxID)
@@ -980,27 +805,38 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Get current timestamp for created_at
 		currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
 
-		// Insert the hot cue into the target track
-		err = m.dbMgr.Execute(`
-			INSERT INTO djmdCue (
-				ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
-				OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
-				InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
-				rb_local_deleted, rb_local_synced, created_at, updated_at
-			) VALUES (
-				?, ?, ?, ?, ?, ?, ?, ?, ?, 
-				?, ?, ?, ?, ?, ?, ?, ?, 
-				?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-			)
-		`,
-			newID, targetID, cue.InMsec, cue.InFrame, cue.InMpegFrame, cue.InMpegAbs, cue.OutMsec, cue.OutFrame, cue.OutMpegFrame,
-			cue.OutMpegAbs, cue.Kind, cue.Color, cue.ColorTableIndex, cue.ActiveLoop, cue.Comment, cue.BeatLoopSize,
-			cue.CueMicrosec, cue.InPointSeekInfo, cue.OutPointSeekInfo, cue.ContentUUID, cue.UUID, cue.rb_data_status,
-			cue.rb_local_data_status, cue.rb_local_deleted, cue.rb_local_synced, currentTime, currentTime,
-		)
+		// SQL query preparation for inserting hot cue
+		query := `
+            INSERT INTO djmdCue (
+                ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
+                OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
+                InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
+                rb_local_deleted, rb_local_synced, created_at, updated_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+        `
+
+		// Parameters for the insert preparation
+		params := []interface{}{
+			newID, targetID,
+			hotCue["InMsec"], hotCue["InFrame"], hotCue["InMpegFrame"], hotCue["InMpegAbs"],
+			hotCue["OutMsec"], hotCue["OutFrame"], hotCue["OutMpegFrame"], hotCue["OutMpegAbs"],
+			hotCue["Kind"], hotCue["Color"], hotCue["ColorTableIndex"], hotCue["ActiveLoop"],
+			hotCue["Comment"], hotCue["BeatLoopSize"], hotCue["CueMicrosec"],
+			hotCue["InPointSeekInfo"], hotCue["OutPointSeekInfo"], hotCue["ContentUUID"],
+			hotCue["UUID"], hotCue["rb_data_status"], hotCue["rb_local_data_status"],
+			hotCue["rb_local_deleted"], hotCue["rb_local_synced"],
+			currentTime, currentTime,
+		}
+
+		// Execute the insert
+		err = m.dbMgr.Execute(query, params...)
 		if err != nil {
 			fmt.Printf("    Error inserting hot cue: %v\n", err)
-			return fmt.Errorf(locales.Translate("hotcuesync.err.cueinsert"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.cueinsert"), err)
 		}
 		fmt.Printf("    Successfully inserted hot cue with ID %s\n", newID)
 	}
@@ -1027,8 +863,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 	// Basic validation
 	if (m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "") ||
 		(m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "") {
-		m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.emptypaths")), common.NewErrorContext(m.GetConfigName(), "Empty Paths"), m.Window, m.Status)
-		return fmt.Errorf(locales.Translate("hotcuesync.err.emptypaths"))
+		m.ErrorHandler.HandleError(fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths")), common.NewErrorContext(m.GetConfigName(), "Empty Paths"), m.Window, m.Status)
+		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths"))
 	}
 
 	// Show a progress dialog
@@ -1039,7 +875,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			if r := recover(); r != nil {
 				// In case of panic
 				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
+				m.ErrorHandler.HandleError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
 			}
 		}()
 
@@ -1084,14 +920,14 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		err = m.dbMgr.BeginTransaction()
 		if err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.transtart"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Start"), m.Window, m.Status)
+			m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Start"), m.Window, m.Status)
 			return
 		}
 
 		// Ensure database connection is properly closed when done
 		defer func() {
-			if err := m.dbMgr.Close(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", err),
+			if err := m.dbMgr.Finalize(); err != nil {
+				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.dbclose"), err),
 					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()
@@ -1100,7 +936,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		defer func() {
 			if err != nil {
 				if rollbackErr := m.dbMgr.RollbackTransaction(); rollbackErr != nil {
-					m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.rollback"), rollbackErr),
+					m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.rollback"), rollbackErr),
 						common.NewErrorContext(m.GetConfigName(), "Transaction Rollback"), m.Window, m.Status)
 				}
 			}
@@ -1130,7 +966,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			targetTracks, err := m.getTargetTracks(sourceTrack)
 			if err != nil {
 				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf("Error processing track: %v", err), common.NewErrorContext(m.GetConfigName(), "Target Tracks"), m.Window, m.Status)
+				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.processtrack"), err), common.NewErrorContext(m.GetConfigName(), "Target Tracks"), m.Window, m.Status)
 				m.dbMgr.RollbackTransaction()
 				return
 			}
@@ -1168,7 +1004,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		err = m.dbMgr.CommitTransaction()
 		if err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("hotcuesync.err.trancommit"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Commit"), m.Window, m.Status)
+			m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Commit"), m.Window, m.Status)
 			return
 		}
 

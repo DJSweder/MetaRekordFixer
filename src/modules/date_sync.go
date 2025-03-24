@@ -398,7 +398,7 @@ func (m *DateSyncModule) initializeUI() {
 			m.Window,
 		)
 
-		// Nastavíme velikost dialogu a zobrazíme ho
+		// Settings for the calendar dialog
 		calendarDialog.Resize(fyne.NewSize(350, 400))
 		calendarDialog.Show()
 	})
@@ -518,7 +518,7 @@ func (m *DateSyncModule) synchronizeDates() {
 	// Zakážeme tlačítko během zpracování
 	m.standardUpdateBtn.Disable()
 
-	// Po dokončení obnovíme tlačítko a nastavíme ikonu úspěchu
+	// After completion, we restore the button and set the success icon
 	defer func() {
 		m.standardUpdateBtn.Enable()
 		// Změníme tlačítko na verzi s ikonou odškrtnutí po dokončení procesu
@@ -551,11 +551,6 @@ func (m *DateSyncModule) synchronizeDates() {
 		}
 
 		m.UpdateProgressStatus(0.1, locales.Translate("datesync.db.backup"))
-		// Create a backup of the database
-		// Generate backup path for logging purposes
-		backupFileName := fmt.Sprintf("master_backup_%s.db", time.Now().Format("2006-01-02@15_04_05"))
-		backupPath := common.JoinPaths(common.GetDirectoryPath(globalConfig.DatabasePath), backupFileName)
-
 		// Use the DBManager's backup function
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
@@ -563,9 +558,6 @@ func (m *DateSyncModule) synchronizeDates() {
 			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbackup"), err))
 			return
 		}
-
-		// Log the backup path
-		fmt.Printf("Database backup created at: %s\n", backupPath)
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -668,10 +660,10 @@ func (m *DateSyncModule) synchronizeDates() {
 
 // setCustomDates sets custom dates for tracks in selected folders
 func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate time.Time) {
-	// Zakážeme tlačítko během zpracování
+	// Disable the button during processing
 	m.customDateUpdateBtn.Disable()
 
-	// Po dokončení obnovíme tlačítko a nastavíme ikonu úspěchu
+	// After completion, we restore the button and set the success icon
 	defer func() {
 		m.customDateUpdateBtn.Enable()
 		// Změníme tlačítko na verzi s ikonou odškrtnutí po dokončení procesu
@@ -708,10 +700,6 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 
 		// Create backup
 		m.UpdateProgressStatus(0.1, locales.Translate("datesync.db.backup"))
-		// Generate backup path for logging purposes
-		backupFileName := fmt.Sprintf("master_backup_%s.db", time.Now().Format("2006-01-02@15_04_05"))
-		backupPath := common.JoinPaths(common.GetDirectoryPath(globalConfig.DatabasePath), backupFileName)
-
 		// Use the DBManager's backup function
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
@@ -719,9 +707,6 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbackup"), err))
 			return
 		}
-
-		// Log the backup path
-		fmt.Printf("Database backup created at: %s\n", backupPath)
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
