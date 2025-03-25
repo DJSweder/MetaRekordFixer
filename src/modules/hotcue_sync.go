@@ -80,7 +80,7 @@ func (m *HotCueSyncModule) GetConfigName() string {
 
 // GetIcon returns the module's icon resource.
 func (m *HotCueSyncModule) GetIcon() fyne.Resource {
-	return theme.MediaPlayIcon()
+	return theme.ContentCopyIcon()
 }
 
 // GetContent constructs and returns the module's UI content.
@@ -851,6 +851,60 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 	return nil
 }
 
+// copyTrackMetadata copies specific metadata fields from source track to target track.
+// Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
+func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
+	fmt.Printf("    Copying track metadata from source ID %s to target ID %s\n", sourceID, targetID)
+
+	// Query to get source track metadata
+	query := `
+        SELECT StockDate, DateCreated, ColorID, DJPlayCount
+        FROM djmdContent
+        WHERE ID = ?
+    `
+
+	row := m.dbMgr.QueryRow(query, sourceID)
+	if row == nil {
+		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.querysource"))
+	}
+
+	// Scan source track metadata using our custom null types
+	var stockDate common.NullString
+	var dateCreated common.NullString
+	var colorID common.NullInt64
+	var djPlayCount common.NullInt64
+
+	err := row.Scan(&stockDate, &dateCreated, &colorID, &djPlayCount)
+	if err != nil {
+		fmt.Printf("    Error scanning source track metadata: %v\n", err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadatascan"), err)
+	}
+
+	// Get current timestamp for updated_at
+	currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
+
+	// Update target track with source track metadata
+	updateQuery := `
+        UPDATE djmdContent
+        SET StockDate = ?, DateCreated = ?, ColorID = ?, DJPlayCount = ?, updated_at = ?
+        WHERE ID = ?
+    `
+
+	err = m.dbMgr.Execute(updateQuery,
+		stockDate.ValueOrNil(),
+		dateCreated.ValueOrNil(),
+		colorID.ValueOrNil(),
+		djPlayCount.ValueOrNil(),
+		currentTime, targetID)
+	if err != nil {
+		fmt.Printf("    Error updating target track metadata: %v\n", err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
+	}
+
+	fmt.Printf("    Successfully copied metadata from source ID %s to target ID %s\n", sourceID, targetID)
+	return nil
+}
+
 // synchronizeHotCues performs the main hot cue synchronization process.
 // It copies hot cues from source tracks to matching target tracks.
 func (m *HotCueSyncModule) synchronizeHotCues() error {
@@ -977,7 +1031,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 				continue
 			}
 
-			// Copy hot cues to each target track
+			// Copy hot cues and metadata to each target track
 			for _, targetTrack := range targetTracks {
 				// Check if operation was cancelled
 				if m.IsCancelled() {
@@ -986,10 +1040,20 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 					return
 				}
 
+				// Copy hot cues
 				err = m.copyHotCues(sourceTrack.ID, targetTrack.ID)
 				if err != nil {
 					m.CloseProgressDialog()
 					m.ErrorHandler.HandleError(err, common.NewErrorContext(m.GetConfigName(), "Copy HotCues"), m.Window, m.Status)
+					m.dbMgr.RollbackTransaction()
+					return
+				}
+
+				// Copy track metadata
+				err = m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID)
+				if err != nil {
+					m.CloseProgressDialog()
+					m.ErrorHandler.HandleError(err, common.NewErrorContext(m.GetConfigName(), "Copy Metadata"), m.Window, m.Status)
 					m.dbMgr.RollbackTransaction()
 					return
 				}

@@ -3,7 +3,6 @@
 package modules
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -45,7 +44,7 @@ func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, 
 
 // GetName returns the localized name of this module.
 func (m *MetadataSyncModule) GetName() string {
-	return locales.Translate("metsync.name.title")
+	return locales.Translate("metsync.mod.name")
 }
 
 // GetConfigName returns the module's configuration key.
@@ -55,7 +54,7 @@ func (m *MetadataSyncModule) GetConfigName() string {
 
 // GetIcon returns the module's icon resource.
 func (m *MetadataSyncModule) GetIcon() fyne.Resource {
-	return theme.MediaReplayIcon()
+	return theme.HomeIcon()
 }
 
 // GetContent returns the module's main UI content.
@@ -280,22 +279,22 @@ func (m *MetadataSyncModule) syncMetadata() {
 		// Prepare a slice to hold MP3 file information
 		var mp3Files []struct {
 			FileName    string
-			AlbumID     sql.NullString
-			ArtistID    sql.NullString
-			OrgArtistID sql.NullString
-			ReleaseDate sql.NullString
-			Subtitle    sql.NullString
+			AlbumID     common.NullString
+			ArtistID    common.NullString
+			OrgArtistID common.NullString
+			ReleaseDate common.NullString
+			Subtitle    common.NullString
 		}
 
 		// Read all MP3 records from database
 		for rows.Next() {
 			var mp3File struct {
 				FileName    string
-				AlbumID     sql.NullString
-				ArtistID    sql.NullString
-				OrgArtistID sql.NullString
-				ReleaseDate sql.NullString
-				Subtitle    sql.NullString
+				AlbumID     common.NullString
+				ArtistID    common.NullString
+				OrgArtistID common.NullString
+				ReleaseDate common.NullString
+				Subtitle    common.NullString
 			}
 
 			err := rows.Scan(
@@ -349,21 +348,21 @@ func (m *MetadataSyncModule) syncMetadata() {
 			// Generate FLAC filename from MP3 filename
 			flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
 
-			// Update FLAC metadata in database
+			// Update the FLAC file with the metadata from the MP3 file
 			err = m.dbMgr.Execute(`
-				UPDATE djmdContent
-				SET AlbumID = CAST(? AS INTEGER),
-					ArtistID = CAST(? AS INTEGER),
-					OrgArtistID = CAST(? AS INTEGER),
-					ReleaseDate = ?,
-					Subtitle = ?
-				WHERE FileNameL = ?
-			`,
-				mp3File.AlbumID.String,
-				mp3File.ArtistID.String,
-				mp3File.OrgArtistID.String,
-				mp3File.ReleaseDate,
-				mp3File.Subtitle,
+					UPDATE djmdContent
+					SET AlbumID = CAST(? AS INTEGER),
+						ArtistID = CAST(? AS INTEGER),
+						OrgArtistID = CAST(? AS INTEGER),
+						ReleaseDate = ?,
+						Subtitle = ?
+					WHERE FileNameL = ?
+				`,
+				mp3File.AlbumID.ValueOrNil(),
+				mp3File.ArtistID.ValueOrNil(),
+				mp3File.OrgArtistID.ValueOrNil(),
+				mp3File.ReleaseDate.ValueOrNil(),
+				mp3File.Subtitle.ValueOrNil(),
 				flacFileName,
 			)
 

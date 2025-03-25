@@ -342,7 +342,7 @@ func (m *DateSyncModule) initializeUI() {
 	m.customDateContainer = container.NewVBox()
 
 	// Create main info label using standard component
-	infoLabel := common.CreateDescriptionLabel(locales.Translate("datesync.mod.descr"))
+	infoLabel := common.CreateDescriptionLabel(locales.Translate("datesync.label.info"))
 
 	// Action buttons using standard components
 	m.standardUpdateBtn = common.CreateSubmitButtonWithIcon(

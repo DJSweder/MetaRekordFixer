@@ -58,7 +58,7 @@ func (m *TracksUpdater) GetConfigName() string {
 
 // GetIcon returns the module's icon resource.
 func (m *TracksUpdater) GetIcon() fyne.Resource {
-	return theme.MediaMusicIcon()
+	return theme.SearchReplaceIcon()
 }
 
 // GetContent returns the module's main UI content.
@@ -66,8 +66,8 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 	// Create form with playlist selector and folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("updater.data.source"), Widget: m.playlistSelect},
-			{Text: locales.Translate("updater.folder.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderPath)},
+			{Text: locales.Translate("updater.label.replaced"), Widget: m.playlistSelect},
+			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderPath)},
 		},
 	}
 
@@ -88,7 +88,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 
 	// Create final layout using standardized module layout
 	return common.CreateStandardModuleLayout(
-		locales.Translate("updater.mod.descr"),
+		locales.Translate("updater.label.info"),
 		contentContainer,
 		m.submitBtn,
 	)
@@ -222,7 +222,7 @@ func (m *TracksUpdater) Start() {
 	m.addStatus(locales.Translate("updater.tracks.starting"), false)
 
 	// Show a progress dialog
-	m.ShowProgressDialog(locales.Translate("updater.diag.header"))
+	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
 
 	go func() {
 		defer func() {

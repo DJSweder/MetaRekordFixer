@@ -93,7 +93,7 @@ func (m *MusicConverterModule) GetConfigName() string {
 
 // GetIcon returns the module's icon resource
 func (m *MusicConverterModule) GetIcon() fyne.Resource {
-	return theme.MediaMusicIcon()
+	return theme.FileAudioIcon()
 }
 
 // GetContent returns the module content
@@ -255,7 +255,7 @@ func (m *MusicConverterModule) initializeFormatSettings() {
 
 	// Create a container that will hold both the format buttons and the settings
 	m.formatSettingsContainer = container.NewVBox(
-		widget.NewLabel(locales.Translate("convert.formats.settings")),
+		widget.NewLabel(locales.Translate("convert.label.formatsettings")),
 		formatButtons,
 		formatsContainer,
 	)
@@ -299,7 +299,7 @@ func (m *MusicConverterModule) updateFormatSettingsVisibility(format string) {
 // conversion settings, and progress indicators.
 func (m *MusicConverterModule) initializeUI() {
 	// Module description and separator
-	descLabel := widget.NewLabel(locales.Translate("convert.mod.descr"))
+	descLabel := widget.NewLabel(locales.Translate("convert.label.info"))
 	descLabel.Wrapping = fyne.TextWrapWord
 	descLabel.TextStyle = fyne.TextStyle{Bold: true}
 
@@ -360,8 +360,8 @@ func (m *MusicConverterModule) initializeUI() {
 	m.targetBrowse = targetFolderField.(*fyne.Container).Objects[1].(*widget.Button)
 
 	// Create labels for source and target folders
-	sourceLabel := widget.NewLabelWithStyle(locales.Translate("convert.folder.source"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	targetLabel := widget.NewLabelWithStyle(locales.Translate("convert.folder.target"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	sourceLabel := widget.NewLabelWithStyle(locales.Translate("convert.label.source"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	targetLabel := widget.NewLabelWithStyle(locales.Translate("convert.label.target"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
 	// Create containers for source and target folders
 	sourceInputContainer := container.NewBorder(
@@ -479,7 +479,7 @@ func (m *MusicConverterModule) initializeUI() {
 
 	// Create standard module layout
 	mainBox := common.CreateStandardModuleLayout(
-		locales.Translate("convert.mod.descr"),
+		locales.Translate("convert.label.info"),
 		contentContainer,
 		submitBtn,
 	)

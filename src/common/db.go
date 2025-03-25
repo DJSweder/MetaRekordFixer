@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -554,8 +555,88 @@ type TrackItem struct {
 	ID          string
 	FolderPath  string
 	FileNameL   string
-	StockDate   sql.NullString
-	DateCreated sql.NullString
-	ColorID     sql.NullInt64
-	DJPlayCount sql.NullInt64
+	StockDate   NullString
+	DateCreated NullString
+	ColorID     NullInt64
+	DJPlayCount NullInt64
+}
+
+// NullString represents a string that may be NULL in the database
+type NullString struct {
+	String string
+	Valid  bool // Valid is true if String is not NULL
+}
+
+// NullInt64 represents an int64 that may be NULL in the database
+type NullInt64 struct {
+	Int64 int64
+	Valid bool // Valid is true if Int64 is not NULL
+}
+
+// Scan implements the Scanner interface for NullString
+func (ns *NullString) Scan(value interface{}) error {
+	if value == nil {
+		ns.String, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	switch v := value.(type) {
+	case string:
+		ns.String = v
+	case []byte:
+		ns.String = string(v)
+	default:
+		ns.String = fmt.Sprintf("%v", v)
+	}
+	return nil
+}
+
+// Scan implements the Scanner interface for NullInt64
+func (ni *NullInt64) Scan(value interface{}) error {
+	if value == nil {
+		ni.Int64, ni.Valid = 0, false
+		return nil
+	}
+	ni.Valid = true
+	switch v := value.(type) {
+	case int64:
+		ni.Int64 = v
+	case int:
+		ni.Int64 = int64(v)
+	case float64:
+		ni.Int64 = int64(v)
+	case []byte:
+		// Attempt to convert bytes to int64
+		i, err := strconv.ParseInt(string(v), 10, 64)
+		if err != nil {
+			return err
+		}
+		ni.Int64 = i
+	case string:
+		// Attempt to convert string to int64
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return err
+		}
+		ni.Int64 = i
+	default:
+		return fmt.Errorf("cannot convert %T to int64", value)
+	}
+	return nil
+}
+
+// ValueOrNil returns the string value if valid, or nil if not valid
+func (ns NullString) ValueOrNil() interface{} {
+	if ns.Valid {
+		return ns.String
+	}
+	return nil
+}
+
+// ValueOrNil returns the int64 value if valid, or nil if not valid
+func (ni NullInt64) ValueOrNil() interface{} {
+	if ni.Valid {
+		return ni.Int64
+	}
+	return nil
 }
