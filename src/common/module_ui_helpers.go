@@ -4,8 +4,10 @@ package common
 
 import (
 	"MetaRekordFixer/locales"
+	"image/color"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -49,8 +51,14 @@ func NewProgressDialog(window fyne.Window, title, initialStatus string, cancelHa
 	})
 	pd.stopButton.Importance = widget.HighImportance
 
+	// Create and initialize status label
 	content := container.NewVBox(pd.progressBar, pd.statusLabel)
 	content.Add(container.NewHBox(layout.NewSpacer(), pd.stopButton, layout.NewSpacer()))
+
+	// Set minimum width for the content to ensure dialog has sufficient width for status messages
+	rect := canvas.NewRectangle(color.Transparent)
+	rect.SetMinSize(fyne.NewSize(550, 1))
+	content.Add(rect)
 
 	// Use NewCustomWithoutButtons to create a dialog without any default buttons
 	pd.dialog = dialog.NewCustomWithoutButtons(title, content, window)
@@ -318,8 +326,8 @@ func CreateStandardModuleLayout(description string, content fyne.CanvasObject, s
 	// Create description label
 	descLabel := CreateDescriptionLabel(description)
 
-	// Create main container
-	mainContainer := container.NewVBox(
+	// Create main container for the module content
+	mainContent := container.NewVBox(
 		descLabel,
 		widget.NewSeparator(),
 		content,
@@ -328,8 +336,20 @@ func CreateStandardModuleLayout(description string, content fyne.CanvasObject, s
 	// Add submit button with right alignment if provided
 	if submitButton != nil {
 		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), submitButton)
-		mainContainer.Add(buttonBox)
+		mainContent.Add(buttonBox)
 	}
 
-	return mainContainer
+	// Create a container for status messages that will expand to fill available space
+	// This container will be populated by the module's status messages container
+	// when the module is initialized
+	statusMessagesSpace := container.NewVBox()
+
+	// Vytvoříme layout, kde hlavní obsah má fixní velikost a prostor pro statusové zprávy
+	// se rozšiřuje, aby vyplnil zbývající prostor
+	// Použijeme container.NewBorderLayout, který umožňuje dynamické rozšiřování prvku
+	return container.New(
+		layout.NewBorderLayout(mainContent, nil, nil, nil),
+		mainContent,
+		statusMessagesSpace,
+	)
 }

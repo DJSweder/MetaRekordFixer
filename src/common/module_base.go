@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -41,6 +43,7 @@ type ModuleBase struct {
 	mutex           sync.Mutex
 	isCancelled     bool
 	ErrorHandler    *ErrorHandler
+	StatusMessages  *StatusMessagesContainer // Container for status messages
 }
 
 // NewModuleBase initializes a new ModuleBase
@@ -64,6 +67,34 @@ func (m *ModuleBase) initBaseComponents() {
 	m.Progress = widget.NewProgressBar()
 	m.Status = widget.NewLabel("")
 	m.Status.Alignment = fyne.TextAlignCenter
+	m.StatusMessages = NewStatusMessagesContainer()
+}
+
+// GetModuleContent returns the module's content without status messages
+// This method should be implemented by modules to return their specific content
+// It is used by the GetContent method to create the full layout with status messages
+func (m *ModuleBase) GetModuleContent() fyne.CanvasObject {
+	return container.NewVBox(widget.NewLabel("Module content not implemented"))
+}
+
+// CreateModuleLayoutWithStatusMessages creates a layout with module content and status messages
+// The module content is placed at the top and status messages at the bottom
+// This method is used by GetContent to create the full module layout
+func (m *ModuleBase) CreateModuleLayoutWithStatusMessages(moduleContent fyne.CanvasObject) fyne.CanvasObject {
+	// Create a container for the module content
+	mainContent := container.NewVBox(moduleContent)
+
+	// Create a container for status messages
+	statusMessagesContainer := m.GetStatusMessagesContainer().scroll
+
+	// Use BorderLayout to make status messages fill the remaining space
+	// The top part (mainContent) has fixed size based on its content
+	// The bottom part (statusMessagesContainer) will expand to fill remaining space
+	return container.New(
+		layout.NewBorderLayout(mainContent, nil, nil, nil),
+		mainContent,
+		statusMessagesContainer,
+	)
 }
 
 // GetName returns an empty name, should be overridden in modules
@@ -81,9 +112,17 @@ func (m *ModuleBase) GetIcon() fyne.Resource {
 	return nil
 }
 
-// GetContent returns the stored content, should be overridden in modules
+// GetContent returns the module content with status messages layout
+// This is the main method that should be called to get the complete module UI
+// It uses GetModuleContent to get the module-specific content and adds status messages container
 func (m *ModuleBase) GetContent() fyne.CanvasObject {
-	return m.Content
+	// If Content is already set, use it
+	if m.Content != nil {
+		return m.Content
+	}
+
+	// Otherwise create a new layout with module content and status messages
+	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
 // LoadConfig is a placeholder for configuration loading
@@ -173,6 +212,46 @@ func (m *ModuleBase) ShowError(err error) {
 		// Fallback to simple error dialog if ErrorHandler is not available
 		ShowError(err, m.Window)
 	}
+}
+
+// AddInfoMessage adds an information message to the status messages container
+func (m *ModuleBase) AddInfoMessage(message string) {
+	if m.StatusMessages != nil {
+		m.StatusMessages.AddMessage(MessageInfo, message)
+	}
+}
+
+// AddWarningMessage adds a warning message to the status messages container
+func (m *ModuleBase) AddWarningMessage(message string) {
+	if m.StatusMessages != nil {
+		m.StatusMessages.AddMessage(MessageWarning, message)
+	}
+}
+
+// AddErrorMessage adds an error message to the status messages container
+func (m *ModuleBase) AddErrorMessage(message string) {
+	if m.StatusMessages != nil {
+		m.StatusMessages.AddMessage(MessageError, message)
+	}
+}
+
+// ClearStatusMessages clears all status messages
+func (m *ModuleBase) ClearStatusMessages() {
+	if m.StatusMessages != nil {
+		m.StatusMessages.ClearMessages()
+	}
+}
+
+// GetStatusMessagesContainer returns the status messages container
+// If it doesn't exist, it creates a new one
+func (m *ModuleBase) GetStatusMessagesContainer() *StatusMessagesContainer {
+	// Make sure StatusMessages is initialized
+	if m.StatusMessages == nil {
+		m.StatusMessages = NewStatusMessagesContainer()
+	}
+
+	// Return the status messages container
+	return m.StatusMessages
 }
 
 // CreateChangeHandler prevents unwanted save triggers during config loading

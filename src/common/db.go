@@ -465,7 +465,7 @@ func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, er
 
 	rows, err := m.Query(query, playlistID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query tracks in playlist: %w", err)
+		return nil, fmt.Errorf("failed to query tracks in playlist: %w", err)
 	}
 	defer rows.Close()
 
@@ -482,7 +482,7 @@ func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, er
 			&track.DJPlayCount,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to scan track row: %w", err)
+			return nil, fmt.Errorf("failed to scan track row: %w", err)
 		}
 		tracks = append(tracks, track)
 	}
@@ -511,7 +511,7 @@ func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, e
 
 	rows, err := m.Query(query, trackID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query hot cues: %w", err)
+		return nil, fmt.Errorf("failed to query hot cues: %w", err)
 	}
 	defer rows.Close()
 
@@ -520,7 +520,7 @@ func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, e
 	// Load column names, this is needed for dynamic mapping
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get column names: %w", err)
+		return nil, fmt.Errorf("failed to get column names: %w", err)
 	}
 
 	for rows.Next() {
@@ -534,7 +534,7 @@ func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, e
 
 		err := rows.Scan(valuePtrs...)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to scan row: %w", err)
+			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
 		// Create a map for the hot cue

@@ -577,7 +577,7 @@ func (m *DateSyncModule) synchronizeDates() {
 		// Make sure to close the database connection when we're done
 		defer func() {
 			if closeErr := m.dbMgr.Close(); closeErr != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", closeErr),
+				m.ErrorHandler.HandleError(fmt.Errorf("error closing database: %v", closeErr),
 					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()
@@ -728,7 +728,7 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 		// Make sure to close the database connection when we're done
 		defer func() {
 			if closeErr := m.dbMgr.Close(); closeErr != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("Error closing database: %v", closeErr),
+				m.ErrorHandler.HandleError(fmt.Errorf("error closing database: %v", closeErr),
 					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()

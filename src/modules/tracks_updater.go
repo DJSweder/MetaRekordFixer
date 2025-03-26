@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -61,8 +60,9 @@ func (m *TracksUpdater) GetIcon() fyne.Resource {
 	return theme.SearchReplaceIcon()
 }
 
-// GetContent returns the module's main UI content.
-func (m *TracksUpdater) GetContent() fyne.CanvasObject {
+// GetModuleContent returns the module's specific content without status messages
+// This implements the method from ModuleBase to provide the module-specific UI
+func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 	// Create form with playlist selector and folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
@@ -71,20 +71,10 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 		},
 	}
 
-	// Create additional widgets array
-	additionalWidgets := []fyne.CanvasObject{
-		m.Status,
-	}
-
-	// Create content container with form and additional widgets
+	// Create content container with form
 	contentContainer := container.NewVBox(
 		form,
 	)
-
-	// Add additional widgets to content container
-	for _, widget := range additionalWidgets {
-		contentContainer.Add(widget)
-	}
 
 	// Create final layout using standardized module layout
 	return common.CreateStandardModuleLayout(
@@ -92,6 +82,12 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 		contentContainer,
 		m.submitBtn,
 	)
+}
+
+// GetContent returns the module's main UI content.
+func (m *TracksUpdater) GetContent() fyne.CanvasObject {
+	// Create the complete module layout with status messages container
+	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
 // LoadConfig applies the configuration to the UI components.
@@ -184,25 +180,7 @@ func (m *TracksUpdater) initializeUI() {
 
 	// Load playlists from database
 	if err := m.loadPlaylists(); err != nil {
-		m.Status.SetText(fmt.Sprintf("%s: %v", locales.Translate("updater.err.dbread"), err))
-	}
-}
-
-// addStatus adds a status message to the status label.
-func (m *TracksUpdater) addStatus(message string, replace bool) {
-	lines := strings.Split(m.Status.Text, "\n")
-	if currentText := m.Status.Text; currentText == "" {
-		m.Status.SetText(message)
-	} else if replace && len(lines) > 0 {
-		// Replace last line only
-		lines[len(lines)-1] = message
-		m.Status.SetText(strings.Join(lines, "\n"))
-	} else {
-		m.Status.SetText(currentText + "\n" + message)
-	}
-	if !replace {
-		time.Sleep(100 * time.Millisecond) // Add small delay for non-replacing messages
-		m.Window.Canvas().Refresh(m.Status)
+		m.ModuleBase.AddErrorMessage(fmt.Sprintf("%s: %v", locales.Translate("updater.err.dbread"), err))
 	}
 }
 
@@ -218,8 +196,8 @@ func (m *TracksUpdater) Start() {
 		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
-	m.Status.SetText("") // Clear previous status
-	m.addStatus(locales.Translate("updater.tracks.starting"), false)
+	m.ModuleBase.ClearStatusMessages() // Clear previous status messages
+	m.ModuleBase.AddInfoMessage(locales.Translate("updater.tracks.starting"))
 
 	// Show a progress dialog
 	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
@@ -229,13 +207,13 @@ func (m *TracksUpdater) Start() {
 			if r := recover(); r != nil {
 				// In case of panic
 				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
+				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, nil)
 			}
 		}()
 		defer func() {
 			if err := m.dbMgr.Finalize(); err != nil {
 				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.finalize"), err),
-					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, m.Status)
+					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, nil)
 			}
 		}()
 
@@ -247,9 +225,12 @@ func (m *TracksUpdater) Start() {
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Database Backup")
 			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+			m.ErrorHandler.HandleError(err, context, m.Window, nil)
 			return
 		}
+
+		// Informace o úspěšné záloze databáze
+		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -258,14 +239,14 @@ func (m *TracksUpdater) Start() {
 		}
 
 		// Database connection
-		m.UpdateProgressStatus(0.2, locales.Translate("updater.db.conn"))
+		m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
 		err = m.dbMgr.Connect()
 		if err != nil {
 			m.CloseProgressDialog()
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Database Connection")
 			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+			m.ErrorHandler.HandleError(err, context, m.Window, nil)
 			return
 		}
 
@@ -280,7 +261,7 @@ func (m *TracksUpdater) Start() {
 		}
 		if selectedPlaylist == "" {
 			m.CloseProgressDialog()
-			m.addStatus(locales.Translate("updater.err.noplaylist"), false)
+			m.ModuleBase.AddErrorMessage(locales.Translate("updater.err.noplaylist"))
 			return
 		}
 
@@ -303,7 +284,7 @@ func (m *TracksUpdater) Start() {
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Database Query")
 			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+			m.ErrorHandler.HandleError(err, context, m.Window, nil)
 			return
 		}
 		defer rows.Close()
@@ -328,7 +309,7 @@ func (m *TracksUpdater) Start() {
 				// Create error context with module name and operation
 				context := common.NewErrorContext(m.GetConfigName(), "Database Scan")
 				context.Severity = common.ErrorWarning
-				m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+				m.ErrorHandler.HandleError(err, context, m.Window, nil)
 				return
 			}
 			tracks = append(tracks, t)
@@ -336,6 +317,7 @@ func (m *TracksUpdater) Start() {
 
 		// Report playlist track count
 		m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
+		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -345,15 +327,18 @@ func (m *TracksUpdater) Start() {
 
 		// Get all files in target folder
 		m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.scanfolder"))
-		_, err = filepath.Glob(filepath.Join(m.folderPath.Text, "*.*"))
+		files, err := filepath.Glob(filepath.Join(m.folderPath.Text, "*.*"))
 		if err != nil {
 			m.CloseProgressDialog()
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Filepath Glob")
 			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+			m.ErrorHandler.HandleError(err, context, m.Window, nil)
 			return
 		}
+
+		// Informace o počtu souborů ve složce
+		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.countinfolder"), len(files)))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -405,6 +390,22 @@ func (m *TracksUpdater) Start() {
 			})
 		}
 
+		// Informace o neodpovídajících souborech
+		if nonMatchingFiles > 0 {
+			m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfilenamescount"), nonMatchingFiles))
+
+			// Zobrazení seznamu neodpovídajících souborů jako varování
+			fileListStr := ""
+			if len(mismatchedFiles) > 5 {
+				// Zobrazíme jen prvních 5 souborů a informaci o počtu dalších
+				fileListStr = strings.Join(mismatchedFiles[:5], ", ")
+				fileListStr += fmt.Sprintf(" %s", fmt.Sprintf(locales.Translate("updater.tracks.morefiles"), len(mismatchedFiles)-5))
+			} else {
+				fileListStr = strings.Join(mismatchedFiles, ", ")
+			}
+			m.ModuleBase.AddWarningMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfileslist"), fileListStr))
+		}
+
 		// Check if operation was cancelled
 		if m.IsCancelled() {
 			m.CloseProgressDialog()
@@ -429,7 +430,7 @@ func (m *TracksUpdater) Start() {
 				// Create error context with module name and operation
 				context := common.NewErrorContext(m.GetConfigName(), "Database Update")
 				context.Severity = common.ErrorWarning
-				m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+				m.ErrorHandler.HandleError(err, context, m.Window, nil)
 				return
 			}
 
@@ -446,10 +447,27 @@ func (m *TracksUpdater) Start() {
 
 		// Update progress and status
 		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
+		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
 
 		// Mark the progress dialog as completed instead of closing it
 		m.CompleteProgressDialog()
 	}()
+}
+
+func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
+	return m.ModuleBase.GetStatusMessagesContainer()
+}
+
+func (m *TracksUpdater) AddInfoMessage(message string) {
+	m.ModuleBase.AddInfoMessage(message)
+}
+
+func (m *TracksUpdater) AddErrorMessage(message string) {
+	m.ModuleBase.AddErrorMessage(message)
+}
+
+func (m *TracksUpdater) ClearStatusMessages() {
+	m.ModuleBase.ClearStatusMessages()
 }
 
 func getFileType(ext string) int {
