@@ -550,7 +550,7 @@ func (m *DateSyncModule) synchronizeDates() {
 			return
 		}
 
-		m.UpdateProgressStatus(0.1, locales.Translate("datesync.db.backup"))
+		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		// Use the DBManager's backup function
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
@@ -699,7 +699,7 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 		defer m.dbMgr.Finalize()
 
 		// Create backup
-		m.UpdateProgressStatus(0.1, locales.Translate("datesync.db.backup"))
+		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		// Use the DBManager's backup function
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
