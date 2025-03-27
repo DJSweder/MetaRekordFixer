@@ -5,8 +5,10 @@ package common
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+
+	"MetaRekordFixer/theme"
 )
 
 // MessageType defines the type of status message
@@ -73,10 +75,20 @@ func (smc *StatusMessagesContainer) AddMessage(messageType MessageType, content 
 	messageLabel := widget.NewLabel(content)
 	messageLabel.Alignment = fyne.TextAlignLeading
 	messageLabel.TextStyle.Bold = messageType != MessageInfo // Bold for warnings and errors
+	// Remove monospace font setting to use the theme's font
+
+	// Create a smaller icon with fixed size
+	iconWidget := widget.NewIcon(icon)
+	// Create a container with fixed size for the icon
+	iconContainer := container.New(
+		layout.NewCenterLayout(), // Center the icon in the container
+		iconWidget)
+	// Use fixed size for more compact display
+	iconContainer.Resize(fyne.NewSize(16, 16))
 
 	// Create row with icon and message
 	row := container.NewHBox(
-		widget.NewIcon(icon),
+		iconContainer,
 		messageLabel,
 	)
 

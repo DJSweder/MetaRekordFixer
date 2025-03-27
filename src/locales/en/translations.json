@@ -118,6 +118,8 @@
     "datesync.chkbox.dateset": "Set date for tracks in these folders",
     "datesync.chkbox.exception": "Do not change anything for records in these folders",
     "datesync.label.info": "Copies release date to *StockDate* (date added) and *DateCreated* (date created)",
+    "datesync.label.leftpanel": "",
+    "datesync.label.rightpanel": "",
     "datesync.mod.name": "Dates master",
     "datesync.month.apr": "April",
     "datesync.month.aug": "August",

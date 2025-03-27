@@ -16,8 +16,6 @@ import (
 	nativedialog "github.com/sqweek/dialog"
 )
 
-// Úpravy podle doporučení v refactoring_result.txt
-
 // ProgressDialog represents a progress dialog with a progress bar and status label
 type ProgressDialog struct {
 	dialog        *dialog.CustomDialog
@@ -292,6 +290,47 @@ func CreateFolderSelectionField(title string, entryField *widget.Entry, changeHa
 
 	// Create container with entry field and browse button
 	return container.NewBorder(nil, nil, nil, browseBtn, entryField)
+}
+
+// CreateFolderSelectionFieldWithDelete creates a standardized folder selection field with browse and delete buttons
+// This extends CreateFolderSelectionField by adding a delete button that calls the provided deleteHandler
+func CreateFolderSelectionFieldWithDelete(title string, entryField *widget.Entry, changeHandler func(string), deleteHandler func()) fyne.CanvasObject {
+	// Create entry field if not provided
+	if entryField == nil {
+		entryField = widget.NewEntry()
+	}
+
+	// Set placeholder using localization key - always set it regardless of whether the entry field is new or existing
+	entryField.SetPlaceHolder(locales.Translate("common.entry.placeholderpath"))
+
+	// Set change handler if provided
+	if changeHandler != nil {
+		entryField.OnChanged = func(value string) {
+			changeHandler(value)
+		}
+	}
+
+	// Create browse button (icon only)
+	browseBtn := CreateNativeFolderBrowseButton(
+		title,
+		"", // Empty text, only icon
+		func(path string) {
+			entryField.SetText(path)
+			if changeHandler != nil {
+				changeHandler(path)
+			}
+		},
+	)
+
+	// Create delete button (icon only)
+	deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+		if deleteHandler != nil {
+			deleteHandler()
+		}
+	})
+
+	// Create container with entry field between delete and browse buttons
+	return container.NewBorder(nil, nil, deleteBtn, browseBtn, entryField)
 }
 
 // CreateSubmitButton creates a standardized submit button with high importance

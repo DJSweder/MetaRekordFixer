@@ -118,6 +118,8 @@
     "datesync.chkbox.dateset": "Datum für Songs in diesen Ordnern festlegen",
     "datesync.chkbox.exception": "Ändern Sie nichts an den Einträgen dieser Ordner",
     "datesync.label.info": "Kopiert das Veröffentlichungsdatum nach *StockDate* (Hinzufügungsdatum) und *DateCreated* (Erstellungsdatum).",
+    "datesync.label.leftpanel": "",
+    "datesync.label.rightpanel": "",
     "datesync.mod.name": "Dates master",
     "datesync.month.apr": "April",
     "datesync.month.aug": "August",

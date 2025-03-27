@@ -192,6 +192,24 @@ func (t *darkTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
 	return theme.DefaultTheme().Icon(name)
 }
 
+// InfoIcon returns the info icon from theme
+func InfoIcon() fyne.Resource {
+	// Returns the info icon from the theme
+	return theme.InfoIcon()
+}
+
+// WarningIcon returns the warning icon from theme
+func WarningIcon() fyne.Resource {
+	// Returns the warning icon from the theme
+	return theme.WarningIcon()
+}
+
+// ErrorIcon returns the error icon from theme
+func ErrorIcon() fyne.Resource {
+	// Returns the error icon from the theme
+	return theme.ErrorIcon()
+}
+
 func (t *darkTheme) Size(name fyne.ThemeSizeName) float32 {
 	return theme.DefaultTheme().Size(name)
 }
