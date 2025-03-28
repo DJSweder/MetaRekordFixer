@@ -357,7 +357,7 @@ func (m *DateSyncModule) initializeUI() {
 		m.CreateBoolChangeHandler(func() { m.SaveConfig() }))
 
 	m.datePicker = widget.NewEntry()
-	m.datePicker.SetPlaceHolder("YYYY-MM-DD")
+	m.datePicker.SetPlaceHolder(locales.Translate("datesync.date.placeholder"))
 	m.datePicker.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
 
 	m.foldersContainer = container.NewVBox()
