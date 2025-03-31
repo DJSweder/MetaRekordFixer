@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -130,12 +131,20 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 		standardForm,
 	)
 
-	// Create final layout using standardized module layout
-	return common.CreateStandardModuleLayout(
-		locales.Translate("hotcuesync.label.info"),
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("hotcuesync.label.info")),
+		widget.NewSeparator(),
 		contentContainer,
-		m.submitBtn,
 	)
+
+	// Add submit button with right alignment if provided
+	if m.submitBtn != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
+		moduleContent.Add(buttonBox)
+	}
+
+	return moduleContent
 }
 
 // GetContent constructs and returns the module's UI content.

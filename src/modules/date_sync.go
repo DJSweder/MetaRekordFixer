@@ -116,12 +116,14 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 		horizontalLayout,
 	)
 
-	// Create final layout using standardized module layout
-	return common.CreateStandardModuleLayout(
-		locales.Translate("datesync.label.info"),
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("datesync.label.info")),
+		widget.NewSeparator(),
 		contentContainer,
-		nil, // No submit button at the bottom as we have buttons in each section
 	)
+
+	return moduleContent
 }
 
 // GetContent returns the module's main UI content.
@@ -400,7 +402,7 @@ func (m *DateSyncModule) initializeUI() {
 		calendar := NewCustomCalendar(func(date time.Time) {
 			m.datePicker.SetText(date.Format("2006-01-02"))
 			m.SaveConfig()
-			// Dialog bude zavřen automaticky po výběru data
+			// Dialog will be closed automatically after date selection
 			calendarDialog.Hide()
 		})
 
@@ -635,13 +637,13 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 
 // synchronizeDates updates the dates in the Rekordbox database
 func (m *DateSyncModule) synchronizeDates() {
-	// Zakážeme tlačítko během zpracování
+	// Disable the button during processing
 	m.standardUpdateBtn.Disable()
 
 	// After completion, we restore the button and set the success icon
 	defer func() {
 		m.standardUpdateBtn.Enable()
-		// Změníme tlačítko na verzi s ikonou odškrtnutí po dokončení procesu
+		// Change the button to the version with the tick icon after process completion
 		m.standardUpdateBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
@@ -802,7 +804,7 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 	// After completion, we restore the button and set the success icon
 	defer func() {
 		m.customDateUpdateBtn.Enable()
-		// Změníme tlačítko na verzi s ikonou odškrtnutí po dokončení procesu
+		// Change the button to the version with the tick icon after process completion
 		m.customDateUpdateBtn.SetIcon(theme.ConfirmIcon())
 	}()
 

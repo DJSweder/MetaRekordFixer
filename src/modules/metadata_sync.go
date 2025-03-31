@@ -14,6 +14,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -93,12 +94,20 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 		contentContainer.Add(widget)
 	}
 
-	// Create final layout using standardized module layout
-	return common.CreateStandardModuleLayout(
-		locales.Translate("metsync.label.info"),
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("metsync.label.info")),
+		widget.NewSeparator(),
 		contentContainer,
-		m.btnSync,
 	)
+
+	// Add submit button with right alignment if provided
+	if m.btnSync != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.btnSync)
+		moduleContent.Add(buttonBox)
+	}
+
+	return moduleContent
 }
 
 // GetContent returns the module's main UI content.
@@ -202,12 +211,20 @@ func (m *MetadataSyncModule) initializeUI() {
 		},
 	)
 
-	// Create final layout using standardized module layout
-	m.Content = common.CreateStandardModuleLayout(
-		locales.Translate("metsync.label.info"),
+	// Create content container with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("metsync.label.info")),
+		widget.NewSeparator(),
 		contentContainer,
-		m.btnSync,
 	)
+
+	// Add submit button with right alignment if provided
+	if m.btnSync != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.btnSync)
+		moduleContent.Add(buttonBox)
+	}
+
+	m.Content = moduleContent
 }
 
 // syncMetadata executes the metadata synchronization process.

@@ -3,11 +3,13 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -187,12 +189,19 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	// Set a fixed position for the divider (80% for left, 20% for right)
 	horizontalLayout.SetOffset(0.8)
 
-	// Return the final layout using standardized module layout
-	return common.CreateStandardModuleLayout(
-		locales.Translate("convert.label.info"),
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("convert.label.info")),
+		widget.NewSeparator(),
 		horizontalLayout,
-		m.submitButton,
 	)
+
+	// Add submit button if provided
+	if m.submitButton != nil {
+		moduleContent.Add(container.NewHBox(layout.NewSpacer(), m.submitButton))
+	}
+
+	return moduleContent
 }
 
 // GetContent returns the module's main UI content
@@ -220,7 +229,6 @@ func (m *MusicConverterModule) initializeUI() {
 	}
 	m.selectSourceFormat = widget.NewSelect(sourceFormats, func(format string) {
 		m.onSourceFormatChanged(format)
-		m.SaveConfig()
 	})
 
 	// Target format selection
@@ -316,6 +324,10 @@ func (m *MusicConverterModule) initializeUI() {
 
 // onSourceFormatChanged handles changes in source format selection
 func (m *MusicConverterModule) onSourceFormatChanged(format string) {
+	// Debug log
+	debugLog("Source format changed to: '%s'", format)
+
+	// Save configuration
 	m.SaveConfig()
 }
 
@@ -323,10 +335,10 @@ func (m *MusicConverterModule) onSourceFormatChanged(format string) {
 func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 	// Debug log
 	debugLog("Target format changed to: '%s'", format)
-	
+
 	// Update format settings container
 	m.updateFormatSettings(format)
-	
+
 	// Save configuration
 	m.SaveConfig()
 }
@@ -576,17 +588,17 @@ func (m *MusicConverterModule) startConversion() {
 	targetFormat := m.selectTargetFormat.Selected
 
 	if sourceFolder == "" {
-		m.ShowError(fmt.Errorf(locales.Translate("convert.err.nosource")))
+		m.ShowError(errors.New(locales.Translate("convert.err.nosource")))
 		return
 	}
 
 	if targetFolder == "" {
-		m.ShowError(fmt.Errorf(locales.Translate("convert.err.notarget")))
+		m.ShowError(errors.New(locales.Translate("convert.err.notarget")))
 		return
 	}
 
 	if targetFormat == "" {
-		m.ShowError(fmt.Errorf(locales.Translate("convert.err.noformat")))
+		m.ShowError(errors.New(locales.Translate("convert.err.noformat")))
 		return
 	}
 
@@ -597,9 +609,9 @@ func (m *MusicConverterModule) startConversion() {
 	case "MP3":
 		// MP3 settings
 		bitrate := m.selectMP3Bitrate.Selected
-		sampleRate := m.selectMP3SampleRate.Selected
+		sampleRateSetting := m.selectMP3SampleRate.Selected
 		formatSettings["bitrate"] = bitrate
-		formatSettings["sample_rate"] = sampleRate
+		formatSettings["sample_rate"] = sampleRateSetting
 	case "FLAC":
 		// FLAC settings
 		compression := m.selectFLACCompression.Selected
@@ -630,7 +642,7 @@ func (m *MusicConverterModule) startConversion() {
 	} else {
 		// Check if target folder exists
 		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
-			m.ShowError(fmt.Errorf(locales.Translate("convert.err.nofolder")))
+			m.ShowError(errors.New(locales.Translate("convert.err.nofolder")))
 			return
 		}
 	}
@@ -677,7 +689,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		return
 	}
 
-	m.AddInfoMessage(fmt.Sprintf("common.status.filesfound", len(files)))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), len(files)))
 
 	// Track conversion statistics
 	successCount := 0
@@ -709,7 +721,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		// Determine target path
 		targetPath := targetFolder
 		if m.checkboxMakeTargetFolder.Checked {
-			// Extract the base name of the source folder
+			// Create target folder if it doesn't exist
 			sourceFolderBase := filepath.Base(sourceFolder)
 			targetPath = filepath.Join(targetFolder, sourceFolderBase)
 
@@ -747,6 +759,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		case "WAV":
 			targetExt = ".wav"
 		default:
+			// No format selected or unsupported format
 			m.AddWarningMessage(fmt.Sprintf("Unsupported target format: %s", targetFormat))
 			failedFiles = append(failedFiles, file)
 			continue
@@ -821,9 +834,9 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat string, formatSettings map[string]string, metadata map[string]string, bitDepth string, sampleRate string, metadataMap *MetadataMap) error {
 	// Build ffmpeg arguments
 	args := []string{
-		"-i", sourcePath, // Input file (bez uvozovek, cmd je přidá automaticky)
-		"-y", // Overwrite output file without asking
-		"-map_metadata", "-1", // Zamezit automatickému kopírování metadat
+		"-i", sourcePath,
+		"-y",                  // Overwrite output file without asking
+		"-map_metadata", "-1", // Prevent metadata copying using ffmpeg rules. We apply own rules for metadata mapping.
 	}
 
 	// Add format-specific settings
@@ -842,13 +855,18 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		if sampleRateSetting != "" && sampleRateSetting != locales.Translate("convert.configpar.copypar") {
 			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
 			sampleRateValue := strings.Split(sampleRateSetting, " ")[0]
-			// Replace decimal point with nothing if it's 44.1
-			sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Convert to proper Hz value
+			if strings.Contains(sampleRateValue, ".") {
+				// For 44.1, convert to 44100
+				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
+				args = append(args, "-ar", sampleRateValue+"00")
+			} else {
+				// For 48, convert to 48000
+				args = append(args, "-ar", sampleRateValue+"000")
+			}
 		} else {
-			// Použít vzorkovací frekvenci ze zdrojového souboru
-			sampleRateValue := strings.ReplaceAll(sampleRate, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Use sample rate from source file
+			args = append(args, "-ar", sampleRate)
 		}
 
 		// Set ID3v2.4 version
@@ -879,13 +897,19 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		if sampleRateSetting != "" && sampleRateSetting != locales.Translate("convert.configpar.copypar") {
 			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
 			sampleRateValue := strings.Split(sampleRateSetting, " ")[0]
-			// Replace decimal point with nothing if it's 44.1
-			sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Convert to proper Hz value
+			if strings.Contains(sampleRateValue, ".") {
+				// For 44.1, convert to 44100
+				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
+				args = append(args, "-ar", sampleRateValue+"00")
+			} else {
+				// For 48, convert to 48000
+				args = append(args, "-ar", sampleRateValue+"000")
+			}
 		} else {
-			// Použít vzorkovací frekvenci ze zdrojového souboru
-			sampleRateValue := strings.ReplaceAll(sampleRate, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Use sample rate from source file
+
+			args = append(args, "-ar", sampleRate)
 		}
 
 		if bitDepthSetting != "" && bitDepthSetting != locales.Translate("convert.configpar.copypar") {
@@ -903,7 +927,7 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 			}
 			args = append(args, "-sample_fmt", sampleFormat)
 		} else {
-			// Použít bitovou hloubku ze zdrojového souboru
+			// Use bit depth from source file
 			var sampleFormat string
 			switch bitDepth {
 			case "16":
@@ -923,9 +947,9 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		sampleRateSetting := formatSettings["sample_rate"]
 		bitDepthSetting := formatSettings["bit_depth"]
 
-		// Pokud je bitová hloubka nastavena na "copy", zjistíme ji ze zdrojového souboru
+		// If bit depth is not set or set to "copy", use bit depth from source file
 		if bitDepthSetting == "" || bitDepthSetting == locales.Translate("convert.configpar.copypar") {
-			// Použít bitovou hloubku ze zdrojového souboru
+			// Use bit depth from source file
 			var sampleFormat string
 			switch bitDepth {
 			case "16":
@@ -939,7 +963,7 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 			}
 			args = append(args, "-c:a", sampleFormat)
 		} else {
-			// Nastavit kodek podle bitové hloubky
+			// Set codec based on bit depth
 			var sampleFormat string
 			switch bitDepthSetting {
 			case "16":
@@ -957,13 +981,18 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		if sampleRateSetting != "" && sampleRateSetting != locales.Translate("convert.configpar.copypar") {
 			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
 			sampleRateValue := strings.Split(sampleRateSetting, " ")[0]
-			// Replace decimal point with nothing if it's 44.1
-			sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Convert to proper Hz value
+			if strings.Contains(sampleRateValue, ".") {
+				// For 44.1, convert to 44100
+				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
+				args = append(args, "-ar", sampleRateValue+"00")
+			} else {
+				// For 48, convert to 48000
+				args = append(args, "-ar", sampleRateValue+"000")
+			}
 		} else {
-			// Použít vzorkovací frekvenci ze zdrojového souboru
-			sampleRateValue := strings.ReplaceAll(sampleRate, ".", "")
-			args = append(args, "-ar", sampleRateValue+"000")
+			// Use sample rate from source file
+			args = append(args, "-ar", sampleRate)
 		}
 	}
 
@@ -985,7 +1014,7 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		var foundValue string
 		var found bool
 
-		// Nejprve zkusu00edme pu0159u00edmu00e9 porovu00e1nu00ed (case-insensitive)
+		// First try to find a matching field in the source
 		for sourceField, value := range metadata {
 			if strings.EqualFold(sourceField, internalName) {
 				foundValue = value
@@ -994,14 +1023,14 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 			}
 		}
 
-		// Speciau0301lniu0301 pu0159iu0301pad pro album_artist, kteryu0301 mu016fu017ee byu0301t v ru016fznyu0301ch formau0301tech
+		// Special case for album_artist, which may be in different formats
 		if !found && (strings.EqualFold(internalName, "ALBUMARTIST") || strings.EqualFold(internalName, "album_artist")) {
-			// Zkontrolujeme ru016fznu00e9 varianty zu00e1pisu
+			// Check for different possible formats
 			for sourceField, value := range metadata {
-				if strings.EqualFold(sourceField, "ALBUMARTIST") || 
-				   strings.EqualFold(sourceField, "album_artist") || 
-				   strings.EqualFold(sourceField, "ALBUM_ARTIST") || 
-				   strings.EqualFold(sourceField, "AlbumArtist") {
+				if strings.EqualFold(sourceField, "ALBUMARTIST") ||
+					strings.EqualFold(sourceField, "album_artist") ||
+					strings.EqualFold(sourceField, "ALBUM_ARTIST") ||
+					strings.EqualFold(sourceField, "AlbumArtist") {
 					foundValue = value
 					found = true
 					break
@@ -1010,24 +1039,23 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		}
 
 		if found {
-			// Pokud hodnota obsahuje mezery nebo speciu00e1lnu00ed znaky, musu00edme ji du00e1t do uvozovek
-			// a escapovat speciu00e1lnu00ed znaky v hodnotu011b
+			// If value contains spaces or special characters, we need to wrap it in quotes
 			escapedValue := foundValue
-			
-			// Escapujeme speciu00e1lnu00ed znaky
+
+			// Escape special characters
 			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
 			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
-			
-			// Pokud hodnota obsahuje mezery nebo speciu00e1lnu00ed znaky, musu00edme ji du00e1t do uvozovek
+
+			// If value contains spaces or special characters, wrap it in quotes
 			if strings.ContainsAny(escapedValue, " \t\n\r\"'=;") {
 				escapedValue = "\"" + escapedValue + "\""
 			}
-			
+
 			args = append(args, "-metadata", fmt.Sprintf("%s=%s", targetField, escapedValue))
 		}
 	}
 
-	// Add output file path (bez uvozovek, cmd je přidá automaticky)
+	// Add output file path
 	args = append(args, targetPath)
 
 	// Log the full command for debugging
@@ -1039,26 +1067,24 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 
 	// Create a batch file to run the command
 	tmpBatFile := filepath.Join(os.TempDir(), "ffmpeg_convert.bat")
-	
-	// Vytvoříme obsah batch souboru s uvozovkami kolem cest k souborům
-	// a s parametry správně oddělenými
+
+	// Create batch file content with quotes around paths and properly separated parameters
 	cmdArgs := make([]string, len(args))
 	for i, arg := range args {
-		// Přidáme uvozovky pouze kolem cest k souborům (první a posledni argument)
-		// a kolem hodnot metadat, které už obsahují uvozovky
+		// Add quotes only around file paths (first and last argument)
+		// and around metadata values that already contain quotes
 		if i == 1 || i == len(args)-1 || (i > 0 && strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"")) {
-			// Pokud už argument obsahuje uvozovky, nebudeme je přidávat znovu
+			// If argument already contains quotes, don't add them again
 			if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
 				cmdArgs[i] = arg
 			} else {
 				cmdArgs[i] = fmt.Sprintf("\"%s\"", arg)
 			}
 		} else if i > 0 && strings.Contains(arg, "=") {
-			// Pokud jde o metadata (obsahuje znak '='), musíme zajistit,
-			// že hodnota po '=' bude v uvozovkách, pokud obsahuje mezery
+			// If it's a metadata (contains '='), we need to ensure the value after '=' is in quotes if it contains spaces
 			parts := strings.SplitN(arg, "=", 2)
-			if len(parts) == 2 && strings.ContainsAny(parts[1], " \t\n\r") && 
-			   !strings.HasPrefix(parts[1], "\"") && !strings.HasSuffix(parts[1], "\"") {
+			if len(parts) == 2 && strings.ContainsAny(parts[1], " \t\n\r") &&
+				!strings.HasPrefix(parts[1], "\"") && !strings.HasSuffix(parts[1], "\"") {
 				cmdArgs[i] = fmt.Sprintf("%s=\"%s\"", parts[0], parts[1])
 			} else {
 				cmdArgs[i] = arg
@@ -1067,8 +1093,8 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 			cmdArgs[i] = arg
 		}
 	}
-	
-	// Použijeme UTF-8 kódování pro batch soubor, aby fungoval s Unicode znaky
+
+	// Create batch file content with UTF-8 encoding
 	cmdContent := fmt.Sprintf("@echo off\r\nchcp 65001 >nul\r\ntools\\ffmpeg.exe %s\r\n", strings.Join(cmdArgs, " "))
 	debugLog("DEBUG: Writing batch file: %s", tmpBatFile)
 	debugLog("DEBUG: Batch content: %s", cmdContent)
@@ -1093,15 +1119,6 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	os.Remove(tmpBatFile)
 
 	return nil
-}
-
-// getExecutableDir returns the directory of the current executable
-func getExecutableDir() (string, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Dir(exePath), nil
 }
 
 // MetadataMap represents the mapping between metadata fields for different formats
@@ -1156,7 +1173,7 @@ func loadMetadataMap() (*MetadataMap, error) {
 	debugLog("DEBUG: Column indices - MP3: %d, FLAC: %d, WAV: %d", mpIndex, flacIndex, wavIndex)
 
 	if mpIndex == -1 || flacIndex == -1 || wavIndex == -1 {
-		return nil, fmt.Errorf("Missing required columns in metadata map CSV")
+		return nil, errors.New(locales.Translate("convert.err.missingcolumns"))
 	}
 
 	// Read the rest of the rows
@@ -1183,7 +1200,7 @@ func loadMetadataMap() (*MetadataMap, error) {
 	}
 
 	// Debug output
-	debugLog("DEBUG: Loaded metadata mappings - MP3: %d, FLAC: %d, WAV: %d", 
+	debugLog("DEBUG: Loaded metadata mappings - MP3: %d, FLAC: %d, WAV: %d",
 		len(result.InternalToMP3), len(result.InternalToFLAC), len(result.InternalToWAV))
 
 	return result, nil
@@ -1203,7 +1220,7 @@ func findAudioFiles(dir string, sourceFormat string) ([]string, error) {
 		}
 		if !info.IsDir() {
 			ext := strings.ToLower(filepath.Ext(path))
-			
+
 			// If sourceFormat is "All" or empty, include all audio files
 			if sourceFormat == "" || sourceFormat == locales.Translate("convert.srcformats.all") {
 				if ext == ".mp3" || ext == ".flac" || ext == ".wav" {
@@ -1294,11 +1311,11 @@ func getAudioProperties(filePath string) (bitDepth string, sampleRate string, er
 	// Parse JSON output
 	var result struct {
 		Streams []struct {
-			CodecType   string `json:"codec_type"`
-			SampleRate  string `json:"sample_rate"`
-			SampleFmt   string `json:"sample_fmt"`
-			BitsPerSample int    `json:"bits_per_sample"`
-			BitsPerRawSample int `json:"bits_per_raw_sample"`
+			CodecType        string      `json:"codec_type"`
+			SampleRate       string      `json:"sample_rate"`
+			SampleFmt        string      `json:"sample_fmt"`
+			BitsPerSample    interface{} `json:"bits_per_sample"`
+			BitsPerRawSample interface{} `json:"bits_per_raw_sample"`
 		} `json:"streams"`
 	}
 
@@ -1317,12 +1334,43 @@ func getAudioProperties(filePath string) (bitDepth string, sampleRate string, er
 
 			// Get bit depth
 			// Try bits_per_raw_sample first, then bits_per_sample
-			if stream.BitsPerRawSample > 0 {
-				bitDepth = fmt.Sprintf("%d", stream.BitsPerRawSample)
-			} else if stream.BitsPerSample > 0 {
-				bitDepth = fmt.Sprintf("%d", stream.BitsPerSample)
-			} else {
-				// Try to determine bit depth from sample format
+			if stream.BitsPerRawSample != nil {
+				switch v := stream.BitsPerRawSample.(type) {
+				case string:
+					if v != "" {
+						bitDepth = v
+					}
+				case float64:
+					if v > 0 {
+						bitDepth = fmt.Sprintf("%d", int(v))
+					}
+				case int:
+					if v > 0 {
+						bitDepth = fmt.Sprintf("%d", v)
+					}
+				}
+			}
+
+			// If we didn't get a valid bit depth from bits_per_raw_sample, try bits_per_sample
+			if bitDepth == "24" && stream.BitsPerSample != nil {
+				switch v := stream.BitsPerSample.(type) {
+				case string:
+					if v != "" {
+						bitDepth = v
+					}
+				case float64:
+					if v > 0 {
+						bitDepth = fmt.Sprintf("%d", int(v))
+					}
+				case int:
+					if v > 0 {
+						bitDepth = fmt.Sprintf("%d", v)
+					}
+				}
+			}
+
+			// If we still don't have a valid bit depth, try to determine from sample format
+			if bitDepth == "24" {
 				switch stream.SampleFmt {
 				case "u8", "s8":
 					bitDepth = "8"

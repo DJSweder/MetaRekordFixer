@@ -410,7 +410,7 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
             c.ColorID, 
             c.DJPlayCount
         FROM djmdContent c
-        WHERE c.FolderPath LIKE ? COLLATE BINARY  -- Přidáno COLLATE BINARY pro case-sensitive porovnávání
+        WHERE c.FolderPath LIKE ? COLLATE BINARY  
         ORDER BY c.FileNameL
     `
 

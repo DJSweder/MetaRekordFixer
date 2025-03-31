@@ -9,6 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	_ "github.com/mutecomm/go-sqlcipher/v4"
@@ -33,7 +34,7 @@ func NewTracksUpdater(window fyne.Window, configMgr *common.ConfigManager, dbMgr
 		dbMgr:      dbMgr,
 	}
 
-	// Inicializace proměnných před voláním initializeUI
+	// Initialize variables before initializeUI
 	m.folderPath = widget.NewEntry()
 
 	// Initialize UI components first
@@ -76,12 +77,20 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 		form,
 	)
 
-	// Create final layout using standardized module layout
-	return common.CreateStandardModuleLayout(
-		locales.Translate("updater.label.info"),
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("updater.label.info")),
+		widget.NewSeparator(),
 		contentContainer,
-		m.submitBtn,
 	)
+
+	// Add submit button with right alignment if provided
+	if m.submitBtn != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
+		moduleContent.Add(buttonBox)
+	}
+
+	return moduleContent
 }
 
 // GetContent returns the module's main UI content.
@@ -95,7 +104,7 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Kontrola, zda konfigurace má inicializované Extra pole
+	// Check if Extra field is initialized
 	if cfg.Extra == nil {
 		return
 	}
@@ -229,7 +238,7 @@ func (m *TracksUpdater) Start() {
 			return
 		}
 
-		// Informace o úspěšné záloze databáze
+		// Inform about successful database backup
 		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 		// Check if operation was cancelled
@@ -337,7 +346,7 @@ func (m *TracksUpdater) Start() {
 			return
 		}
 
-		// Informace o počtu souborů ve složce
+		// Inform about number of files in folder
 		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.countinfolder"), len(files)))
 
 		// Check if operation was cancelled
@@ -390,14 +399,14 @@ func (m *TracksUpdater) Start() {
 			})
 		}
 
-		// Informace o neodpovídajících souborech
+		// Inform about non-matching files
 		if nonMatchingFiles > 0 {
 			m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfilenamescount"), nonMatchingFiles))
 
-			// Zobrazení seznamu neodpovídajících souborů jako varování
+			// Display list of non-matching files as warning
 			fileListStr := ""
 			if len(mismatchedFiles) > 5 {
-				// Zobrazíme jen prvních 5 souborů a informaci o počtu dalších
+				// Display only first 5 files and information about remaining files
 				fileListStr = strings.Join(mismatchedFiles[:5], ", ")
 				fileListStr += fmt.Sprintf(" %s", fmt.Sprintf(locales.Translate("updater.tracks.morefiles"), len(mismatchedFiles)-5))
 			} else {

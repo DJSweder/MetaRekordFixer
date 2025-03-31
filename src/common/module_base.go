@@ -58,7 +58,7 @@ func NewModuleBase(window fyne.Window, configMgr *ConfigManager, errorHandler *E
 		ErrorHandler: errorHandler,
 	}
 	base.initBaseComponents()
-	// Odstranění automatického volání LoadModuleConfig, bude voláno až po inicializaci modulu
+
 	return base
 }
 
@@ -72,7 +72,7 @@ func (m *ModuleBase) initBaseComponents() {
 
 // GetModuleContent returns the module's content without status messages
 // This method should be implemented by modules to return their specific content
-// It is used by the GetContent method to create the full layout with status messages
+// It is used by the CreateModuleLayoutWithStatusMessages method to create the full layout with status messages
 func (m *ModuleBase) GetModuleContent() fyne.CanvasObject {
 	return container.NewVBox(widget.NewLabel("Module content not implemented"))
 }
@@ -110,19 +110,6 @@ func (m *ModuleBase) GetConfigName() string {
 // GetIcon returns a default icon, should be overridden in modules
 func (m *ModuleBase) GetIcon() fyne.Resource {
 	return nil
-}
-
-// GetContent returns the module content with status messages layout
-// This is the main method that should be called to get the complete module UI
-// It uses GetModuleContent to get the module-specific content and adds status messages container
-func (m *ModuleBase) GetContent() fyne.CanvasObject {
-	// If Content is already set, use it
-	if m.Content != nil {
-		return m.Content
-	}
-
-	// Otherwise create a new layout with module content and status messages
-	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
 // LoadConfig is a placeholder for configuration loading
