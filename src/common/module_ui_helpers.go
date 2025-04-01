@@ -4,10 +4,8 @@ package common
 
 import (
 	"MetaRekordFixer/locales"
-	"image/color"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -15,6 +13,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	nativedialog "github.com/sqweek/dialog"
 )
+
+// Úpravy podle doporučení v refactoring_result.txt
 
 // ProgressDialog represents a progress dialog with a progress bar and status label
 type ProgressDialog struct {
@@ -49,14 +49,8 @@ func NewProgressDialog(window fyne.Window, title, initialStatus string, cancelHa
 	})
 	pd.stopButton.Importance = widget.HighImportance
 
-	// Create and initialize status label
 	content := container.NewVBox(pd.progressBar, pd.statusLabel)
 	content.Add(container.NewHBox(layout.NewSpacer(), pd.stopButton, layout.NewSpacer()))
-
-	// Set minimum width for the content to ensure dialog has sufficient width for status messages
-	rect := canvas.NewRectangle(color.Transparent)
-	rect.SetMinSize(fyne.NewSize(550, 1))
-	content.Add(rect)
 
 	// Use NewCustomWithoutButtons to create a dialog without any default buttons
 	pd.dialog = dialog.NewCustomWithoutButtons(title, content, window)
@@ -103,6 +97,26 @@ func (pd *ProgressDialog) ShowSuccess(message string) {
 	dialog.ShowInformation(locales.Translate("common.diag.success"), message, pd.window)
 }
 
+// CreateStandardForm creates a standard form layout
+func CreateStandardForm(items ...interface{}) fyne.CanvasObject {
+	form := container.NewVBox()
+
+	for i := 0; i < len(items); i += 3 {
+		if i+2 < len(items) {
+			label := items[i].(string)
+			input := items[i+1].(fyne.CanvasObject)
+			button := items[i+2].(fyne.CanvasObject)
+
+			row := container.NewBorder(nil, nil, nil, button, input)
+			formItem := container.NewHBox(widget.NewLabel(label), row)
+
+			form.Add(formItem)
+		}
+	}
+
+	return form
+}
+
 // CreateNativeFolderBrowseButton creates a standardized folder browse button using native OS dialog
 // This is a replacement for CreateFolderBrowseButton that uses native OS dialogs instead of Fyne dialogs
 // to avoid issues with folder selection on Windows platforms
@@ -114,6 +128,21 @@ func CreateNativeFolderBrowseButton(title string, buttonText string, changeHandl
 				changeHandler(dirname)
 			}
 		}
+	})
+}
+
+// CreateFolderBrowseButton creates a standardized folder browse button
+// DEPRECATED: Use CreateNativeFolderBrowseButton instead to avoid issues with folder selection on Windows
+func CreateFolderBrowseButton(window fyne.Window, entry *widget.Entry, buttonText string, changeHandler func(string)) *widget.Button {
+	return widget.NewButtonWithIcon(buttonText, theme.FolderOpenIcon(), func() {
+		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
+			if err == nil && uri != nil {
+				entry.SetText(uri.Path())
+				if changeHandler != nil {
+					changeHandler(uri.Path())
+				}
+			}
+		}, window)
 	})
 }
 
@@ -148,6 +177,13 @@ func CreateButtonBar(buttons ...*widget.Button) fyne.CanvasObject {
 	return container
 }
 
+// CreateInfoSection creates an informational text section
+func CreateInfoSection(text string) fyne.CanvasObject {
+	infoLabel := widget.NewLabel(text)
+	infoLabel.Wrapping = fyne.TextWrapWord
+	return container.NewVBox(infoLabel, widget.NewSeparator())
+}
+
 // CreateLoadingOverlay creates an overlay with a loading indicator
 func CreateLoadingOverlay(parent fyne.Window, message string) *dialog.CustomDialog {
 	progress := widget.NewProgressBarInfinite()
@@ -176,36 +212,48 @@ func ShowConfirmDialogWithCancel(title, message string, onConfirm, onCancel func
 
 // ShowTextInputDialog displays a text input dialog
 func ShowTextInputDialog(title, message, defaultValue string, onSubmit func(string), window fyne.Window) *dialog.CustomDialog {
-	// Create entry field with default value
 	entry := widget.NewEntry()
 	entry.SetText(defaultValue)
 
-	// Create submit button
 	submitBtn := widget.NewButtonWithIcon(locales.Translate("common.button.submit"), theme.ConfirmIcon(), func() {
-		if onSubmit != nil {
-			onSubmit(entry.Text)
-		}
+		onSubmit(entry.Text)
 	})
-	submitBtn.Importance = widget.HighImportance
 
-	// Create cancel button
 	cancelBtn := widget.NewButtonWithIcon(locales.Translate("common.button.cancel"), theme.CancelIcon(), nil)
 
-	// Create content container
-	content := container.NewVBox(
-		widget.NewLabel(message),
-		entry,
-		container.NewHBox(layout.NewSpacer(), cancelBtn, submitBtn),
-	)
-
-	// Create dialog
+	content := container.NewVBox(widget.NewLabel(message), entry, container.NewHBox(layout.NewSpacer(), cancelBtn, submitBtn))
 	d := dialog.NewCustom(title, "", content, window)
+
 	cancelBtn.OnTapped = func() { d.Hide() }
 
 	return d
 }
 
+// CreateModuleContainer creates a standard UI container for a module
+func CreateModuleContainer(title string, content, actions fyne.CanvasObject) fyne.CanvasObject {
+	titleLabel := widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	return container.NewBorder(
+		container.NewVBox(container.NewHBox(titleLabel, layout.NewSpacer()), widget.NewSeparator()),
+		actions, nil, nil, content,
+	)
+}
+
+// CreateVisibilityToggler toggles widget visibility based on a condition
+func CreateVisibilityToggler(condition func() bool, widgets ...fyne.CanvasObject) func() {
+	return func() {
+		visible := condition()
+		for _, w := range widgets {
+			w.Hide()
+			if visible {
+				w.Show()
+			}
+		}
+	}
+}
+
 // CreateFolderSelectionField creates a standardized folder selection field with browse button
+// This creates a container with an entry field and a browse button for folder selection
+// If entryField is nil, creates a new entry field, otherwise uses the provided one
 func CreateFolderSelectionField(title string, entryField *widget.Entry, changeHandler func(string)) fyne.CanvasObject {
 	// Create entry field if not provided
 	if entryField == nil {
@@ -238,46 +286,6 @@ func CreateFolderSelectionField(title string, entryField *widget.Entry, changeHa
 	return container.NewBorder(nil, nil, nil, browseBtn, entryField)
 }
 
-// CreateFolderSelectionFieldWithDelete creates a standardized folder selection field with browse and delete buttons
-func CreateFolderSelectionFieldWithDelete(title string, entryField *widget.Entry, changeHandler func(string), deleteHandler func()) fyne.CanvasObject {
-	// Create entry field if not provided
-	if entryField == nil {
-		entryField = widget.NewEntry()
-	}
-
-	// Set placeholder using localization key - always set it regardless of whether the entry field is new or existing
-	entryField.SetPlaceHolder(locales.Translate("common.entry.placeholderpath"))
-
-	// Set change handler if provided
-	if changeHandler != nil {
-		entryField.OnChanged = func(value string) {
-			changeHandler(value)
-		}
-	}
-
-	// Create browse button (icon only)
-	browseBtn := CreateNativeFolderBrowseButton(
-		title,
-		"", // Empty text, only icon
-		func(path string) {
-			entryField.SetText(path)
-			if changeHandler != nil {
-				changeHandler(path)
-			}
-		},
-	)
-
-	// Create delete button (icon only)
-	deleteBtn := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
-		if deleteHandler != nil {
-			deleteHandler()
-		}
-	})
-
-	// Create container with entry field between delete and browse buttons
-	return container.NewBorder(nil, nil, deleteBtn, browseBtn, entryField)
-}
-
 // CreateSubmitButton creates a standardized submit button with high importance
 // This button is used to start a process or submit a form
 func CreateSubmitButton(title string, handler func()) *widget.Button {
@@ -301,4 +309,39 @@ func CreateDescriptionLabel(text string) *widget.Label {
 	label.Wrapping = fyne.TextWrapWord
 	label.TextStyle = fyne.TextStyle{Bold: true}
 	return label
+}
+
+// CreateStandardModuleLayout creates a standardized layout for a module
+// This layout includes a description at the top, custom content in the middle, and a submit button at the bottom
+// The custom content can be any CanvasObject, allowing for flexibility in the module's layout
+func CreateStandardModuleLayout(description string, content fyne.CanvasObject, submitButton *widget.Button) fyne.CanvasObject {
+	// Create description label
+	descLabel := CreateDescriptionLabel(description)
+
+	// Create main container for the module content
+	mainContent := container.NewVBox(
+		descLabel,
+		widget.NewSeparator(),
+		content,
+	)
+
+	// Add submit button with right alignment if provided
+	if submitButton != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), submitButton)
+		mainContent.Add(buttonBox)
+	}
+
+	// Create a container for status messages that will expand to fill available space
+	// This container will be populated by the module's status messages container
+	// when the module is initialized
+	statusMessagesSpace := container.NewVBox()
+	
+	// Vytvoříme layout, kde hlavní obsah má fixní velikost a prostor pro statusové zprávy
+	// se rozšiřuje, aby vyplnil zbývající prostor
+	// Použijeme container.NewBorderLayout, který umožňuje dynamické rozšiřování prvku
+	return container.New(
+		layout.NewBorderLayout(mainContent, nil, nil, nil),
+		mainContent,
+		statusMessagesSpace,
+	)
 }

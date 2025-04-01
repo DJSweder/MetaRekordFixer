@@ -58,7 +58,7 @@ func NewModuleBase(window fyne.Window, configMgr *ConfigManager, errorHandler *E
 		ErrorHandler: errorHandler,
 	}
 	base.initBaseComponents()
-
+	// Odstranění automatického volání LoadModuleConfig, bude voláno až po inicializaci modulu
 	return base
 }
 
@@ -72,7 +72,7 @@ func (m *ModuleBase) initBaseComponents() {
 
 // GetModuleContent returns the module's content without status messages
 // This method should be implemented by modules to return their specific content
-// It is used by the CreateModuleLayoutWithStatusMessages method to create the full layout with status messages
+// It is used by the GetContent method to create the full layout with status messages
 func (m *ModuleBase) GetModuleContent() fyne.CanvasObject {
 	return container.NewVBox(widget.NewLabel("Module content not implemented"))
 }
@@ -85,7 +85,7 @@ func (m *ModuleBase) CreateModuleLayoutWithStatusMessages(moduleContent fyne.Can
 	mainContent := container.NewVBox(moduleContent)
 
 	// Create a container for status messages
-	statusMessagesContainer := m.GetStatusMessagesContainer().scroll
+	statusMessagesContainer := m.GetStatusMessagesContainer()
 
 	// Use BorderLayout to make status messages fill the remaining space
 	// The top part (mainContent) has fixed size based on its content
@@ -110,6 +110,19 @@ func (m *ModuleBase) GetConfigName() string {
 // GetIcon returns a default icon, should be overridden in modules
 func (m *ModuleBase) GetIcon() fyne.Resource {
 	return nil
+}
+
+// GetContent returns the module content with status messages layout
+// This is the main method that should be called to get the complete module UI
+// It uses GetModuleContent to get the module-specific content and adds status messages container
+func (m *ModuleBase) GetContent() fyne.CanvasObject {
+	// If Content is already set, use it
+	if m.Content != nil {
+		return m.Content
+	}
+	
+	// Otherwise create a new layout with module content and status messages
+	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
 // LoadConfig is a placeholder for configuration loading
@@ -204,21 +217,21 @@ func (m *ModuleBase) ShowError(err error) {
 // AddInfoMessage adds an information message to the status messages container
 func (m *ModuleBase) AddInfoMessage(message string) {
 	if m.StatusMessages != nil {
-		m.StatusMessages.AddMessage(MessageInfo, message)
+		m.StatusMessages.AddInfoMessage(message)
 	}
 }
 
 // AddWarningMessage adds a warning message to the status messages container
 func (m *ModuleBase) AddWarningMessage(message string) {
 	if m.StatusMessages != nil {
-		m.StatusMessages.AddMessage(MessageWarning, message)
+		m.StatusMessages.AddWarningMessage(message)
 	}
 }
 
 // AddErrorMessage adds an error message to the status messages container
 func (m *ModuleBase) AddErrorMessage(message string) {
 	if m.StatusMessages != nil {
-		m.StatusMessages.AddMessage(MessageError, message)
+		m.StatusMessages.AddErrorMessage(message)
 	}
 }
 
@@ -230,14 +243,7 @@ func (m *ModuleBase) ClearStatusMessages() {
 }
 
 // GetStatusMessagesContainer returns the status messages container
-// If it doesn't exist, it creates a new one
 func (m *ModuleBase) GetStatusMessagesContainer() *StatusMessagesContainer {
-	// Make sure StatusMessages is initialized
-	if m.StatusMessages == nil {
-		m.StatusMessages = NewStatusMessagesContainer()
-	}
-
-	// Return the status messages container
 	return m.StatusMessages
 }
 

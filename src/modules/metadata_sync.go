@@ -14,7 +14,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -58,62 +57,9 @@ func (m *MetadataSyncModule) GetIcon() fyne.Resource {
 	return theme.HomeIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
-// This implements the method from ModuleBase to provide the module-specific UI
-func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
-	// Create folder selection field using standardized function
-	folderSelectionField := common.CreateFolderSelectionField(
-		locales.Translate("metsync.label.source"),
-		m.entrySourceFolder,
-		func(path string) {
-			// Normalize path, save config
-			m.entrySourceFolder.SetText(common.NormalizePath(path))
-			m.SaveConfig()
-		},
-	)
-
-	// Create form with folder selection field
-	form := &widget.Form{
-		Items: []*widget.FormItem{
-			{Text: locales.Translate("metsync.label.source"), Widget: container.NewBorder(nil, nil, nil, folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button), m.entrySourceFolder)},
-		},
-	}
-
-	// Create additional widgets array
-	additionalWidgets := []fyne.CanvasObject{
-		m.checkRecursive,
-	}
-
-	// Create content container with form and additional widgets
-	contentContainer := container.NewVBox(
-		form,
-	)
-
-	// Add additional widgets to content container
-	for _, widget := range additionalWidgets {
-		contentContainer.Add(widget)
-	}
-
-	// Create module content with description and separator
-	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("metsync.label.info")),
-		widget.NewSeparator(),
-		contentContainer,
-	)
-
-	// Add submit button with right alignment if provided
-	if m.btnSync != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.btnSync)
-		moduleContent.Add(buttonBox)
-	}
-
-	return moduleContent
-}
-
 // GetContent returns the module's main UI content.
 func (m *MetadataSyncModule) GetContent() fyne.CanvasObject {
-	// Create the complete module layout with status messages container
-	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	return m.Content
 }
 
 // LoadConfig applies the configuration to the UI components.
@@ -211,20 +157,12 @@ func (m *MetadataSyncModule) initializeUI() {
 		},
 	)
 
-	// Create content container with description and separator
-	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("metsync.label.info")),
-		widget.NewSeparator(),
+	// Create final layout using standardized module layout
+	m.Content = common.CreateStandardModuleLayout(
+		locales.Translate("metsync.label.info"),
 		contentContainer,
+		m.btnSync,
 	)
-
-	// Add submit button with right alignment if provided
-	if m.btnSync != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.btnSync)
-		moduleContent.Add(buttonBox)
-	}
-
-	m.Content = moduleContent
 }
 
 // syncMetadata executes the metadata synchronization process.
@@ -257,14 +195,8 @@ func (m *MetadataSyncModule) syncMetadata() {
 			}
 		}()
 
-		// Clear previous status messages
-		m.ClearStatusMessages()
-
 		// Example progress
-		m.UpdateProgressStatus(0.0, locales.Translate("common.status.start"))
-
-		// Add real status message about starting the synchronization
-		m.AddInfoMessage(locales.Translate("common.status.start"))
+		m.UpdateProgressStatus(0.0, locales.Translate("metsync.status.start"))
 
 		// Normalize paths
 		sourcePath := common.NormalizePath(m.entrySourceFolder.Text)
@@ -279,9 +211,6 @@ func (m *MetadataSyncModule) syncMetadata() {
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
 			return
 		}
-
-		// Add status message about successful database backup
-		m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -300,9 +229,6 @@ func (m *MetadataSyncModule) syncMetadata() {
 			return
 		}
 
-		// Add status message about successful database connection
-		m.AddInfoMessage(locales.Translate("common.db.conn"))
-
 		// Ensure database connection is properly closed when done
 		defer func() {
 			if err := m.dbMgr.Close(); err != nil {
@@ -318,10 +244,7 @@ func (m *MetadataSyncModule) syncMetadata() {
 		}
 
 		// Update progress
-		m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
-
-		// Add status message about reading files from database
-		m.AddInfoMessage(locales.Translate("common.status.reading"))
+		m.UpdateProgressStatus(0.1, locales.Translate("metsync.status.reading"))
 
 		// Query to get MP3 files from database
 		rows, err := m.dbMgr.Query(`
@@ -403,9 +326,6 @@ func (m *MetadataSyncModule) syncMetadata() {
 			return
 		}
 
-		// Add status message about number of files found
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
-
 		// Check if operation was cancelled
 		if m.IsCancelled() {
 			m.CloseProgressDialog()
@@ -413,11 +333,7 @@ func (m *MetadataSyncModule) syncMetadata() {
 		}
 
 		// Process each MP3 file and update corresponding FLAC files
-		m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
-
-		// Add status message about starting the update process
-		m.AddInfoMessage(locales.Translate("common.status.updating"))
-
+		m.UpdateProgressStatus(0.2, locales.Translate("metsync.status.updating"))
 		for i, mp3File := range mp3Files {
 			// Check if operation was cancelled
 			if m.IsCancelled() {
@@ -464,10 +380,7 @@ func (m *MetadataSyncModule) syncMetadata() {
 		}
 
 		// Mark done and update progress
-		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
-
-		// Add final status message about completion
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
+		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("metsync.status.completed"), totalDbFiles))
 
 		m.CompleteProgressDialog()
 	}()

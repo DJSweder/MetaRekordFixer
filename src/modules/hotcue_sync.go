@@ -83,9 +83,12 @@ func (m *HotCueSyncModule) GetIcon() fyne.Resource {
 	return theme.ContentCopyIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
-// This implements the method from ModuleBase to provide the module-specific UI
-func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
+// GetContent constructs and returns the module's UI content.
+func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
+	infoLabel := widget.NewLabel(locales.Translate("hotcuesync.label.info"))
+	infoLabel.Wrapping = fyne.TextWrapWord
+	infoLabel.TextStyle = fyne.TextStyle{Bold: true}
+
 	// Containers for source inputs.
 	sourceTypeContainer := container.NewBorder(
 		nil, nil,
@@ -116,6 +119,24 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 		),
 	)
 
+	// Create a button with a dynamic icon.
+	var submitBtn *widget.Button
+	submitBtn = widget.NewButtonWithIcon(locales.Translate("hotcuesync.button.start"), nil, func() {
+		// Save configuration before synchronization.
+		m.SaveConfig()
+		go func() {
+			err := m.synchronizeHotCues()
+			if err != nil {
+				common.ShowError(err, m.Window)
+			} else {
+				// Set the icon to a checkmark upon successful completion.
+				submitBtn.SetIcon(theme.ConfirmIcon())
+			}
+		}()
+	})
+	submitBtn.Importance = widget.HighImportance
+	m.submitBtn = submitBtn
+
 	// Form with submit button.
 	standardForm := &widget.Form{
 		Items: []*widget.FormItem{
@@ -126,31 +147,15 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 		OnSubmit:   nil, // OnSubmit is now controlled directly by the button.
 	}
 
-	// Create content container
-	contentContainer := container.NewVBox(
-		standardForm,
-	)
-
-	// Create module content with description and separator
-	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("hotcuesync.label.info")),
+	// Insert the button into the layout.
+	content := container.NewVBox(
+		infoLabel,
 		widget.NewSeparator(),
-		contentContainer,
+		standardForm,
+		container.NewHBox(layout.NewSpacer(), submitBtn),
 	)
 
-	// Add submit button with right alignment if provided
-	if m.submitBtn != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
-		moduleContent.Add(buttonBox)
-	}
-
-	return moduleContent
-}
-
-// GetContent constructs and returns the module's UI content.
-func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
-	// Create the complete module layout with status messages container
-	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	return content
 }
 
 // LoadConfig applies the configuration to the UI components.
@@ -330,48 +335,20 @@ func (m *HotCueSyncModule) initializeUI() {
 	)
 
 	// Initialize source playlist selector
-	m.sourcePlaylistSelect = widget.NewSelect([]string{}, func(selected string) {
-		// Find the playlist ID for the selected name
-		for _, p := range m.playlists {
-			if p.Name == selected {
-				m.sourcePlaylistID = p.ID
-				break
-			}
-		}
-		if !m.IsLoadingConfig {
-			m.SaveConfig()
-		}
+	m.sourcePlaylistSelect = widget.NewSelect([]string{}, nil)
+	m.sourcePlaylistSelect.PlaceHolder = locales.Translate("hotcuesync.label.playlistsel")
+	m.sourcePlaylistSelect.Disable() // Initially disabled
+	m.sourcePlaylistSelect.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveConfig()
 	})
 
 	// Initialize target playlist selector
-	m.targetPlaylistSelect = widget.NewSelect([]string{}, func(selected string) {
-		// Find the playlist ID for the selected name
-		for _, p := range m.playlists {
-			if p.Name == selected {
-				m.targetPlaylistID = p.ID
-				break
-			}
-		}
-		if !m.IsLoadingConfig {
-			m.SaveConfig()
-		}
-	})
-
-	// Create a button with a dynamic icon
-	m.submitBtn = widget.NewButtonWithIcon(locales.Translate("hotcuesync.button.start"), nil, func() {
-		// Save configuration before synchronization
+	m.targetPlaylistSelect = widget.NewSelect([]string{}, nil)
+	m.targetPlaylistSelect.PlaceHolder = locales.Translate("hotcuesync.label.playlistsel")
+	m.targetPlaylistSelect.Disable() // Initially disabled
+	m.targetPlaylistSelect.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
-		go func() {
-			err := m.synchronizeHotCues()
-			if err != nil {
-				common.ShowError(err, m.Window)
-			} else {
-				// Set the icon to a checkmark upon successful completion
-				m.submitBtn.SetIcon(theme.ConfirmIcon())
-			}
-		}()
 	})
-	m.submitBtn.Importance = widget.HighImportance
 
 	// Create a form with source and target containers.
 	standardForm := &widget.Form{
@@ -512,7 +489,7 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	m.playlists = nil
 
 	// Update UI to show loading state
-	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.playlistload"))
+	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.loadingplaylists"))
 
 	// Skip database connection during initialization
 	if m.IsInitializing {
@@ -547,7 +524,7 @@ func (m *HotCueSyncModule) loadPlaylists() error {
             CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
     `)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("hotcuesync.err.playlistsload"), err)
+		return fmt.Errorf(locales.Translate("hotcuesync.err.loadplaylists"), err)
 	}
 	defer rows.Close()
 
@@ -557,7 +534,7 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 		var playlist common.PlaylistItem
 		err := rows.Scan(&playlist.ID, &playlist.Name, &playlist.ParentID, &playlist.Path)
 		if err != nil {
-			return fmt.Errorf(locales.Translate("hotcuesync.err.playlistsscan"), err)
+			return fmt.Errorf(locales.Translate("hotcuesync.err.scanplaylists"), err)
 		}
 
 		m.playlists = append(m.playlists, playlist)
@@ -956,14 +933,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			}
 		}()
 
-		// Clear previous status messages
-		m.ClearStatusMessages()
-
 		// Initial progress
-		m.UpdateProgressStatus(0.0, locales.Translate("common.status.start"))
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
+		m.UpdateProgressStatus(0.0, locales.Translate("hotcuesync.status.start"))
 
 		// Get source tracks based on selected source type
 		sourceTracks, err := m.getSourceTracks()
@@ -980,10 +951,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		}
 
 		// Update progress
-		m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
-
-		// Add status message about reading source tracks
-		m.AddInfoMessage(locales.Translate("common.status.reading"))
+		m.UpdateProgressStatus(0.1, locales.Translate("hotcuesync.status.reading"))
 
 		// Create a backup of the database
 		err = m.dbMgr.BackupDatabase()
@@ -995,9 +963,6 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
 			return
 		}
-
-		// Add status message about successful database backup
-		m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -1016,7 +981,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		// Ensure database connection is properly closed when done
 		defer func() {
 			if err := m.dbMgr.Finalize(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err),
+				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.dbclose"), err),
 					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
 			}
 		}()
@@ -1025,7 +990,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		defer func() {
 			if err != nil {
 				if rollbackErr := m.dbMgr.RollbackTransaction(); rollbackErr != nil {
-					m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.rollbackerr"), rollbackErr),
+					m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.rollback"), rollbackErr),
 						common.NewErrorContext(m.GetConfigName(), "Transaction Rollback"), m.Window, m.Status)
 				}
 			}
@@ -1036,10 +1001,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		skippedCount := 0
 
 		// Update progress before processing
-		m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
-
-		// Add status message about starting the update process
-		m.AddInfoMessage(locales.Translate("common.status.updating"))
+		m.UpdateProgressStatus(0.2, locales.Translate("hotcuesync.status.updating"))
 
 		// Process each source track
 		for i, sourceTrack := range sourceTracks {
@@ -1052,7 +1014,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 
 			// Update progress
 			progress := 0.2 + (float64(i+1) / float64(len(sourceTracks)) * 0.8)
-			m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), i+1, len(sourceTracks)))
+			m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.status.process"), i+1, len(sourceTracks)))
 
 			// Get target tracks for this source track
 			targetTracks, err := m.getTargetTracks(sourceTrack)
@@ -1115,9 +1077,6 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 
 		// Update status message
 		m.UpdateProgressStatus(1.0, summaryMessage)
-
-		// Add final status message about completion
-		m.AddInfoMessage(summaryMessage)
 
 		// Mark the progress dialog as completed instead of closing it
 		m.CompleteProgressDialog()
