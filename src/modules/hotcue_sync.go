@@ -14,8 +14,6 @@ import (
 
 	"MetaRekordFixer/common"
 	"MetaRekordFixer/locales"
-
-	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
 // SourceType defines the type of source (folder or playlist).
@@ -39,7 +37,6 @@ type HotCueSyncModule struct {
 	sourcePlaylistSelect *widget.Select
 	targetPlaylistSelect *widget.Select
 	playlists            []common.PlaylistItem
-	IsInitializing       bool
 	sourcePlaylistID     string
 	targetPlaylistID     string
 	submitBtn            *widget.Button
@@ -51,7 +48,6 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 		ModuleBase:     common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:          dbMgr,
 		playlists:      make([]common.PlaylistItem, 0),
-		IsInitializing: true, // Set initializing flag to prevent database connection during startup
 	}
 	// Initialize UI components first
 	m.initializeUI()
@@ -61,9 +57,6 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 
 	// Update controls state without loading playlists
 	m.updateControlsState()
-
-	// Reset initializing flag after initialization is complete
-	m.IsInitializing = false
 
 	return m
 }
@@ -86,69 +79,112 @@ func (m *HotCueSyncModule) GetIcon() fyne.Resource {
 // GetModuleContent returns the module's specific content without status messages
 // This implements the method from ModuleBase to provide the module-specific UI
 func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
-	// Containers for source inputs.
-	sourceTypeContainer := container.NewBorder(
-		nil, nil,
-		nil, nil,
-		m.sourceType,
-	)
-	sourceContainer := container.NewBorder(
-		nil, nil,
-		sourceTypeContainer, nil,
-		container.NewStack(
-			m.sourceFolderField,
-			m.sourcePlaylistSelect,
-		),
-	)
-
-	// Containers for target inputs.
-	targetTypeContainer := container.NewBorder(
-		nil, nil,
-		nil, nil,
-		m.targetType,
-	)
-	targetContainer := container.NewBorder(
-		nil, nil,
-		targetTypeContainer, nil,
-		container.NewStack(
-			m.targetFolderField,
-			m.targetPlaylistSelect,
-		),
-	)
-
-	// Form with submit button.
+	// Form without submit button
 	standardForm := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("hotcuesync.label.source"), Widget: sourceContainer},
-			{Text: locales.Translate("hotcuesync.label.target"), Widget: targetContainer},
+			{
+				Text: locales.Translate("hotcuesync.label.source"),
+				Widget: container.NewBorder(
+					nil, nil,
+					m.sourceType,
+					nil,
+					container.NewStack(
+						m.sourceFolderField,
+						m.sourcePlaylistSelect,
+					),
+				),
+			},
+			{
+				Text: locales.Translate("hotcuesync.label.target"),
+				Widget: container.NewBorder(
+					nil, nil,
+					m.targetType,
+					nil,
+					container.NewStack(
+						m.targetFolderField,
+						m.targetPlaylistSelect,
+					),
+				),
+			},
 		},
-		SubmitText: "",
-		OnSubmit:   nil, // OnSubmit is now controlled directly by the button.
 	}
 
 	// Create content container
 	contentContainer := container.NewVBox(
+		widget.NewLabel(locales.Translate("hotcuesync.label.info")),
+		widget.NewSeparator(),
 		standardForm,
 	)
 
-	// Create module content with description and separator
-	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("hotcuesync.label.info")),
-		widget.NewSeparator(),
-		contentContainer,
-	)
+	// Add submit button with right alignment
+	buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
+	contentContainer.Add(buttonBox)
 
-	// Add submit button with right alignment if provided
-	if m.submitBtn != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
-		moduleContent.Add(buttonBox)
-	}
+	// Set initial values for source and target type without triggering change handlers
+	m.IsLoadingConfig = true
+	m.sourceType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)))
+	m.targetType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)))
+	m.IsLoadingConfig = false
 
-	return moduleContent
+	// Update controls visibility
+	m.updateControlsState()
+
+	return contentContainer
 }
 
 // GetContent constructs and returns the module's UI content.
 func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
+	// Check database requirements
+	if m.dbMgr.GetDatabasePath() == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		m.sourcePlaylistSelect.Disable()
+		m.targetPlaylistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+
+	// Try to connect to database
+	if err := m.dbMgr.Connect(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		m.sourcePlaylistSelect.Disable()
+		m.targetPlaylistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+	defer m.dbMgr.Finalize()
+
+	// Load playlists
+	if err := m.loadPlaylists(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Access",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
+		m.sourcePlaylistSelect.Disable()
+		m.targetPlaylistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+
+	// Enable interactive components if all checks passed
+	m.sourcePlaylistSelect.Enable()
+	m.targetPlaylistSelect.Enable()
+	m.submitBtn.Enable()
+
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
@@ -177,13 +213,29 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.sourceFolderEntry.SetText(cfg.Get("source_folder", ""))
 	m.targetFolderEntry.SetText(cfg.Get("target_folder", ""))
 
-	// Save playlist IDs for later use when playlists are loaded
+	// Save playlist IDs for later use
 	m.sourcePlaylistID = cfg.Get("source_playlist", "")
 	m.targetPlaylistID = cfg.Get("target_playlist", "")
 
-	// Load playlist selections if playlists are loaded
+	// Update UI visibility without loading playlists
+	if sourceType == SourceTypeFolder {
+		m.sourceFolderField.Show()
+		m.sourcePlaylistSelect.Hide()
+	} else {
+		m.sourceFolderField.Hide()
+		m.sourcePlaylistSelect.Show()
+	}
+
+	if targetType == SourceTypeFolder {
+		m.targetFolderField.Show()
+		m.targetPlaylistSelect.Hide()
+	} else {
+		m.targetFolderField.Hide()
+		m.targetPlaylistSelect.Show()
+	}
+
+	// Set playlist selections if playlists are loaded
 	if len(m.playlists) > 0 {
-		// Find and set source playlist
 		for i, playlist := range m.playlists {
 			if playlist.ID == m.sourcePlaylistID {
 				if i < len(m.sourcePlaylistSelect.Options) {
@@ -193,7 +245,6 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 			}
 		}
 
-		// Find and set target playlist
 		for i, playlist := range m.playlists {
 			if playlist.ID == m.targetPlaylistID {
 				if i < len(m.targetPlaylistSelect.Options) {
@@ -203,237 +254,106 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 			}
 		}
 	}
-
-	// Update UI state based on loaded configuration only if not initializing
-	if !m.IsInitializing {
-		m.updateControlsState()
-	}
 }
 
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
-func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
-	if m.IsLoadingConfig {
-		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
-	}
-
-	cfg := common.NewModuleConfig()
-
-	// Save source type
-	var sourceType SourceType
+// getSourceType returns the current source type based on the selected dropdown value.
+func (m *HotCueSyncModule) getSourceType() SourceType {
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		sourceType = SourceTypeFolder
-	} else {
-		sourceType = SourceTypePlaylist
+		return SourceTypeFolder
 	}
-	cfg.Set("source_type", string(sourceType))
+	return SourceTypePlaylist
+}
 
-	// Save target type
-	var targetType SourceType
+// getTargetType returns the current target type based on the selected dropdown value.
+func (m *HotCueSyncModule) getTargetType() SourceType {
 	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		targetType = SourceTypeFolder
-	} else {
-		targetType = SourceTypePlaylist
+		return SourceTypeFolder
 	}
-	cfg.Set("target_type", string(targetType))
-
-	// Save folder paths
-	cfg.Set("source_folder", m.sourceFolderEntry.Text)
-	cfg.Set("target_folder", m.targetFolderEntry.Text)
-
-	// Save playlist selections
-	if sourceType == SourceTypePlaylist && m.sourcePlaylistSelect.Selected != "" {
-		for _, playlist := range m.playlists {
-			if playlist.Path == m.sourcePlaylistSelect.Selected {
-				cfg.Set("source_playlist", playlist.ID)
-				break
-			}
-		}
-	}
-
-	if targetType == SourceTypePlaylist && m.targetPlaylistSelect.Selected != "" {
-		for _, playlist := range m.playlists {
-			if playlist.Path == m.targetPlaylistSelect.Selected {
-				cfg.Set("target_playlist", playlist.ID)
-				break
-			}
-		}
-	}
-
-	// Save config to the config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-
-	return cfg
+	return SourceTypePlaylist
 }
 
 // initializeUI sets up the user interface components.
 func (m *HotCueSyncModule) initializeUI() {
-	// Initialize source type selector
+	// First create all UI components without handlers
+	
+	// Create type selectors
 	m.sourceType = widget.NewSelect([]string{
 		locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)),
 		locales.Translate("hotcuesync.dropdown." + string(SourceTypePlaylist)),
-	}, func(selected string) {
-		var sourceType SourceType
-		if selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-			sourceType = SourceTypeFolder
-		} else {
-			sourceType = SourceTypePlaylist
-		}
-		m.updateSourceVisibility(sourceType)
-		if !m.IsLoadingConfig {
-			m.SaveConfig()
-		}
-	})
+	}, nil)
 
-	// Initialize target type selector
 	m.targetType = widget.NewSelect([]string{
 		locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)),
 		locales.Translate("hotcuesync.dropdown." + string(SourceTypePlaylist)),
-	}, func(selected string) {
-		var targetType SourceType
-		if selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-			targetType = SourceTypeFolder
-		} else {
-			targetType = SourceTypePlaylist
-		}
-		m.updateTargetVisibility(targetType)
-		if !m.IsLoadingConfig {
-			m.SaveConfig()
-		}
-	})
+	}, nil)
 
-	// Initialize source folder field
+	// Create folder entries
 	m.sourceFolderEntry = widget.NewEntry()
-	m.sourceFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
-	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
-	})
-	m.sourceFolderField = common.CreateFolderSelectionField(
-		locales.Translate("hotcuesync.data.source"),
-		m.sourceFolderEntry,
-		m.CreateChangeHandler(func() {
-			m.SaveConfig()
-		}),
-	)
-
-	// Initialize target folder field
 	m.targetFolderEntry = widget.NewEntry()
-	m.targetFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
-	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
-	})
-	m.targetFolderField = common.CreateFolderSelectionField(
-		locales.Translate("hotcuesync.data.target"),
-		m.targetFolderEntry,
-		m.CreateChangeHandler(func() {
+
+	// Create playlist selectors
+	m.sourcePlaylistSelect = common.CreateDisabledSelect([]string{}, nil, "common.select.plsplacehldrinact")
+	m.targetPlaylistSelect = common.CreateDisabledSelect([]string{}, nil, "common.select.plsplacehldrinact")
+
+	// Create folder selection fields
+	m.sourceFolderField = common.CreateFolderSelectionField(
+		locales.Translate("hotcuesync.folder.source"),
+		m.sourceFolderEntry,
+		func(path string) {
+			m.sourceFolderEntry.SetText(path)
 			m.SaveConfig()
-		}),
+		},
 	)
 
-	// Initialize source playlist selector
-	m.sourcePlaylistSelect = widget.NewSelect([]string{}, func(selected string) {
-		// Find the playlist ID for the selected name
-		for _, p := range m.playlists {
-			if p.Name == selected {
-				m.sourcePlaylistID = p.ID
-				break
-			}
-		}
-		if !m.IsLoadingConfig {
+	m.targetFolderField = common.CreateFolderSelectionField(
+		locales.Translate("hotcuesync.folder.target"),
+		m.targetFolderEntry,
+		func(path string) {
+			m.targetFolderEntry.SetText(path)
 			m.SaveConfig()
-		}
-	})
+		},
+	)
 
-	// Initialize target playlist selector
-	m.targetPlaylistSelect = widget.NewSelect([]string{}, func(selected string) {
-		// Find the playlist ID for the selected name
-		for _, p := range m.playlists {
-			if p.Name == selected {
-				m.targetPlaylistID = p.ID
-				break
-			}
-		}
-		if !m.IsLoadingConfig {
-			m.SaveConfig()
-		}
-	})
-
-	// Create a button with a dynamic icon
-	m.submitBtn = widget.NewButtonWithIcon(locales.Translate("hotcuesync.button.start"), nil, func() {
-		// Save configuration before synchronization
+	// Create submit button
+	m.submitBtn = widget.NewButton(locales.Translate("hotcuesync.button.start"), func() {
 		m.SaveConfig()
 		go func() {
 			err := m.synchronizeHotCues()
 			if err != nil {
-				common.ShowError(err, m.Window)
-			} else {
-				// Set the icon to a checkmark upon successful completion
-				m.submitBtn.SetIcon(theme.ConfirmIcon())
+				context := common.NewErrorContext(m.GetConfigName(), "Synchronize Hot Cues")
+				m.ErrorHandler.ShowStandardError(err, &context)
 			}
 		}()
 	})
 	m.submitBtn.Importance = widget.HighImportance
 
-	// Create a form with source and target containers.
-	standardForm := &widget.Form{
-		Items: []*widget.FormItem{
-			{
-				Text: locales.Translate("hotcuesync.data.source"),
-				Widget: container.NewBorder(
-					nil, nil,
-					widget.NewLabel(locales.Translate("hotcuesync.label.sourcetype")), nil,
-					m.sourceType,
-				),
-			},
-			{
-				Text: locales.Translate("hotcuesync.data.target"),
-				Widget: container.NewBorder(
-					nil, nil,
-					widget.NewLabel(locales.Translate("hotcuesync.data.targettype")), nil,
-					m.targetType,
-				),
-			},
-		},
-		OnSubmit: func() {
-			if !m.IsLoadingConfig {
-				m.SaveConfig()
-			}
-			go func() {
-				err := m.synchronizeHotCues()
-				if err != nil {
-					common.ShowError(err, m.Window)
-				}
-			}()
-		},
-		SubmitText: locales.Translate("hotcuesync.button.start"),
-	}
+	// Now set up handlers and default values
+	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveConfig()
+	})
 
-	// Arrange components in a vertical box.
-	m.Window.SetContent(container.NewVBox(
-		widget.NewLabel(locales.Translate("hotcuesync.label.info")),
-		widget.NewSeparator(),
-		standardForm,
-		widget.NewSeparator(),
-	))
+	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveConfig()
+	})
 
-	// Set initial values for source and target type without triggering change handlers
-	m.IsLoadingConfig = true
+	m.sourceType.OnChanged = m.CreateSelectionChangeHandler(func() {
+		m.updateSourceVisibility(m.getSourceType())
+		m.SaveConfig()
+	})
+
+	m.targetType.OnChanged = m.CreateSelectionChangeHandler(func() {
+		m.updateTargetVisibility(m.getTargetType())
+		m.SaveConfig()
+	})
+
+	// Set default values last
 	m.sourceType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)))
 	m.targetType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(SourceTypeFolder)))
-	m.IsLoadingConfig = false
 }
 
 // updateControlsState updates the state of playlist selectors and loads playlists on first activation.
 func (m *HotCueSyncModule) updateControlsState() {
-	// Load playlists if needed and not initializing
-	if len(m.playlists) == 0 && !m.IsInitializing {
-		if err := m.loadPlaylists(); err != nil {
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Load Playlists")
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
-		}
-	}
-
-	// Update visibility based on current selections
+	// Get current source and target types
 	var sourceType, targetType SourceType
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
 		sourceType = SourceTypeFolder
@@ -447,38 +367,6 @@ func (m *HotCueSyncModule) updateControlsState() {
 		targetType = SourceTypePlaylist
 	}
 
-	// Only update visibility if not initializing, or update without loading playlists
-	if m.IsInitializing {
-		// Just update UI visibility without loading playlists
-		if sourceType == SourceTypeFolder {
-			m.sourceFolderField.Show()
-			m.sourcePlaylistSelect.Hide()
-		} else {
-			m.sourceFolderField.Hide()
-			m.sourcePlaylistSelect.Show()
-		}
-
-		if targetType == SourceTypeFolder {
-			m.targetFolderField.Show()
-			m.targetPlaylistSelect.Hide()
-		} else {
-			m.targetFolderField.Hide()
-			m.targetPlaylistSelect.Show()
-		}
-	} else {
-		// Normal operation - update visibility with possible playlist loading
-		m.updateSourceVisibility(sourceType)
-		m.updateTargetVisibility(targetType)
-	}
-}
-
-// updateSourceVisibility updates the visibility of source input controls based on the selected source type.
-func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
-	// Load playlists only if playlist type is selected and not initializing
-	if sourceType == SourceTypePlaylist && !m.IsInitializing {
-		m.loadPlaylists()
-	}
-
 	// Update visibility based on selected source type
 	if sourceType == SourceTypeFolder {
 		m.sourceFolderField.Show()
@@ -486,14 +374,6 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 	} else {
 		m.sourceFolderField.Hide()
 		m.sourcePlaylistSelect.Show()
-	}
-}
-
-// updateTargetVisibility updates the visibility of target input controls based on the selected target type.
-func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
-	// Load playlists only if playlist type is selected and not initializing
-	if targetType == SourceTypePlaylist && !m.IsInitializing {
-		m.loadPlaylists()
 	}
 
 	// Update visibility based on selected target type
@@ -506,102 +386,88 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 	}
 }
 
+// updateSourceVisibility updates the visibility of source input controls based on the selected source type.
+func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
+	if sourceType == SourceTypeFolder {
+		m.sourceFolderField.Show()
+		m.sourcePlaylistSelect.Hide()
+	} else {
+		m.sourceFolderField.Hide()
+		m.sourcePlaylistSelect.Show()
+	}
+}
+
+// updateTargetVisibility updates the visibility of target input controls based on the selected target type.
+func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
+	if targetType == SourceTypeFolder {
+		m.targetFolderField.Show()
+		m.targetPlaylistSelect.Hide()
+	} else {
+		m.targetFolderField.Hide()
+		m.targetPlaylistSelect.Show()
+	}
+}
+
 // loadPlaylists loads playlist items from the database and updates the playlist selectors.
 func (m *HotCueSyncModule) loadPlaylists() error {
-	// Clear existing playlists
-	m.playlists = nil
-
 	// Update UI to show loading state
 	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.playlistload"))
-
-	// Skip database connection during initialization
-	if m.IsInitializing {
-		// During initialization, we don't need to load playlists
-		return nil
-	}
 
 	// Ensure database connection
 	err := m.dbMgr.EnsureConnected(false)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.connectdb"), err)
 	}
 
-	// Make sure to close the database connection when done
-	defer func() {
-		if finalizeErr := m.dbMgr.Finalize(); finalizeErr != nil {
-			fmt.Printf("Error closing database connection: %v\n", finalizeErr)
-		}
-	}()
+	// Query playlists from database
+	query := `
+		SELECT DISTINCT
+			P.ID,
+			P.Name,
+			P.ParentID,
+			CASE 
+				WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || P.Name
+				ELSE P.Name
+			END as Path
+		FROM djmdPlaylist P
+		LEFT JOIN djmdPlaylist p2 ON P.ParentID = p2.ID
+		ORDER BY 
+			CASE WHEN p2.ID IS NULL THEN P.Seq ELSE p2.Seq END,
+			CASE WHEN p2.ID IS NULL THEN 0 ELSE P.Seq + 1 END
+	`
 
-	// Query playlists from the database
-	rows, err := m.dbMgr.Query(`
-        SELECT p1.ID, p1.Name, p1.ParentID,
-               CASE 
-                   WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || p1.Name
-                   ELSE p1.Name
-               END as Path
-        FROM djmdPlaylist p1
-        LEFT JOIN djmdPlaylist p2 ON p1.ParentID = p2.ID
-        ORDER BY 
-            CASE WHEN p2.ID IS NULL THEN p1.Seq ELSE p2.Seq END,
-            CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
-    `)
+	rows, err := m.dbMgr.Query(query)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("hotcuesync.err.playlistsload"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.playlistload"), err)
 	}
 	defer rows.Close()
 
+	// Clear existing playlists
+	m.playlists = make([]common.PlaylistItem, 0)
+	playlistNames := make([]string, 0)
+
 	// Process query results
-	var playlistNames []string
 	for rows.Next() {
 		var playlist common.PlaylistItem
-		err := rows.Scan(&playlist.ID, &playlist.Name, &playlist.ParentID, &playlist.Path)
+		err := rows.Scan(
+			&playlist.ID,
+			&playlist.Name,
+			&playlist.ParentID,
+			&playlist.Path,
+		)
 		if err != nil {
-			return fmt.Errorf(locales.Translate("hotcuesync.err.playlistsscan"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("common.err.playlistload"), err)
 		}
 
 		m.playlists = append(m.playlists, playlist)
 		playlistNames = append(playlistNames, playlist.Path)
 	}
 
-	// Debug output for available playlists
-	fmt.Printf("Available playlists:\n")
-	for _, p := range m.playlists {
-		fmt.Printf("- %s (ID: %s)\n", p.Path, p.ID)
-	}
-
-	// Update playlist selectors
+	// Update playlist selectors with new data
 	m.sourcePlaylistSelect.Options = playlistNames
 	m.targetPlaylistSelect.Options = playlistNames
 
-	// Enable playlist selectors if we have playlists
-	if len(playlistNames) > 0 {
-		m.sourcePlaylistSelect.Enable()
-		m.targetPlaylistSelect.Enable()
-
-		// Use stored playlist IDs from module
-		// Restore source playlist selection
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.sourcePlaylistID {
-				if i < len(m.sourcePlaylistSelect.Options) {
-					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
-				}
-				break
-			}
-		}
-
-		// Restore target playlist selection
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.targetPlaylistID {
-				if i < len(m.targetPlaylistSelect.Options) {
-					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
-				}
-				break
-			}
-		}
-	}
-
-	// Clear loading status
+	// Update progress status
 	m.UpdateProgressStatus(0, "")
 
 	return nil
@@ -652,7 +518,7 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
 		}
 
-		// Debug output
+		// Debug output for playlist ID
 		fmt.Printf("Loading source tracks from playlist ID: %s\n", playlistID)
 
 		tracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
@@ -940,7 +806,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 	// Basic validation
 	if (m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "") ||
 		(m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "") {
-		m.ErrorHandler.HandleError(fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths")), common.NewErrorContext(m.GetConfigName(), "Empty Paths"), m.Window, m.Status)
+		context := common.NewErrorContext(m.GetConfigName(), "Validate Paths")
+		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths")), &context)
 		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths"))
 	}
 
@@ -952,7 +819,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			if r := recover(); r != nil {
 				// In case of panic
 				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
+				context := common.NewErrorContext(m.GetConfigName(), "Panic Recovery")
+				m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), &context)
 			}
 		}()
 
@@ -969,7 +837,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		sourceTracks, err := m.getSourceTracks()
 		if err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.HandleError(err, common.NewErrorContext(m.GetConfigName(), "Source Tracks"), m.Window, m.Status)
+			context := common.NewErrorContext(m.GetConfigName(), "Get Source Tracks")
+			m.ErrorHandler.ShowStandardError(err, &context)
 			return
 		}
 
@@ -992,7 +861,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Database Backup")
 			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
+			m.ErrorHandler.ShowStandardError(err, &context)
 			return
 		}
 
@@ -1009,15 +878,16 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		err = m.dbMgr.BeginTransaction()
 		if err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Start"), m.Window, m.Status)
+			context := common.NewErrorContext(m.GetConfigName(), "Begin Transaction")
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), &context)
 			return
 		}
 
 		// Ensure database connection is properly closed when done
 		defer func() {
 			if err := m.dbMgr.Finalize(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err),
-					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
+				finalizeContext := common.NewErrorContext(m.GetConfigName(), "Close Database")
+				m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err), &finalizeContext)
 			}
 		}()
 
@@ -1025,8 +895,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		defer func() {
 			if err != nil {
 				if rollbackErr := m.dbMgr.RollbackTransaction(); rollbackErr != nil {
-					m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.rollbackerr"), rollbackErr),
-						common.NewErrorContext(m.GetConfigName(), "Transaction Rollback"), m.Window, m.Status)
+					rollbackContext := common.NewErrorContext(m.GetConfigName(), "Rollback Transaction")
+					m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.rollbackerr"), rollbackErr), &rollbackContext)
 				}
 			}
 		}()
@@ -1058,7 +928,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 			targetTracks, err := m.getTargetTracks(sourceTrack)
 			if err != nil {
 				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.processtrack"), err), common.NewErrorContext(m.GetConfigName(), "Target Tracks"), m.Window, m.Status)
+				context := common.NewErrorContext(m.GetConfigName(), "Get Target Tracks")
+				m.ErrorHandler.ShowStandardError(err, &context)
 				m.dbMgr.RollbackTransaction()
 				return
 			}
@@ -1082,7 +953,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 				err = m.copyHotCues(sourceTrack.ID, targetTrack.ID)
 				if err != nil {
 					m.CloseProgressDialog()
-					m.ErrorHandler.HandleError(err, common.NewErrorContext(m.GetConfigName(), "Copy HotCues"), m.Window, m.Status)
+					context := common.NewErrorContext(m.GetConfigName(), "Copy Hot Cues")
+					m.ErrorHandler.ShowStandardError(err, &context)
 					m.dbMgr.RollbackTransaction()
 					return
 				}
@@ -1091,7 +963,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 				err = m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID)
 				if err != nil {
 					m.CloseProgressDialog()
-					m.ErrorHandler.HandleError(err, common.NewErrorContext(m.GetConfigName(), "Copy Metadata"), m.Window, m.Status)
+					context := common.NewErrorContext(m.GetConfigName(), "Copy Track Metadata")
+					m.ErrorHandler.ShowStandardError(err, &context)
 					m.dbMgr.RollbackTransaction()
 					return
 				}
@@ -1106,7 +979,8 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 		err = m.dbMgr.CommitTransaction()
 		if err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.HandleError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), common.NewErrorContext(m.GetConfigName(), "Transaction Commit"), m.Window, m.Status)
+			context := common.NewErrorContext(m.GetConfigName(), "Commit Transaction")
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), &context)
 			return
 		}
 
@@ -1121,6 +995,7 @@ func (m *HotCueSyncModule) synchronizeHotCues() error {
 
 		// Mark the progress dialog as completed instead of closing it
 		m.CompleteProgressDialog()
+		m.submitBtn.SetIcon(theme.ConfirmIcon()) // Set icon to checkmark on success
 	}()
 
 	return nil

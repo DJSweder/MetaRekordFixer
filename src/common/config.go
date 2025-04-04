@@ -17,6 +17,7 @@ type GlobalConfig struct {
 	DatabasePath string
 	Language     string
 	Logging      bool
+	LoggingConfig ModuleConfig
 }
 
 // ModuleConfig defines a configuration structure for modules
@@ -121,12 +122,12 @@ func (mgr *ConfigManager) saveConfig() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	// Zajištění výchozích hodnot
+	// Ensure default values
 	if mgr.globalConfig.DatabasePath == "" {
-		mgr.globalConfig.DatabasePath = "" // Nastavit výchozí hodnotu
+		mgr.globalConfig.DatabasePath = "" // Set default value
 	}
 	if mgr.globalConfig.Language == "" {
-		mgr.globalConfig.Language = "cs" // Výchozí jazyk
+		mgr.globalConfig.Language = "cs" // Default language
 	}
 
 	config := struct {
@@ -260,6 +261,9 @@ func CreateConfigFile(configPath string) error {
 			DatabasePath: "",
 			Language:     "cs",
 			Logging:      true,
+			LoggingConfig: ModuleConfig{
+				Extra: make(map[string]string),
+			},
 		},
 		Modules: make(map[string]ModuleConfig),
 	}

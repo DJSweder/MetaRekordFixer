@@ -4,6 +4,7 @@ package common
 
 import (
 	"MetaRekordFixer/locales"
+	"fmt"
 	"image/color"
 
 	"fyne.io/fyne/v2"
@@ -301,4 +302,179 @@ func CreateDescriptionLabel(text string) *widget.Label {
 	label.Wrapping = fyne.TextWrapWord
 	label.TextStyle = fyne.TextStyle{Bold: true}
 	return label
+}
+
+// CreateCalendarDayButton creates a standardized calendar day button
+// This button is used in calendar widgets for day selection
+func CreateCalendarDayButton(day int, onSelected func()) *widget.Button {
+	btn := widget.NewButton(fmt.Sprintf("%d", day), onSelected)
+	btn.Importance = widget.HighImportance
+	return btn
+}
+
+// ErrorDialogDetails represents details shown in the error dialog
+type ErrorDialogDetails struct {
+	Module      string
+	Operation   string
+	Error       error
+	Severity    ErrorSeverity
+	Recoverable bool
+	Timestamp   string
+	StackTrace  string
+}
+
+// ShowStandardError displays a standardized error dialog with optional details
+func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *dialog.CustomDialog {
+	// Get header based on severity
+	var header string
+	if context != nil {
+		switch context.Severity {
+		case ErrorWarning:
+			header = locales.Translate("common.dialog.warningheader")
+		case ErrorCritical:
+			header = locales.Translate("common.dialog.criticalheader")
+		case ErrorFatal:
+			header = locales.Translate("common.dialog.fatalerror")
+		default:
+			header = locales.Translate("common.dialog.errorheader")
+		}
+	} else {
+		header = locales.Translate("common.dialog.errorheader")
+	}
+
+	// Create error message label
+	messageLabel := widget.NewLabel(err.Error())
+	messageLabel.Wrapping = fyne.TextWrapWord
+
+	// Create buttons container
+	var buttons *fyne.Container
+	if context != nil && context.Recoverable {
+		// Create details button
+		detailsBtn := widget.NewButtonWithIcon(
+			locales.Translate("common.button.showdetails"),
+			theme.InfoIcon(),
+			func() {
+				ShowErrorDetails(window, &ErrorDialogDetails{
+					Module:      context.Module,
+					Operation:   context.Operation,
+					Error:       context.Error,
+					Severity:    context.Severity,
+					Recoverable: context.Recoverable,
+					Timestamp:   context.Timestamp.Format("2006-01-02 15:04:05"),
+					StackTrace:  context.StackTrace,
+				})
+			},
+		)
+
+		// Create OK and Cancel buttons
+		okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
+		cancelBtn := widget.NewButtonWithIcon(locales.Translate("common.button.cancel"), theme.CancelIcon(), nil)
+
+		buttons = container.NewHBox(layout.NewSpacer(), detailsBtn, cancelBtn, okBtn)
+	} else {
+		// Create OK button only
+		okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
+		buttons = container.NewHBox(layout.NewSpacer(), okBtn)
+	}
+
+	// Create content container
+	content := container.NewVBox(
+		messageLabel,
+		buttons,
+	)
+
+	// Create and return dialog
+	return dialog.NewCustom(header, "", content, window)
+}
+
+// ShowErrorDetails displays a dialog with detailed error information
+func ShowErrorDetails(window fyne.Window, details *ErrorDialogDetails) *dialog.CustomDialog {
+	// Create text area for details
+	detailsText := fmt.Sprintf(
+		"Module: %s\nOperation: %s\nError: %v\nSeverity: %v\nRecoverable: %v\nTimestamp: %s\n\nStack Trace:\n%s",
+		details.Module,
+		details.Operation,
+		details.Error,
+		details.Severity,
+		details.Recoverable,
+		details.Timestamp,
+		details.StackTrace,
+	)
+
+	textArea := widget.NewMultiLineEntry()
+	textArea.SetText(detailsText)
+	textArea.Disable() // Make it read-only
+
+	// Create copy button
+	copyBtn := widget.NewButtonWithIcon(
+		locales.Translate("common.button.copy"),
+		theme.ContentCopyIcon(),
+		func() {
+			window.Clipboard().SetContent(detailsText)
+		},
+	)
+
+	// Create close button
+	closeBtn := widget.NewButtonWithIcon(
+		locales.Translate("common.button.close"),
+		theme.CancelIcon(),
+		nil,
+	)
+
+	// Create buttons container
+	buttons := container.NewHBox(layout.NewSpacer(), copyBtn, closeBtn)
+
+	// Create content container with minimum size
+	content := container.NewVBox(
+		textArea,
+		buttons,
+	)
+	rect := canvas.NewRectangle(color.Transparent)
+	rect.SetMinSize(fyne.NewSize(600, 400))
+	content.Add(rect)
+
+	// Create and return dialog
+	return dialog.NewCustom(
+		locales.Translate("common.dialog.errordetails"),
+		"",
+		content,
+		window,
+	)
+}
+
+// CreateDisabledSelect creates a select widget that is disabled by default.
+// Used for components that require database access to be populated.
+// placeholderKey is an optional localization key for the placeholder text shown when no option is selected.
+// If placeholderKey is empty, default placeholder from common.select.placeholderiact will be used.
+func CreateDisabledSelect(options []string, changed func(string), placeholderKey string) *widget.Select {
+	selectWidget := widget.NewSelect(options, changed)
+	if placeholderKey != "" {
+		selectWidget.PlaceHolder = locales.Translate(placeholderKey)
+	} else {
+		selectWidget.PlaceHolder = locales.Translate("common.select.placeholderinact")
+	}
+	selectWidget.Disable()
+	return selectWidget
+}
+
+// CreatePlaylistSelect creates a select widget for playlist selection.
+// Used for components that require database access to be populated with playlists.
+// placeholderKey is an optional localization key for the placeholder text shown when no playlist is selected.
+// If placeholderKey is empty, default placeholder from common.select.plsplaceholder will be used.
+func CreatePlaylistSelect(changed func(string), placeholderKey string) *widget.Select {
+	selectWidget := widget.NewSelect([]string{}, changed)
+	if placeholderKey != "" {
+		selectWidget.PlaceHolder = locales.Translate(placeholderKey)
+	} else {
+		selectWidget.PlaceHolder = locales.Translate("common.select.plsplaceholder")
+	}
+	return selectWidget
+}
+
+// CreateDisabledSubmitButton creates a submit button that is disabled by default.
+// Used for actions that require database access to be executed.
+func CreateDisabledSubmitButton(title string, handler func()) *widget.Button {
+	btn := CreateSubmitButton(title, handler)
+	btn.Disable()
+	return btn
 }

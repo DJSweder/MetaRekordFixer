@@ -5,8 +5,7 @@ package common
 import (
 	"MetaRekordFixer/locales"
 	"fmt"
-	"log"
-	"runtime"
+	"os"
 	"strings"
 	"time"
 
@@ -27,10 +26,11 @@ const (
 	ErrorFatal
 )
 
-// ErrorContext contains additional context for an error
+// ErrorContext provides additional information about an error
 type ErrorContext struct {
 	Module      string
 	Operation   string
+	Error       error
 	Severity    ErrorSeverity
 	Recoverable bool
 	Timestamp   time.Time
@@ -42,23 +42,24 @@ func NewErrorContext(module, operation string) ErrorContext {
 	return ErrorContext{
 		Module:      module,
 		Operation:   operation,
-		Severity:    ErrorWarning,
+		Severity:    ErrorInfo,
 		Recoverable: true,
 		Timestamp:   time.Now(),
 	}
 }
 
-// ErrorHandler provides centralized error handling
+// ErrorHandler handles application errors and logging
 type ErrorHandler struct {
-	logger      *log.Logger
-	lastContext ErrorContext
-	isLogging   bool
+	logger  *Logger
+	window  fyne.Window
+	isLogging bool
 }
 
-// NewErrorHandler creates a new error handler
-func NewErrorHandler(logger *log.Logger) *ErrorHandler {
+// NewErrorHandler creates a new error handler instance
+func NewErrorHandler(logger *Logger) *ErrorHandler {
 	if logger == nil {
-		logger = log.New(log.Writer(), "ERROR: ", log.LstdFlags)
+		// This should never happen in production
+		os.Exit(1)
 	}
 
 	return &ErrorHandler{
@@ -67,54 +68,54 @@ func NewErrorHandler(logger *log.Logger) *ErrorHandler {
 	}
 }
 
-// HandleError processes an error, logs it, and displays it to the user if needed
-func (h *ErrorHandler) HandleError(err error, context ErrorContext, window fyne.Window, statusLabel *widget.Label) {
+// SetWindow sets the window for displaying error dialogs
+func (h *ErrorHandler) SetWindow(window fyne.Window) {
+	h.window = window
+}
+
+// GetLogger returns the logger instance
+func (h *ErrorHandler) GetLogger() *Logger {
+	return h.logger
+}
+
+// ShowError displays an error dialog and logs the error
+func (h *ErrorHandler) ShowError(err error) {
 	if err == nil {
 		return
 	}
 
-	if context.StackTrace == "" {
-		buf := make([]byte, 8192)
-		length := runtime.Stack(buf, false)
-		context.StackTrace = string(buf[:length])
+	if h.isLogging {
+		h.logger.Error("%v", err)
 	}
 
-	severityStr := "INFO"
-	switch context.Severity {
-	case ErrorWarning:
-		severityStr = "WARNING"
-	case ErrorCritical:
-		severityStr = "CRITICAL"
-	case ErrorFatal:
-		severityStr = "FATAL"
-	}
-
-	logMessage := fmt.Sprintf("[%s] Module: %s, Operation: %s, Error: %v, Recoverable: %v\n%s",
-		severityStr, context.Module, context.Operation, err, context.Recoverable, context.StackTrace)
-
-	h.logger.Println(logMessage)
-
-	if statusLabel != nil {
-		statusLabel.SetText(err.Error())
-	}
-
-	switch context.Severity {
-	case ErrorInfo:
-		dialog.ShowInformation(context.Operation, err.Error(), window)
-	case ErrorWarning, ErrorCritical:
-		h.showCustomErrorDialog(err, window)
-	case ErrorFatal:
-		h.showFatalErrorDialog(err, window)
+	if h.window != nil {
+		dialog.ShowError(err, h.window)
 	}
 }
 
-// showCustomErrorDialog shows a custom error dialog with more details
-func (h *ErrorHandler) showCustomErrorDialog(err error, window fyne.Window) {
-	message := widget.NewLabel(err.Error())
-	message.Wrapping = fyne.TextWrapWord
+// ShowErrorWithContext displays an error dialog with context and logs the error
+func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
+	if context.Error == nil {
+		return
+	}
 
-	detailsLabel := widget.NewLabel(fmt.Sprintf("Module: %s\nOperation: %s", h.lastContext.Module, h.lastContext.Operation))
+	if h.isLogging {
+		h.logger.Error("%s: %v", context.Operation, context.Error)
+	}
+
+	if h.window != nil {
+		h.showErrorDialog(context)
+	}
+}
+
+func (h *ErrorHandler) showErrorDialog(context ErrorContext) {
+	message := widget.NewLabel(context.Error.Error())
+	message.Wrapping = fyne.TextWrapWord
+	message.Resize(fyne.NewSize(400, message.MinSize().Height))
+
+	detailsLabel := widget.NewLabel(fmt.Sprintf("Module: %s\nOperation: %s", context.Module, context.Operation))
 	detailsLabel.Wrapping = fyne.TextWrapWord
+	detailsLabel.Resize(fyne.NewSize(400, detailsLabel.MinSize().Height))
 
 	content := container.NewVBox(
 		message,
@@ -124,9 +125,9 @@ func (h *ErrorHandler) showCustomErrorDialog(err error, window fyne.Window) {
 
 	showStackTraceBtn := widget.NewButtonWithIcon(locales.Translate("common.button.showdetails"), theme.InfoIcon(), nil)
 
-	if h.lastContext.StackTrace != "" {
+	if context.StackTrace != "" {
 		stackTraceArea := widget.NewMultiLineEntry()
-		stackTraceArea.SetText(h.lastContext.StackTrace)
+		stackTraceArea.SetText(context.StackTrace)
 		stackTraceArea.Disable()
 
 		showStackTraceBtn.OnTapped = func() {
@@ -146,35 +147,8 @@ func (h *ErrorHandler) showCustomErrorDialog(err error, window fyne.Window) {
 		locales.Translate("common.dialog.error"),
 		locales.Translate("common.button.ok"),
 		content,
-		window,
+		h.window,
 	)
-
-	customDialog.Show()
-}
-
-// showFatalErrorDialog shows a dialog for fatal errors
-func (h *ErrorHandler) showFatalErrorDialog(err error, window fyne.Window) {
-	message := widget.NewLabel(fmt.Sprintf(locales.Translate("common.dialog.fatal"), err))
-	message.Wrapping = fyne.TextWrapWord
-
-	content := container.NewVBox(
-		message,
-		widget.NewSeparator(),
-		widget.NewButton(locales.Translate("common.button.exit"), func() {
-			window.Close()
-		}),
-	)
-
-	customDialog := dialog.NewCustom(
-		locales.Translate("common.dialog.fatalerror"),
-		"",
-		content,
-		window,
-	)
-
-	customDialog.SetOnClosed(func() {
-		window.Close()
-	})
 
 	customDialog.Show()
 }
@@ -194,7 +168,12 @@ func (h *ErrorHandler) SetLoggingEnabled(enabled bool) {
 	h.isLogging = enabled
 }
 
-// ShowError displays an error message
-func ShowError(err error, window fyne.Window) {
-	dialog.ShowError(err, window)
+// ShowStandardError displays an error with standard formatting and context
+func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {
+	if err == nil {
+		return
+	}
+
+	context.Error = err
+	h.showErrorDialog(*context)
 }

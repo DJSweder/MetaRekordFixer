@@ -79,13 +79,14 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("updater.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("updater.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)
 
 	// Add submit button with right alignment if provided
 	if m.submitBtn != nil {
+
 		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
 		moduleContent.Add(buttonBox)
 	}
@@ -93,8 +94,55 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 	return moduleContent
 }
 
-// GetContent returns the module's main UI content.
+// GetContent returns the module's main UI content and initializes database connection.
 func (m *TracksUpdater) GetContent() fyne.CanvasObject {
+	// Check database requirements
+	if m.dbMgr.GetDatabasePath() == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		m.playlistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+
+	// Try to connect to database
+	if err := m.dbMgr.Connect(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		m.playlistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+	defer m.dbMgr.Finalize()
+
+	// Load playlists
+	if err := m.loadPlaylists(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Access",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
+		m.playlistSelect.Disable()
+		m.submitBtn.Disable()
+		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	}
+
+	// Enable interactive components if all checks passed
+	m.playlistSelect.Enable()
+	m.submitBtn.Enable()
+
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
@@ -154,17 +202,18 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 	return cfg
 }
 
-// initializeUI sets up the user interface of the module.
+// initializeUI sets up the user interface components.
 func (m *TracksUpdater) initializeUI() {
-	// Initialize playlist selector
-	m.playlistSelect = widget.NewSelect([]string{}, m.CreateSelectionChangeHandler(func() {
-		m.SaveConfig()
-	}))
-
 	// Initialize folder path entry
+	m.folderPath = widget.NewEntry()
 	m.folderPath.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
 	})
+
+	// Initialize playlist selector with disabled state
+	m.playlistSelect = common.CreateDisabledSelect([]string{}, m.CreateSelectionChangeHandler(func() {
+		m.SaveConfig()
+	}), "common.select.plsplacehldrinact")
 
 	// Create folder selection field using standardized function
 	folderSelectionField := common.CreateFolderSelectionField(
@@ -180,61 +229,164 @@ func (m *TracksUpdater) initializeUI() {
 	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
 	// Create submit button using standardized function
-	m.submitBtn = common.CreateSubmitButton(
+	m.submitBtn = common.CreateDisabledSubmitButton(
 		locales.Translate("updater.button.libupd"),
 		func() {
 			go m.Start()
 		},
 	)
 
-	// Load playlists from database
-	if err := m.loadPlaylists(); err != nil {
-		m.ModuleBase.AddErrorMessage(fmt.Sprintf("%s: %v", locales.Translate("updater.err.dbread"), err))
+	// Create form with playlist selector and folder selection field
+	form := &widget.Form{
+		Items: []*widget.FormItem{
+			{Text: locales.Translate("updater.label.replaced"), Widget: m.playlistSelect},
+			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderPath)},
+		},
+	}
+
+	// Create content container with form
+	contentContainer := container.NewVBox(
+		form,
+	)
+
+	// Create module content with description and separator
+	moduleContent := container.NewVBox(
+		widget.NewLabel(locales.Translate("updater.label.info")),
+		widget.NewSeparator(),
+		contentContainer,
+	)
+
+	// Add submit button with right alignment if provided
+	if m.submitBtn != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
+		moduleContent.Add(buttonBox)
+	}
+
+	m.Content = moduleContent
+}
+
+// Start handles the module's main functionality
+
+func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
+	return m.ModuleBase.GetStatusMessagesContainer()
+}
+
+func (m *TracksUpdater) AddInfoMessage(message string) {
+	m.ModuleBase.AddInfoMessage(message)
+}
+
+func (m *TracksUpdater) AddErrorMessage(message string) {
+	m.ModuleBase.AddErrorMessage(message)
+}
+
+func (m *TracksUpdater) ClearStatusMessages() {
+	m.ModuleBase.ClearStatusMessages()
+}
+
+// getFileType is used to translate the file type according to its extension into an identifier that is stored in updated records in djmdContent in the database
+func getFileType(ext string) int {
+	switch strings.ToLower(ext) {
+	case ".mp3":
+		return 1
+	case ".m4a":
+		return 4
+	case ".flac":
+		return 5
+	case ".wav":
+		return 11
+	case ".aiff":
+		return 12
+	default:
+		return 0
 	}
 }
 
+func (m *TracksUpdater) loadPlaylists() error {
+	err := m.dbMgr.Connect()
+	if err != nil {
+		return fmt.Errorf("%s %w", locales.Translate("common.err.connectdb"), err)
+	}
+	defer m.dbMgr.Finalize()
+
+	rows, err := m.dbMgr.Query(`
+        SELECT p1.ID, p1.Name, p1.ParentID,
+        CASE
+            WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || p1.Name
+            ELSE p1.Name
+        END as Path
+        FROM djmdPlaylist p1
+        LEFT JOIN djmdPlaylist p2 ON p1.ParentID = p2.ID
+        ORDER BY
+            CASE WHEN p2.ID IS NULL THEN p1.Seq ELSE p2.Seq END,
+            CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
+    `)
+	if err != nil {
+		return fmt.Errorf("%s %w", locales.Translate("common.err.dbread"), err)
+	}
+	defer rows.Close()
+
+	m.playlists = make([]common.PlaylistItem, 0)
+	var playlistPaths []string
+	for rows.Next() {
+		var p common.PlaylistItem
+		if err := rows.Scan(&p.ID, &p.Name, &p.ParentID, &p.Path); err != nil {
+			return fmt.Errorf("%s %w", locales.Translate("common.err.dbread"), err)
+		}
+		m.playlists = append(m.playlists, p)
+		playlistPaths = append(playlistPaths, p.Path)
+	}
+
+	m.playlistSelect.Options = playlistPaths
+	m.playlistSelect.Enable()
+	m.playlistSelect.PlaceHolder = locales.Translate("common.select.plsplaceholder")
+	return nil
+}
 func (m *TracksUpdater) Start() {
 	// Save configuration before starting the process
 	m.SaveConfig()
 
-	// Disable the button during processing
-	m.submitBtn.Disable()
-	defer func() {
-		// Enable the button and set success icon after completion
-		m.submitBtn.Enable()
-		m.submitBtn.SetIcon(theme.ConfirmIcon())
-	}()
+	// Clear any previous status messages
+	m.ClearStatusMessages()
 
-	m.ModuleBase.ClearStatusMessages() // Clear previous status messages
-	m.ModuleBase.AddInfoMessage(locales.Translate("updater.tracks.starting"))
+	// Get selected playlist
+	if m.playlistSelect.Selected == "" {
+		m.AddErrorMessage(locales.Translate("updater.err.noplaylist"))
+		return
+	}
 
-	// Show a progress dialog
+	// Get folder path
+	folderPath := m.folderPath.Text
+	if folderPath == "" {
+		m.AddErrorMessage(locales.Translate("updater.err.nofolder"))
+		return
+	}
+
+	// Show progress dialog
 	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
 
+	// Start processing in a goroutine
 	go func() {
+		// Track the number of updated files
+		updateCount := 0
+
 		defer func() {
 			if r := recover(); r != nil {
-				// In case of panic
-				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, nil)
-			}
-		}()
-		defer func() {
-			if err := m.dbMgr.Finalize(); err != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("updater.err.finalize"), err),
-					common.NewErrorContext(m.GetConfigName(), "Database Finalize"), m.Window, nil)
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Update Process",
+					Severity:    common.ErrorCritical,
+					Recoverable: false,
+				}
+				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
 			}
 		}()
 
 		// Backup database
-		m.UpdateProgressStatus(0.1, locales.Translate("updater.db.backup"))
+		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
 			m.CloseProgressDialog()
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Database Backup")
-			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, nil)
+			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.backupdb"), err))
 			return
 		}
 
@@ -243,7 +395,8 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
@@ -252,10 +405,7 @@ func (m *TracksUpdater) Start() {
 		err = m.dbMgr.Connect()
 		if err != nil {
 			m.CloseProgressDialog()
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Database Connection")
-			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, nil)
+			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.connectdb"), err))
 			return
 		}
 
@@ -276,12 +426,13 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
 		// Get tracks from playlist
-		m.UpdateProgressStatus(0.4, locales.Translate("updater.tracks.gettracks"))
+		m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettracks"))
 		rows, err := m.dbMgr.Query(`
         SELECT c.ID, c.FileNameL
         FROM djmdContent c
@@ -290,17 +441,15 @@ func (m *TracksUpdater) Start() {
     `, selectedPlaylist)
 		if err != nil {
 			m.CloseProgressDialog()
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Database Query")
-			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, nil)
+			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.dbquery"), err))
 			return
 		}
 		defer rows.Close()
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
@@ -315,10 +464,7 @@ func (m *TracksUpdater) Start() {
 			}
 			if err := rows.Scan(&t.ID, &t.FileName); err != nil {
 				m.CloseProgressDialog()
-				// Create error context with module name and operation
-				context := common.NewErrorContext(m.GetConfigName(), "Database Scan")
-				context.Severity = common.ErrorWarning
-				m.ErrorHandler.HandleError(err, context, m.Window, nil)
+				m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("updater.err.dbscan"), err))
 				return
 			}
 			tracks = append(tracks, t)
@@ -330,7 +476,8 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
@@ -339,10 +486,7 @@ func (m *TracksUpdater) Start() {
 		files, err := filepath.Glob(filepath.Join(m.folderPath.Text, "*.*"))
 		if err != nil {
 			m.CloseProgressDialog()
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Filepath Glob")
-			context.Severity = common.ErrorWarning
-			m.ErrorHandler.HandleError(err, context, m.Window, nil)
+			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("updater.err.glob"), err))
 			return
 		}
 
@@ -351,12 +495,13 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
 		// Count matching files and non-matching files
-		m.UpdateProgressStatus(0.7, locales.Translate("updater.tracks.matching"))
+		m.UpdateProgressStatus(0.7, locales.Translate("updater.status.matching"))
 		matchingFiles := 0
 		nonMatchingFiles := 0
 		mismatchedFiles := make([]string, 0) // Add slice for mismatched filenames
@@ -417,14 +562,14 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+			m.CompleteProgressDialog()
 			return
 		}
 
 		// Process tracks
-		m.UpdateProgressStatus(0.8, locales.Translate("updater.tracks.updating"))
-		updateCount := 0
-		for i, updateTrack := range updateTracks {
+		m.UpdateProgressStatus(0.0, locales.Translate("updater.tracks.starting"))
+		for _, updateTrack := range updateTracks {
 			err = m.dbMgr.Execute(`
 		UPDATE djmdContent
 		SET 
@@ -436,20 +581,18 @@ func (m *TracksUpdater) Start() {
 
 			if err != nil {
 				m.CloseProgressDialog()
-				// Create error context with module name and operation
-				context := common.NewErrorContext(m.GetConfigName(), "Database Update")
-				context.Severity = common.ErrorWarning
-				m.ErrorHandler.HandleError(err, context, m.Window, nil)
+				m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.dbupdate"), err))
 				return
 			}
 
 			updateCount++
-			progress := 0.8 + (float64(i+1) / float64(len(updateTracks)) * 0.2)
-			m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("updater.status.process"), i+1, len(updateTracks)))
+			progress := float64(updateCount) / float64(len(updateTracks))
+			m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("updater.status.progress"), updateCount, len(updateTracks)))
 
 			// Check if operation was cancelled
 			if m.IsCancelled() {
-				m.CloseProgressDialog()
+				m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
+				m.CompleteProgressDialog()
 				return
 			}
 		}
@@ -458,79 +601,7 @@ func (m *TracksUpdater) Start() {
 		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
 		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
 
-		// Mark the progress dialog as completed instead of closing it
+		// Mark the progress dialog as completed
 		m.CompleteProgressDialog()
 	}()
-}
-
-func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-func (m *TracksUpdater) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-func (m *TracksUpdater) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-func (m *TracksUpdater) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
-}
-
-func getFileType(ext string) int {
-	switch strings.ToLower(ext) {
-	case ".mp3":
-		return 1
-	case ".m4a":
-		return 4
-	case ".flac":
-		return 5
-	case ".wav":
-		return 11
-	case ".aiff":
-		return 12
-	default:
-		return 0
-	}
-}
-
-func (m *TracksUpdater) loadPlaylists() error {
-	err := m.dbMgr.Connect()
-	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("updater.err.dbopen"), err)
-	}
-	defer m.dbMgr.Finalize()
-
-	rows, err := m.dbMgr.Query(`
-        SELECT p1.ID, p1.Name, p1.ParentID,
-        CASE
-            WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || p1.Name
-            ELSE p1.Name
-        END as Path
-        FROM djmdPlaylist p1
-        LEFT JOIN djmdPlaylist p2 ON p1.ParentID = p2.ID
-        ORDER BY
-            CASE WHEN p2.ID IS NULL THEN p1.Seq ELSE p2.Seq END,
-            CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
-    `)
-	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("updater.err.dbread"), err)
-	}
-	defer rows.Close()
-
-	m.playlists = make([]common.PlaylistItem, 0)
-	var playlistPaths []string
-	for rows.Next() {
-		var p common.PlaylistItem
-		if err := rows.Scan(&p.ID, &p.Name, &p.ParentID, &p.Path); err != nil {
-			return fmt.Errorf("%s: %w", locales.Translate("updater.err.dbread"), err)
-		}
-		m.playlists = append(m.playlists, p)
-		playlistPaths = append(playlistPaths, p.Path)
-	}
-
-	m.playlistSelect.Options = playlistPaths
-	return nil
 }

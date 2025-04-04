@@ -4,10 +4,11 @@ package modules
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"strings"
 	"time"
+
+	"MetaRekordFixer/common"
+	"MetaRekordFixer/locales"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -15,9 +16,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-
-	"MetaRekordFixer/common"
-	"MetaRekordFixer/locales"
 )
 
 // DateSyncModule implements a module for synchronizing dates in the Rekordbox database
@@ -333,7 +331,7 @@ func (c *CustomCalendar) updateDays() {
 
 	for day := 1; day <= lastDay.Day(); day++ {
 		currentDay := day
-		dayBtn := widget.NewButton(fmt.Sprintf("%d", day), func() {
+		dayBtn := common.CreateCalendarDayButton(day, func() {
 			date := time.Date(c.currentYear, c.currentMonth, currentDay, 0, 0, 0, 0, time.Local)
 			if c.onSelected != nil {
 				c.onSelected(date)
@@ -354,79 +352,191 @@ func (c *CustomCalendar) CreateRenderer() fyne.WidgetRenderer {
 
 // initializeUI sets up the user interface components
 func (m *DateSyncModule) initializeUI() {
-	// Initialize UI components for configuration
+	// Create excluded folders checkbox
 	m.excludeFoldersCheck = widget.NewCheck(locales.Translate("datesync.chkbox.exception"),
-		m.CreateBoolChangeHandler(func() { m.SaveConfig() }))
+		m.CreateBoolChangeHandler(func() {
+			m.SaveConfig()
+		}),
+	)
 
-	m.datePicker = widget.NewEntry()
-	m.datePicker.SetPlaceHolder(locales.Translate("datesync.date.placeholder"))
-	m.datePicker.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
-
+	// Create folders container
 	m.foldersContainer = container.NewVBox()
+
+	// Create custom date container
 	m.customDateContainer = container.NewVBox()
 
-	// Action buttons using standard components
-	m.standardUpdateBtn = common.CreateSubmitButtonWithIcon(
-		locales.Translate("datesync.date.dbupd"),
-		nil,
-		func() {
-			go m.synchronizeDates()
-		},
-	)
-
-	m.customDateUpdateBtn = common.CreateSubmitButtonWithIcon(
-		locales.Translate("datesync.date.foldersupd"),
-		nil,
-		func() {
-			customDateFolders := []string{}
-			for _, entry := range m.customDateFolders {
-				if entry.Text != "" {
-					customDateFolders = append(customDateFolders, entry.Text)
-				}
-			}
-			customDate, err := time.Parse("2006-01-02", m.datePicker.Text)
-			if err != nil {
-				m.ShowError(fmt.Errorf("%s", locales.Translate("datesync.err.invalidcustomdate")))
-				return
-			}
-			go m.setCustomDates(customDateFolders, customDate)
-		},
-	)
-
-	// Calendar date selection
-	m.calendarBtn = widget.NewButtonWithIcon("", theme.HistoryIcon(), func() {
-		// Declaration of the dialog variable
-		var calendarDialog dialog.Dialog
-
-		// Create a new custom calendar
-		calendar := NewCustomCalendar(func(date time.Time) {
-			m.datePicker.SetText(date.Format("2006-01-02"))
-			m.SaveConfig()
-			// Dialog will be closed automatically after date selection
-			calendarDialog.Hide()
-		})
-
-		// Create the calendar content
-		calendarContent := container.NewVBox(
-			widget.NewLabel(locales.Translate("datesync.calendar.label")),
-			calendar,
-		)
-
-		// Calendar dialog initialization
-		calendarDialog = dialog.NewCustomWithoutButtons(
-			locales.Translate("datesync.dialog.header"),
-			calendarContent,
-			m.Window,
-		)
-
-		// Settings for the calendar dialog
-		calendarDialog.Resize(fyne.NewSize(350, 400))
-		calendarDialog.Show()
+	// Create date picker
+	m.datePicker = widget.NewEntry()
+	m.datePicker.SetPlaceHolder("YYYY-MM-DD")
+	m.datePicker.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveConfig()
 	})
 
-	// Initialize the first entry fields for both sections
+	// Create calendar button
+	m.calendarBtn = widget.NewButtonWithIcon("", theme.HistoryIcon(), func() {
+		calendar := NewCustomCalendar(func(selectedDate time.Time) {
+			m.datePicker.SetText(selectedDate.Format("2006-01-02"))
+			m.SaveConfig()
+		})
+		dialog.ShowCustom(locales.Translate("datesync.dialog.calendar"), locales.Translate("common.button.close"), calendar, m.Window)
+	})
+
+	// Create standard update button
+	m.standardUpdateBtn = common.CreateSubmitButton(
+		locales.Translate("datesync.button.startupdate"),
+		func() {
+			go m.standardUpdate()
+		},
+	)
+
+	// Create custom date update button
+	m.customDateUpdateBtn = common.CreateSubmitButton(
+		locales.Translate("datesync.button.startcustomupdate"),
+		func() {
+			go m.customUpdate()
+		},
+	)
+
+	// Add initial folder entries
 	m.addExcludedFolderEntry()
 	m.addCustomDateFolderEntry()
+}
+
+// standardUpdate performs the standard date synchronization
+func (m *DateSyncModule) standardUpdate() {
+	// Save configuration before starting
+	m.SaveConfig()
+
+	// Show progress dialog
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+	defer m.CloseProgressDialog()
+
+	// Check database path
+	if m.dbMgr.GetDatabasePath() == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		return
+	}
+
+	// Create database backup
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+
+	// Try to connect to database
+	if err := m.dbMgr.Connect(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		return
+	}
+
+	// Execute standard date sync
+	if err := m.synchronizeDates(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Date Sync",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+}
+
+// customUpdate performs the custom date synchronization
+func (m *DateSyncModule) customUpdate() {
+	// Save configuration before starting
+	m.SaveConfig()
+
+	// Show progress dialog
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+	defer m.CloseProgressDialog()
+
+	// Check database path
+	if m.dbMgr.GetDatabasePath() == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		return
+	}
+
+	// Create database backup
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+
+	// Try to connect to database
+	if err := m.dbMgr.Connect(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		return
+	}
+
+	// Get custom date folders
+	var customDateFolders []string
+	for _, entry := range m.customDateFolders {
+		if entry.Text != "" {
+			customDateFolders = append(customDateFolders, entry.Text)
+		}
+	}
+
+	// Parse custom date
+	customDate, err := time.Parse("2006-01-02", m.datePicker.Text)
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Date Parse",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.invaliddate")), context)
+		return
+	}
+
+	// Execute custom date sync
+	if err := m.setCustomDates(customDateFolders, customDate); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Custom Date Sync",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
 }
 
 // addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add
@@ -636,326 +746,89 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 }
 
 // synchronizeDates updates the dates in the Rekordbox database
-func (m *DateSyncModule) synchronizeDates() {
-	// Disable the button during processing
-	m.standardUpdateBtn.Disable()
-
-	// After completion, we restore the button and set the success icon
-	defer func() {
-		m.standardUpdateBtn.Enable()
-		// Change the button to the version with the tick icon after process completion
-		m.standardUpdateBtn.SetIcon(theme.ConfirmIcon())
-	}()
-
+func (m *DateSyncModule) synchronizeDates() error {
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
-	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+	// Add status message about starting the process
+	m.AddInfoMessage(locales.Translate("common.status.start"))
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				// In case of panic
-				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("datesync.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
-			}
-		}()
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
-
-		// Get global configuration for database path
-		globalConfig := m.ConfigMgr.GetGlobalConfig()
-		if globalConfig.DatabasePath == "" {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf("%s", locales.Translate("datesync.err.nodbpath")))
-			return
-		}
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
-		m.AddInfoMessage(locales.Translate("common.db.backupcreate"))
-		// Use the DBManager's backup function
-		err := m.dbMgr.BackupDatabase()
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbackup"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dbackup"), err))
-			return
-		}
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		m.UpdateProgressStatus(0.2, locales.Translate("datesync.db.conn"))
-		m.AddInfoMessage(locales.Translate("datesync.db.conn"))
-		// Make sure we're connected to the database - Pass false to avoid read-only mode
-		err = m.dbMgr.EnsureConnected(false)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbconn"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dbconn"), err))
-			return
-		}
-
-		// Make sure to close the database connection when we're done
-		defer func() {
-			if closeErr := m.dbMgr.Close(); closeErr != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("error closing database: %v", closeErr),
-					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
-			}
-		}()
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		whereClause := "WHERE ReleaseDate IS NOT NULL"
-
-		// Add excluded folders to WHERE clause if enabled
-		if m.excludeFoldersCheck.Checked {
-			var excludedPaths []string
-			for _, entry := range m.excludedFolders {
-				if entry.Text != "" {
-					excludedPaths = append(excludedPaths, entry.Text)
-				}
-			}
-			if len(excludedPaths) > 0 {
-				whereClause += " AND ("
-				for i, path := range excludedPaths {
-					if i > 0 {
-						whereClause += " AND "
-					}
-					whereClause += fmt.Sprintf("FolderPath NOT LIKE '%s%%'", common.ToDbPath(path, true))
-				}
-				whereClause += ")"
+	// Get excluded folders if enabled
+	var excludedFolders []string
+	if m.excludeFoldersCheck.Checked {
+		for _, entry := range m.excludedFolders {
+			if entry.Text != "" {
+				excludedFolders = append(excludedFolders, entry.Text)
 			}
 		}
+	}
 
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
+	// Build the WHERE clause for excluded folders
+	var excludeClause string
+	if len(excludedFolders) > 0 {
+		excludeConditions := make([]string, len(excludedFolders))
+		for i, folder := range excludedFolders {
+			excludeConditions[i] = fmt.Sprintf("FolderPath NOT LIKE '%s%%'", common.ToDbPath(folder, true))
 		}
+		excludeClause = " AND " + strings.Join(excludeConditions, " AND ")
+	}
 
-		m.UpdateProgressStatus(0.4, locales.Translate("common.status.reading"))
-		m.AddInfoMessage(locales.Translate("common.status.reading"))
-		// Get count of affected records
-		var count int
-		countQuery := "SELECT COUNT(*) FROM djmdContent " + whereClause
-		row := m.dbMgr.QueryRow(countQuery)
-		err = row.Scan(&count)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.entrycount"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.entrycount"), err))
-			return
-		}
+	// Query to update dates
+	updateQuery := fmt.Sprintf(`
+		UPDATE djmdContent
+		SET DateCreated = DateModified
+		WHERE FileType = 1%s
+	`, excludeClause)
 
-		if count == 0 {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf("%s", locales.Translate("datesync.err.noentryfound")))
-			m.AddErrorMessage(locales.Translate("datesync.err.noentryfound"))
-			return
-		}
+	// Execute the update
+	if err := m.dbMgr.Execute(updateQuery); err != nil {
+		m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
+		return err
+	}
 
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		m.UpdateProgressStatus(0.6, locales.Translate("common.status.updating"))
-		m.AddInfoMessage(locales.Translate("common.status.updating"))
-		// Update dates
-		updateQuery := "UPDATE djmdContent SET StockDate = ReleaseDate, DateCreated = ReleaseDate " + whereClause
-		err = m.dbMgr.Execute(updateQuery)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dateupd"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
-			return
-		}
-
-		// Update progress and status
-		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("datesync.status.completed"), count))
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("datesync.status.completed"), count))
-
-		// Mark the progress dialog as completed instead of closing it
-		m.CompleteProgressDialog()
-	}()
+	// Add success message
+	m.AddInfoMessage(locales.Translate("common.status.completed"))
+	m.CompleteProgressDialog()
+	return nil
 }
 
 // setCustomDates sets custom dates for tracks in selected folders
-func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate time.Time) {
-	// Disable the button during processing
-	m.customDateUpdateBtn.Disable()
-
-	// After completion, we restore the button and set the success icon
-	defer func() {
-		m.customDateUpdateBtn.Enable()
-		// Change the button to the version with the tick icon after process completion
-		m.customDateUpdateBtn.SetIcon(theme.ConfirmIcon())
-	}()
-
+func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate time.Time) error {
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
-	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+	// Add status message about starting the process
+	m.AddInfoMessage(locales.Translate("common.status.start"))
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				// In case of panic
-				m.CloseProgressDialog()
-				m.ErrorHandler.HandleError(fmt.Errorf(locales.Translate("datesync.err.panic"), r), common.NewErrorContext(m.GetConfigName(), "Panic"), m.Window, m.Status)
-			}
-		}()
+	// Check if any folders are selected
+	if len(customDateFolders) == 0 {
+		return fmt.Errorf(locales.Translate("datesync.err.nofolders"))
+	}
 
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("datesync.status.startcustom"))
+	// Build the WHERE clause for custom date folders
+	var conditions []string
+	for _, folder := range customDateFolders {
+		conditions = append(conditions, fmt.Sprintf("FolderPath LIKE '%s%%'", common.ToDbPath(folder, true)))
+	}
+	whereClause := strings.Join(conditions, " OR ")
 
-		// Get global configuration
-		globalConfig := m.ConfigMgr.GetGlobalConfig()
+	// Query to update dates
+	updateQuery := fmt.Sprintf(`
+		UPDATE djmdContent
+		SET StockDate = ?
+		WHERE FileType = 1 AND (%s)
+	`, whereClause)
 
-		// Ensure we have a database manager
-		if m.dbMgr == nil {
-			var err error
-			m.dbMgr, err = common.NewDBManager(globalConfig.DatabasePath, log.New(os.Stdout, "DateSync DB: ", log.LstdFlags), m.ErrorHandler)
-			if err != nil {
-				m.CloseProgressDialog()
-				m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbmanager"), err))
-				m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dbmanager"), err))
-				return
-			}
-		}
+	// Execute the update
+	if err := m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02")); err != nil {
+		m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
+		return err
+	}
 
-		// Make sure to finalize the database connection when we're done
-		defer m.dbMgr.Finalize()
-
-		// Validate input
-		if len(customDateFolders) == 0 {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf("%s", locales.Translate("datesync.err.nodateorfolders")))
-			m.AddErrorMessage(locales.Translate("datesync.err.nodateorfolders"))
-			return
-		}
-
-		// Create backup
-		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
-		m.AddInfoMessage(locales.Translate("common.db.backupcreate"))
-		// Use the DBManager's backup function
-		err := m.dbMgr.BackupDatabase()
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbackup"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dbackup"), err))
-			return
-		}
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		// Connect to database
-		m.UpdateProgressStatus(0.2, locales.Translate("datesync.db.conn"))
-		m.AddInfoMessage(locales.Translate("datesync.db.conn"))
-		// Make sure we're connected to the database - Pass false to avoid read-only mode
-		err = m.dbMgr.EnsureConnected(false)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dbconn"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dbconn"), err))
-			return
-		}
-
-		// Make sure to close the database connection when we're done
-		defer func() {
-			if closeErr := m.dbMgr.Close(); closeErr != nil {
-				m.ErrorHandler.HandleError(fmt.Errorf("error closing database: %v", closeErr),
-					common.NewErrorContext(m.GetConfigName(), "Database Close"), m.Window, m.Status)
-			}
-		}()
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		// Build folder clauses for the WHERE condition
-		folderClauses := make([]string, len(customDateFolders))
-		for i, path := range customDateFolders {
-			folderClauses[i] = fmt.Sprintf("FolderPath LIKE '%s%%'", common.ToDbPath(path, true))
-		}
-
-		whereClause := "WHERE " + strings.Join(folderClauses, " OR ")
-
-		// Count affected records
-		var count int
-		countQuery := "SELECT COUNT(*) FROM djmdContent " + whereClause
-		row := m.dbMgr.QueryRow(countQuery)
-		err = row.Scan(&count)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.entrycount"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.entrycount"), err))
-			return
-		}
-
-		if count == 0 {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf("%s", locales.Translate("datesync.err.noentryinfolders")))
-			m.AddErrorMessage(locales.Translate("datesync.err.noentryinfolders"))
-			return
-		}
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		// Set progress bar maximum value
-		m.UpdateProgressStatus(0.3, locales.Translate("datesync.dates.updating"))
-		m.AddInfoMessage(locales.Translate("datesync.dates.updating"))
-		// Format date string
-		formattedDate := customDate.Format("2006-01-02")
-
-		// Update database using parameterized query
-		updateQuery := `
-        UPDATE djmdContent
-        SET StockDate = ?,
-            DateCreated = ?
-    ` + whereClause
-
-		err = m.dbMgr.Execute(updateQuery, formattedDate, formattedDate)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ShowError(fmt.Errorf(locales.Translate("datesync.err.dateupd"), err))
-			m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
-			return
-		}
-
-		// Update progress and status
-		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("datesync.status.completed"), count))
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("datesync.status.completed"), count))
-
-		// Mark the progress dialog as completed instead of closing it
-		m.CompleteProgressDialog()
-	}()
+	// Add success message
+	m.AddInfoMessage(locales.Translate("common.status.completed"))
+	m.CompleteProgressDialog()
+	return nil
 }
 
 // GetStatusMessagesContainer returns the status messages container for this module

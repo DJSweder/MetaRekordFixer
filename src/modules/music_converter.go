@@ -325,7 +325,7 @@ func (m *MusicConverterModule) initializeUI() {
 // onSourceFormatChanged handles changes in source format selection
 func (m *MusicConverterModule) onSourceFormatChanged(format string) {
 	// Debug log
-	debugLog("Source format changed to: '%s'", format)
+	m.debugLog("Source format changed to: '%s'", format)
 
 	// Save configuration
 	m.SaveConfig()
@@ -334,7 +334,7 @@ func (m *MusicConverterModule) onSourceFormatChanged(format string) {
 // onTargetFormatChanged handles changes in target format selection
 func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 	// Debug log
-	debugLog("Target format changed to: '%s'", format)
+	m.debugLog("Target format changed to: '%s'", format)
 
 	// Update format settings container
 	m.updateFormatSettings(format)
@@ -347,7 +347,7 @@ func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 func (m *MusicConverterModule) updateFormatSettings(format string) {
 	// Safety check - if containers are not initialized yet, return
 	if m.formatSettingsContainer == nil {
-		debugLog("WARNING: Format settings container is nil")
+		m.debugLog("WARNING: Format settings container is nil")
 		return
 	}
 
@@ -356,35 +356,35 @@ func (m *MusicConverterModule) updateFormatSettings(format string) {
 	m.currentTargetFormat = format
 
 	// Debug log
-	debugLog("Updating format settings for: '%s'", format)
+	m.debugLog("Updating format settings for: '%s'", format)
 
 	// Exact string comparison for format types
 	switch format {
 	case "MP3":
 		if m.mp3SettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.mp3SettingsContainer)
-			debugLog("Adding MP3 settings container")
+			m.debugLog("Adding MP3 settings container")
 		} else {
-			debugLog("WARNING: MP3 settings container is nil")
+			m.debugLog("WARNING: MP3 settings container is nil")
 		}
 	case "FLAC":
 		if m.flacSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.flacSettingsContainer)
-			debugLog("Adding FLAC settings container")
+			m.debugLog("Adding FLAC settings container")
 		} else {
-			debugLog("WARNING: FLAC settings container is nil")
+			m.debugLog("WARNING: FLAC settings container is nil")
 		}
 	case "WAV":
 		if m.wavSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.wavSettingsContainer)
-			debugLog("Adding WAV settings container")
+			m.debugLog("Adding WAV settings container")
 		} else {
-			debugLog("WARNING: WAV settings container is nil")
+			m.debugLog("WARNING: WAV settings container is nil")
 		}
 	default:
 		// No format selected or unsupported format
 		m.formatSettingsContainer.Add(widget.NewLabel(locales.Translate("convert.formatsel.default")))
-		debugLog("Using default settings container")
+		m.debugLog("Using default settings container")
 	}
 
 	// Force refresh of the container
@@ -486,9 +486,9 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	// Ensure metadata map is loaded
 	if m.metadataMap == nil {
 		var err error
-		m.metadataMap, err = loadMetadataMap()
+		m.metadataMap, err = m.loadMetadataMap()
 		if err != nil {
-			debugLog("ERROR: Failed to load metadata map: %v", err)
+			m.debugLog("ERROR: Failed to load metadata map: %v", err)
 		}
 	}
 }
@@ -667,7 +667,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	// Ensure metadata map is loaded
 	if m.metadataMap == nil {
 		var err error
-		m.metadataMap, err = loadMetadataMap()
+		m.metadataMap, err = m.loadMetadataMap()
 		if err != nil {
 			m.AddErrorMessage(fmt.Sprintf(locales.Translate("convert.err.nomaploaded"), err))
 			m.CompleteProgressDialog() // Mark as completed instead of closing
@@ -676,7 +676,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	}
 
 	// Find all audio files in the source folder
-	files, err := findAudioFiles(sourceFolder, m.selectSourceFormat.Selected)
+	files, err := m.findAudioFiles(sourceFolder, m.selectSourceFormat.Selected)
 	if err != nil {
 		m.AddErrorMessage(fmt.Sprintf(locales.Translate("convert.err.nosourcefiles"), err))
 		m.CompleteProgressDialog() // Mark as completed instead of closing
@@ -776,7 +776,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		}
 
 		// Extract metadata from source file using ffprobe
-		metadata, err := extractMetadata(file)
+		metadata, err := m.extractMetadata(file)
 		if err != nil {
 			m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.readmeta"), err))
 			failedFiles = append(failedFiles, file)
@@ -784,14 +784,14 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		}
 
 		// Add debug info for metadata
-		debugLog("Input #0, %s, from '%s':", filepath.Ext(file)[1:], file)
-		debugLog("Metadata:")
+		m.debugLog("Input #0, %s, from '%s':", filepath.Ext(file)[1:], file)
+		m.debugLog("Metadata:")
 		for key, value := range metadata {
-			debugLog("  %s\t: %s", key, value)
+			m.debugLog("  %s\t: %s", key, value)
 		}
 
 		// Convert file with ffmpeg
-		bitDepth, sampleRate, err := getAudioProperties(file)
+		bitDepth, sampleRate, err := m.getAudioProperties(file)
 		if err != nil {
 			m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.readprops"), err))
 			failedFiles = append(failedFiles, file)
@@ -1063,7 +1063,7 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	for _, arg := range args {
 		cmdStr += fmt.Sprintf("%s ", arg)
 	}
-	debugLog("DEBUG: Executing command: %s", cmdStr)
+	m.debugLog("DEBUG: Executing command: %s", cmdStr)
 
 	// Create a batch file to run the command
 	tmpBatFile := filepath.Join(os.TempDir(), "ffmpeg_convert.bat")
@@ -1096,8 +1096,8 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 
 	// Create batch file content with UTF-8 encoding
 	cmdContent := fmt.Sprintf("@echo off\r\nchcp 65001 >nul\r\ntools\\ffmpeg.exe %s\r\n", strings.Join(cmdArgs, " "))
-	debugLog("DEBUG: Writing batch file: %s", tmpBatFile)
-	debugLog("DEBUG: Batch content: %s", cmdContent)
+	m.debugLog("DEBUG: Writing batch file: %s", tmpBatFile)
+	m.debugLog("DEBUG: Batch content: %s", cmdContent)
 
 	if err := os.WriteFile(tmpBatFile, []byte(cmdContent), 0644); err != nil {
 		return fmt.Errorf("failed to create batch file: %v", err)
@@ -1129,12 +1129,12 @@ type MetadataMap struct {
 }
 
 // loadMetadataMap loads the metadata mapping from the CSV file
-func loadMetadataMap() (*MetadataMap, error) {
-	// Get CSV content from embedded resource
+func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
+	// Load the CSV content from the embedded file
 	csvContent := assets.ResourceMetadataMapCSV.Content()
 
 	// Debug output
-	debugLog("DEBUG: Loading metadata map CSV, size: %d bytes", len(csvContent))
+	m.debugLog("DEBUG: Loading metadata map CSV, size: %d bytes", len(csvContent))
 
 	// Create a new CSV reader from the content
 	reader := csv.NewReader(bytes.NewReader(csvContent))
@@ -1142,12 +1142,12 @@ func loadMetadataMap() (*MetadataMap, error) {
 	// Read the header row
 	header, err := reader.Read()
 	if err != nil {
-		debugLog("DEBUG: Error reading CSV header: %v", err)
+		m.debugLog("DEBUG: Error reading CSV header: %v", err)
 		return nil, err
 	}
 
 	// Debug output
-	debugLog("DEBUG: CSV header: %v", header)
+	m.debugLog("DEBUG: CSV header: %v", header)
 
 	// Initialize maps
 	result := &MetadataMap{
@@ -1157,7 +1157,9 @@ func loadMetadataMap() (*MetadataMap, error) {
 	}
 
 	// Find column indices
-	mpIndex, flacIndex, wavIndex := -1, -1, -1
+	mpIndex := -1
+	flacIndex := -1
+	wavIndex := -1
 	for i, col := range header {
 		switch col {
 		case "MP3":
@@ -1170,37 +1172,37 @@ func loadMetadataMap() (*MetadataMap, error) {
 	}
 
 	// Debug output
-	debugLog("DEBUG: Column indices - MP3: %d, FLAC: %d, WAV: %d", mpIndex, flacIndex, wavIndex)
+	m.debugLog("DEBUG: Column indices - MP3: %d, FLAC: %d, WAV: %d", mpIndex, flacIndex, wavIndex)
 
 	if mpIndex == -1 || flacIndex == -1 || wavIndex == -1 {
 		return nil, errors.New(locales.Translate("convert.err.missingcolumns"))
 	}
 
-	// Read the rest of the rows
+	// Read and process each row
 	for {
-		row, err := reader.Read()
+		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			debugLog("DEBUG: Error reading CSV row: %v", err)
+			m.debugLog("DEBUG: Error reading CSV row: %v", err)
 			return nil, err
 		}
 
-		internalName := row[0]
-		if mpIndex < len(row) && row[mpIndex] != "" {
-			result.InternalToMP3[internalName] = row[mpIndex]
+		// Skip empty rows
+		if len(record) == 0 || record[0] == "" {
+			continue
 		}
-		if flacIndex < len(row) && row[flacIndex] != "" {
-			result.InternalToFLAC[internalName] = row[flacIndex]
-		}
-		if wavIndex < len(row) && row[wavIndex] != "" {
-			result.InternalToWAV[internalName] = row[wavIndex]
-		}
+
+		// Map the fields
+		internalName := record[0]
+		result.InternalToMP3[internalName] = record[mpIndex]
+		result.InternalToFLAC[internalName] = record[flacIndex]
+		result.InternalToWAV[internalName] = record[wavIndex]
 	}
 
 	// Debug output
-	debugLog("DEBUG: Loaded metadata mappings - MP3: %d, FLAC: %d, WAV: %d",
+	m.debugLog("DEBUG: Loaded metadata mappings - MP3: %d, FLAC: %d, WAV: %d",
 		len(result.InternalToMP3), len(result.InternalToFLAC), len(result.InternalToWAV))
 
 	return result, nil
@@ -1208,63 +1210,69 @@ func loadMetadataMap() (*MetadataMap, error) {
 
 // findAudioFiles recursively finds all audio files in the given directory
 // If sourceFormat is specified (not "All"), only files of that format are returned
-func findAudioFiles(dir string, sourceFormat string) ([]string, error) {
+func (m *MusicConverterModule) findAudioFiles(dir string, sourceFormat string) ([]string, error) {
 	var files []string
 
 	// Debug output - pouze do konzole
-	debugLog("DEBUG: Finding audio files in '%s', filter: '%s'", dir, sourceFormat)
+	m.debugLog("DEBUG: Finding audio files in '%s', filter: '%s'", dir, sourceFormat)
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
-			ext := strings.ToLower(filepath.Ext(path))
 
-			// If sourceFormat is "All" or empty, include all audio files
-			if sourceFormat == "" || sourceFormat == locales.Translate("convert.srcformats.all") {
-				if ext == ".mp3" || ext == ".flac" || ext == ".wav" {
-					files = append(files, path)
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Get file extension
+		ext := strings.ToLower(filepath.Ext(path))
+
+		// Filter by format if specified
+		if sourceFormat != "All" {
+			switch sourceFormat {
+			case "MP3":
+				if ext != ".mp3" {
+					return nil
 				}
-			} else {
-				// Otherwise, only include files of the specified format
-				switch sourceFormat {
-				case "MP3":
-					if ext == ".mp3" {
-						files = append(files, path)
-					}
-				case "FLAC":
-					if ext == ".flac" {
-						files = append(files, path)
-					}
-				case "WAV":
-					if ext == ".wav" {
-						files = append(files, path)
-					}
+			case "FLAC":
+				if ext != ".flac" {
+					return nil
+				}
+			case "WAV":
+				if ext != ".wav" {
+					return nil
 				}
 			}
+		} else {
+			// For "All", accept any supported format
+			if ext != ".mp3" && ext != ".flac" && ext != ".wav" {
+				return nil
+			}
 		}
+
+		files = append(files, path)
 		return nil
 	})
 
 	// Debug output - pouze do konzole
-	debugLog("DEBUG: Found %d audio files matching format '%s'", len(files), sourceFormat)
+	m.debugLog("DEBUG: Found %d audio files matching format '%s'", len(files), sourceFormat)
 
 	return files, err
 }
 
 // extractMetadata extracts metadata from an audio file using ffprobe
-func extractMetadata(filePath string) (map[string]string, error) {
-	// Prepare ffprobe command
+func (m *MusicConverterModule) extractMetadata(filePath string) (map[string]string, error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_format", filePath)
 
 	// Log the command for debugging - pouze do konzole
-	debugLog("DEBUG: Executing ffprobe: tools/ffprobe.exe -v quiet -print_format json -show_format \"%s\"", filePath)
+	m.debugLog("DEBUG: Executing ffprobe: tools/ffprobe.exe -v quiet -print_format json -show_format \"%s\"", filePath)
 
 	// Get command output
 	output, err := cmd.Output()
 	if err != nil {
-		debugLog("DEBUG: ffprobe error: %v", err)
+		m.debugLog("DEBUG: ffprobe error: %v", err)
 		return nil, err
 	}
 
@@ -1276,126 +1284,84 @@ func extractMetadata(filePath string) (map[string]string, error) {
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		debugLog("DEBUG: JSON parse error: %v", err)
+		m.debugLog("DEBUG: JSON parse error: %v", err)
 		return nil, err
 	}
 
-	// Log metadata for debugging - pouze do konzole
-	debugLog("DEBUG: Extracted metadata:")
+	// Debug output - pouze do konzole
+	m.debugLog("DEBUG: Extracted metadata:")
 	for k, v := range result.Format.Tags {
-		debugLog("DEBUG:   %s: %s", k, v)
+		m.debugLog("DEBUG:   %s: %s", k, v)
 	}
 
 	return result.Format.Tags, nil
 }
 
 // getAudioProperties extracts audio properties (bit depth, sample rate) from a file using ffprobe
-func getAudioProperties(filePath string) (bitDepth string, sampleRate string, err error) {
-	// Default values in case of error
-	bitDepth = "24"
-	sampleRate = "44100"
-
-	// Prepare ffprobe command to get stream information
+func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth string, sampleRate string, err error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_streams", filePath)
 
 	// Log the command for debugging - pouze do konzole
-	debugLog("DEBUG: Executing ffprobe for audio properties: tools/ffprobe.exe -v quiet -print_format json -show_streams \"%s\"", filePath)
+	m.debugLog("DEBUG: Executing ffprobe for audio properties: tools/ffprobe.exe -v quiet -print_format json -show_streams \"%s\"", filePath)
 
 	// Get command output
 	output, err := cmd.Output()
 	if err != nil {
-		debugLog("DEBUG: ffprobe error when getting audio properties: %v", err)
+		m.debugLog("DEBUG: ffprobe error when getting audio properties: %v", err)
 		return bitDepth, sampleRate, err
 	}
 
 	// Parse JSON output
 	var result struct {
 		Streams []struct {
-			CodecType        string      `json:"codec_type"`
-			SampleRate       string      `json:"sample_rate"`
-			SampleFmt        string      `json:"sample_fmt"`
-			BitsPerSample    interface{} `json:"bits_per_sample"`
-			BitsPerRawSample interface{} `json:"bits_per_raw_sample"`
+			CodecType   string `json:"codec_type"`
+			SampleRate  string `json:"sample_rate"`
+			SampleFmt   string `json:"sample_fmt"`
+			BitsPerRaw  string `json:"bits_per_raw_sample"`
+			BitsPerSamp string `json:"bits_per_sample"`
 		} `json:"streams"`
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		debugLog("DEBUG: JSON parse error for audio properties: %v", err)
+		m.debugLog("DEBUG: JSON parse error for audio properties: %v", err)
 		return bitDepth, sampleRate, err
 	}
 
-	// Find audio stream
+	// Find the audio stream
 	for _, stream := range result.Streams {
 		if stream.CodecType == "audio" {
 			// Get sample rate
-			if stream.SampleRate != "" {
-				sampleRate = stream.SampleRate
-			}
+			sampleRate = stream.SampleRate
 
-			// Get bit depth
-			// Try bits_per_raw_sample first, then bits_per_sample
-			if stream.BitsPerRawSample != nil {
-				switch v := stream.BitsPerRawSample.(type) {
-				case string:
-					if v != "" {
-						bitDepth = v
-					}
-				case float64:
-					if v > 0 {
-						bitDepth = fmt.Sprintf("%d", int(v))
-					}
-				case int:
-					if v > 0 {
-						bitDepth = fmt.Sprintf("%d", v)
-					}
-				}
-			}
-
-			// If we didn't get a valid bit depth from bits_per_raw_sample, try bits_per_sample
-			if bitDepth == "24" && stream.BitsPerSample != nil {
-				switch v := stream.BitsPerSample.(type) {
-				case string:
-					if v != "" {
-						bitDepth = v
-					}
-				case float64:
-					if v > 0 {
-						bitDepth = fmt.Sprintf("%d", int(v))
-					}
-				case int:
-					if v > 0 {
-						bitDepth = fmt.Sprintf("%d", v)
-					}
-				}
-			}
-
-			// If we still don't have a valid bit depth, try to determine from sample format
-			if bitDepth == "24" {
+			// Try to determine bit depth
+			if stream.BitsPerRaw != "" {
+				bitDepth = stream.BitsPerRaw
+			} else if stream.BitsPerSamp != "" {
+				bitDepth = stream.BitsPerSamp
+			} else {
+				// Try to determine from sample format
 				switch stream.SampleFmt {
-				case "u8", "s8":
+				case "u8", "u8p":
 					bitDepth = "8"
 				case "s16", "s16p":
 					bitDepth = "16"
-				case "s24", "s24p":
-					bitDepth = "24"
 				case "s32", "s32p", "flt", "fltp":
 					bitDepth = "32"
-				case "dbl", "dblp":
+				case "s64", "s64p", "dbl", "dblp":
 					bitDepth = "64"
 				default:
-					// Default to 24-bit if we can't determine
-					bitDepth = "24"
+					bitDepth = "16" // Default to 16-bit if unknown
 				}
 			}
 
 			// Log the detected properties - pouze do konzole
-			debugLog("DEBUG: Detected audio properties - Bit Depth: %s, Sample Rate: %s", bitDepth, sampleRate)
+			m.debugLog("DEBUG: Detected audio properties - Bit Depth: %s, Sample Rate: %s", bitDepth, sampleRate)
 			return bitDepth, sampleRate, nil
 		}
 	}
 
 	// If we get here, we couldn't find an audio stream - pouze do konzole
-	debugLog("DEBUG: No audio stream found in the file")
+	m.debugLog("DEBUG: No audio stream found in the file")
 	return bitDepth, sampleRate, nil
 }
 
@@ -1433,8 +1399,7 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	return cfg
 }
 
-// debugLog prints debug messages only to console, not to GUI
-func debugLog(format string, args ...interface{}) {
-	// Print to console only
-	fmt.Printf("DEBUG: "+format+"\n", args...)
+// debugLog prints debug messages using the module's logger
+func (m *MusicConverterModule) debugLog(format string, args ...interface{}) {
+	m.Logger.Debug(format, args...)
 }

@@ -5,7 +5,6 @@ package common
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,16 +53,13 @@ func EnsureDirectoryExists(path string) error {
 		return fmt.Errorf("path is empty")
 	}
 
-	info, err := os.Stat(path)
+	// Check if directory already exists
+	_, err := os.Stat(path)
 	if err == nil {
-		if !info.IsDir() {
-			return fmt.Errorf("path exists but is not a directory: %s", path)
-		}
-		return nil
+		return nil // Directory exists
 	}
 
 	if os.IsNotExist(err) {
-		log.Printf("Creating directory: %s", path) // Log the creation attempt
 		err = os.MkdirAll(path, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory %s: %v", path, err)
@@ -71,7 +67,7 @@ func EnsureDirectoryExists(path string) error {
 		return nil
 	}
 
-	return fmt.Errorf("failed to check directory %s: %v", path, err)
+	return err // Some other error occurred
 }
 
 // DirectoryExists checks if a directory exists

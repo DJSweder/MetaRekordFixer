@@ -29,6 +29,8 @@ type Module interface {
 	GetContent() fyne.CanvasObject
 	LoadConfig(config ModuleConfig)
 	SaveConfig() ModuleConfig
+	GetDatabaseRequirements() DatabaseRequirements
+	SetDatabaseRequirements(needs bool, immediate bool)
 }
 
 // ModuleBase provides common functionality for all modules
@@ -43,19 +45,30 @@ type ModuleBase struct {
 	mutex           sync.Mutex
 	isCancelled     bool
 	ErrorHandler    *ErrorHandler
+	Logger          *Logger
 	StatusMessages  *StatusMessagesContainer // Container for status messages
+	dbRequirements  DatabaseRequirements
+}
+
+// DatabaseRequirements defines how a module uses the database
+type DatabaseRequirements struct {
+	// NeedsDatabase indicates if the module requires database access
+	NeedsDatabase bool
+	// NeedsImmediateAccess indicates if database access is required during initialization
+	NeedsImmediateAccess bool
 }
 
 // NewModuleBase initializes a new ModuleBase
 func NewModuleBase(window fyne.Window, configMgr *ConfigManager, errorHandler *ErrorHandler) *ModuleBase {
 	if errorHandler == nil {
-		errorHandler = NewErrorHandler(nil) // Default ErrorHandler if none provided
+		panic("ErrorHandler cannot be nil")
 	}
 
 	base := &ModuleBase{
 		Window:       window,
 		ConfigMgr:    configMgr,
 		ErrorHandler: errorHandler,
+		Logger:       errorHandler.GetLogger(),
 	}
 	base.initBaseComponents()
 
@@ -188,17 +201,28 @@ func (m *ModuleBase) IsCancelled() bool {
 	return m.isCancelled
 }
 
-// ShowError displays an error message in a dialog using ErrorHandler
-func (m *ModuleBase) ShowError(err error) {
-	if m.ErrorHandler != nil {
-		// Create error context with module name
-		context := NewErrorContext(m.GetConfigName(), "")
-		context.Severity = ErrorWarning
-		m.ErrorHandler.HandleError(err, context, m.Window, m.Status)
-	} else {
-		// Fallback to simple error dialog if ErrorHandler is not available
-		ShowError(err, m.Window)
+// HandleError processes an error with context
+func (m *ModuleBase) HandleError(err error, operation string) {
+	if m.ErrorHandler == nil {
+		return
 	}
+
+	context := ErrorContext{
+		Module:    m.GetName(),
+		Operation: operation,
+		Error:     err,
+	}
+
+	m.ErrorHandler.ShowErrorWithContext(context)
+}
+
+// ShowError displays a simple error dialog
+func (m *ModuleBase) ShowError(err error) {
+	if m.ErrorHandler == nil {
+		return
+	}
+
+	m.ErrorHandler.ShowError(err)
 }
 
 // AddInfoMessage adds an information message to the status messages container
@@ -291,4 +315,17 @@ func SaveFolderEntries(cfg ModuleConfig, key string, entries []*widget.Entry) {
 		}
 	}
 	cfg.Set(key, strings.Join(folders, "|"))
+}
+
+// SetDatabaseRequirements sets the database requirements for this module
+func (m *ModuleBase) SetDatabaseRequirements(needs bool, immediate bool) {
+	m.dbRequirements = DatabaseRequirements{
+		NeedsDatabase:        needs,
+		NeedsImmediateAccess: immediate,
+	}
+}
+
+// GetDatabaseRequirements returns the database requirements for this module
+func (m *ModuleBase) GetDatabaseRequirements() DatabaseRequirements {
+	return m.dbRequirements
 }

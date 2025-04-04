@@ -14,6 +14,8 @@ type customTheme struct {
 
 func (t *customTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	switch name {
+	case "ErrorMessagesColor": // Specific color for error messages
+		return color.RGBA{R: 255, G: 0, B: 0, A: 255} // Red
 	case theme.ColorNameBackground: // Application background color
 		return color.RGBA{R: 30, G: 30, B: 30, A: 255} // #1E1E1E
 	case theme.ColorNameButton: // Buttons color
@@ -130,6 +132,8 @@ type darkTheme struct{}
 
 func (t *darkTheme) Color(name fyne.ThemeColorName, _ fyne.ThemeVariant) color.Color {
 	switch name {
+	case "ErrorMessagesColor": // Specific color for error messages
+		return color.RGBA{R: 255, G: 0, B: 0, A: 255} // Red
 	case theme.ColorNameBackground: // Application background color
 		return color.RGBA{R: 30, G: 30, B: 30, A: 255} // #1E1E1E
 	case theme.ColorNameButton: // Buttons color

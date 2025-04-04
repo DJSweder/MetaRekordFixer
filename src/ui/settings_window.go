@@ -132,7 +132,7 @@ func ShowSettingsWindow(parent fyne.Window, configMgr *common.ConfigManager) {
 	)
 
 	// Create own close button
-	closeButton := widget.NewButton(locales.Translate("settings.window.close"), func() {
+	closeButton := widget.NewButton(locales.Translate("common.button.close"), func() {
 		settingsDialog.Hide()
 	})
 	closeButton.Importance = widget.DangerImportance

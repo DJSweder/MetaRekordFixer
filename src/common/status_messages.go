@@ -75,7 +75,6 @@ func (smc *StatusMessagesContainer) AddMessage(messageType MessageType, content 
 	messageLabel := widget.NewLabel(content)
 	messageLabel.Alignment = fyne.TextAlignLeading
 	messageLabel.TextStyle.Bold = messageType != MessageInfo // Bold for warnings and errors
-	// Remove monospace font setting to use the theme's font
 
 	// Create a smaller icon with fixed size
 	iconWidget := widget.NewIcon(icon)

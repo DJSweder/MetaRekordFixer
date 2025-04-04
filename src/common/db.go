@@ -5,7 +5,6 @@ package common
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -35,7 +34,7 @@ type DBManager struct {
 	dbPath            string
 	isConnected       bool
 	mutex             sync.Mutex
-	logger            *log.Logger
+	logger            *Logger
 	errorHandler      *ErrorHandler
 	useTransactions   bool
 	activeTransaction *sql.Tx
@@ -43,7 +42,7 @@ type DBManager struct {
 }
 
 // NewDBManager creates a new database manager
-func NewDBManager(dbPath string, logger *log.Logger, errorHandler *ErrorHandler) (*DBManager, error) {
+func NewDBManager(dbPath string, logger *Logger, errorHandler *ErrorHandler) (*DBManager, error) {
 	dbDir := filepath.Dir(dbPath)
 	err := EnsureDirectoryExists(dbDir)
 	if err != nil {
@@ -60,7 +59,7 @@ func NewDBManager(dbPath string, logger *log.Logger, errorHandler *ErrorHandler)
 	}
 
 	if manager.logger == nil {
-		manager.logger = log.New(os.Stdout, "DB: ", log.LstdFlags)
+		manager.logger = &Logger{} // Create empty logger if none provided
 	}
 
 	return manager, nil
@@ -77,7 +76,7 @@ func (m *DBManager) Connect() error {
 
 	// Check if database path is set
 	if m.dbPath == "" {
-		return fmt.Errorf("database path is not configured")
+		return fmt.Errorf(locales.Translate("common.err.nodbpath"), m.dbPath)
 	}
 
 	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, getDbPassword())
@@ -107,7 +106,7 @@ func (m *DBManager) Connect() error {
 
 	m.db = db
 	m.isConnected = true
-	m.logger.Printf("Connected to database: %s", m.dbPath)
+	m.logger.Info("Connected to database: %s", m.dbPath)
 
 	return nil
 }
@@ -300,7 +299,7 @@ func (m *DBManager) BackupDatabase() error {
 		return fmt.Errorf(locales.Translate("common.db.backupcopyerr"), err)
 	}
 
-	m.logger.Printf("Database backup created: %s", backupPath)
+	m.logger.Info("Database backup created: %s", backupPath)
 	return nil
 }
 
@@ -358,7 +357,7 @@ func (m *DBManager) Finalize() error {
 
 	// If there's an active transaction, roll it back
 	if m.activeTransaction != nil {
-		m.logger.Printf("Rolling back active transaction during finalization")
+		m.logger.Info("Rolling back active transaction during finalization")
 		m.activeTransaction.Rollback()
 		m.activeTransaction = nil
 	}
@@ -366,14 +365,14 @@ func (m *DBManager) Finalize() error {
 	// Force synchronization before closing - helps with removing .db-shm and .db-wal files
 	_, err := m.db.Exec("PRAGMA wal_checkpoint(FULL)")
 	if err != nil {
-		m.logger.Printf("Warning: Failed to execute WAL checkpoint: %v", err)
+		m.logger.Info("Warning: Failed to execute WAL checkpoint: %v", err)
 		// Continue despite error
 	}
 
 	// Optimize the database to clean up prepared statements
 	_, err = m.db.Exec("PRAGMA optimize")
 	if err != nil {
-		m.logger.Printf("Warning: Failed to optimize database: %v", err)
+		m.logger.Info("Warning: Failed to optimize database: %v", err)
 		// Continue despite error
 	}
 
@@ -385,7 +384,7 @@ func (m *DBManager) Finalize() error {
 
 	m.isConnected = false
 	m.finalized = true
-	m.logger.Printf("Database connection finalized: %s", m.dbPath)
+	m.logger.Info("Database connection finalized: %s", m.dbPath)
 
 	return nil
 }
@@ -548,6 +547,11 @@ func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, e
 	}
 
 	return hotCues, nil
+}
+
+// GetDatabasePath returns the configured database path
+func (m *DBManager) GetDatabasePath() string {
+	return m.dbPath
 }
 
 // TrackItem represents a track from the djmdContent table with basic metadata
