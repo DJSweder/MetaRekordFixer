@@ -311,14 +311,17 @@ func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	}
 
 	query := `
-		SELECT 
-			djmd_content.ID,
-			djmd_content.Title,
-			djmd_content.ParentID,
-			djmd_content.Attribute
-		FROM djmd_content 
-		WHERE ContentType = 1 
-		ORDER BY Title`
+        SELECT p1.ID, p1.Name, p1.ParentID,
+        CASE
+            WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || p1.Name
+            ELSE p1.Name
+        END as Path
+        FROM djmdPlaylist p1
+        LEFT JOIN djmdPlaylist p2 ON p1.ParentID = p2.ID
+        ORDER BY
+            CASE WHEN p2.ID IS NULL THEN p1.Seq ELSE p2.Seq END,
+            CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
+    `
 
 	rows, err := m.Query(query)
 	if err != nil {
@@ -329,8 +332,7 @@ func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	var playlists []PlaylistItem
 	for rows.Next() {
 		var playlist PlaylistItem
-		var attribute int
-		err := rows.Scan(&playlist.ID, &playlist.Name, &playlist.ParentID, &attribute)
+		err := rows.Scan(&playlist.ID, &playlist.Name, &playlist.ParentID, &playlist.Path)
 		if err != nil {
 			return nil, fmt.Errorf(locales.Translate("common.db.playlistscanerr"), err)
 		}

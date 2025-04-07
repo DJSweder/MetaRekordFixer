@@ -12,7 +12,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
 // TracksUpdater handles updating track file paths and formats in the database
@@ -282,32 +281,19 @@ func (m *TracksUpdater) loadPlaylists() error {
 	}
 	defer m.dbMgr.Finalize()
 
-	rows, err := m.dbMgr.Query(`
-        SELECT p1.ID, p1.Name, p1.ParentID,
-        CASE
-            WHEN p2.Name IS NOT NULL THEN p2.Name || ' > ' || p1.Name
-            ELSE p1.Name
-        END as Path
-        FROM djmdPlaylist p1
-        LEFT JOIN djmdPlaylist p2 ON p1.ParentID = p2.ID
-        ORDER BY
-            CASE WHEN p2.ID IS NULL THEN p1.Seq ELSE p2.Seq END,
-            CASE WHEN p2.ID IS NULL THEN 0 ELSE p1.Seq + 1 END
-    `)
+	// Get playlists from database
+	playlists, err := m.dbMgr.GetPlaylists()
 	if err != nil {
-		return fmt.Errorf("%s %w", locales.Translate("common.err.dbread"), err)
+		return err
 	}
-	defer rows.Close()
 
-	m.playlists = make([]common.PlaylistItem, 0)
-	var playlistPaths []string
-	for rows.Next() {
-		var p common.PlaylistItem
-		if err := rows.Scan(&p.ID, &p.Name, &p.ParentID, &p.Path); err != nil {
-			return fmt.Errorf("%s %w", locales.Translate("common.err.dbread"), err)
-		}
-		m.playlists = append(m.playlists, p)
-		playlistPaths = append(playlistPaths, p.Path)
+	// Store playlists for later use
+	m.playlists = playlists
+
+	// Create options list for selectors
+	playlistPaths := make([]string, len(playlists))
+	for i, playlist := range playlists {
+		playlistPaths[i] = playlist.Path
 	}
 
 	m.playlistSelect.Options = playlistPaths
@@ -331,6 +317,7 @@ func (m *TracksUpdater) loadPlaylists() error {
 
 	return nil
 }
+
 func (m *TracksUpdater) Start() {
 	// Save the configuration before starting the process so that the most recent playlist and folder path are used.
 	m.SaveConfig()
@@ -371,7 +358,8 @@ func (m *TracksUpdater) Start() {
 				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
 			}
 		}()
-
+		// Add initial status message
+		m.AddInfoMessage(locales.Translate("common.status.start"))
 		// Backup the database.
 		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		err := m.dbMgr.BackupDatabase()
