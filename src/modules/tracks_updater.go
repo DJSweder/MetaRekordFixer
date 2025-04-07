@@ -17,14 +17,19 @@ import (
 
 // TracksUpdater handles updating track file paths and formats in the database
 // Implements the standard Module interface
+// TracksUpdater is a module that handles updating track file paths and formats in the database.
+// It implements the standard Module interface.
 type TracksUpdater struct {
+	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and
+	// configuration manager.
 	*common.ModuleBase
-	dbMgr          *common.DBManager
-	playlistSelect *widget.Select
-	folderPath     *widget.Entry
-	folderSelect   *widget.Button
-	submitBtn      *widget.Button
-	playlists      []common.PlaylistItem
+	dbMgr             *common.DBManager
+	playlistSelect    *widget.Select
+	folderEntry       *widget.Entry
+	folderSelect      *widget.Button
+	submitBtn         *widget.Button
+	playlists         []common.PlaylistItem
+	pendingPlaylistID string // Temporary storage for playlist ID
 }
 
 // NewTracksUpdater creates a new instance of TracksUpdater.
@@ -35,7 +40,7 @@ func NewTracksUpdater(window fyne.Window, configMgr *common.ConfigManager, dbMgr
 	}
 
 	// Initialize variables before initializeUI
-	m.folderPath = widget.NewEntry()
+	m.folderEntry = widget.NewEntry()
 
 	// Initialize UI components first
 	m.initializeUI()
@@ -68,7 +73,7 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 	form := &widget.Form{
 		Items: []*widget.FormItem{
 			{Text: locales.Translate("updater.label.replaced"), Widget: m.playlistSelect},
-			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderPath)},
+			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderEntry)},
 		},
 	}
 
@@ -86,7 +91,6 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 
 	// Add submit button with right alignment if provided
 	if m.submitBtn != nil {
-
 		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
 		moduleContent.Add(buttonBox)
 	}
@@ -105,8 +109,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
-		m.playlistSelect.Disable()
-		m.submitBtn.Disable()
+		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 
@@ -119,8 +122,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
-		m.playlistSelect.Disable()
-		m.submitBtn.Disable()
+		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 	defer m.dbMgr.Finalize()
@@ -134,8 +136,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
-		m.playlistSelect.Disable()
-		m.submitBtn.Disable()
+		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 
@@ -158,21 +159,11 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 	}
 
 	if folder, ok := cfg.Extra["folder"]; ok && folder != "" {
-		m.folderPath.SetText(folder)
+		m.folderEntry.SetText(folder)
 	}
 
 	if playlistID, ok := cfg.Extra["playlist_id"]; ok && playlistID != "" {
-		// Find and set playlist by ID
-		for i, playlist := range m.playlists {
-			if playlist.ID == playlistID {
-				if i < len(m.playlistSelect.Options) {
-					m.playlistSelect.SetSelected(m.playlistSelect.Options[i])
-				}
-				break
-			}
-		}
-	} else if len(m.playlistSelect.Options) > 0 {
-		m.playlistSelect.SetSelected(m.playlistSelect.Options[0])
+		m.pendingPlaylistID = playlistID // Save temporary PlaylistID for later use
 	}
 }
 
@@ -185,7 +176,7 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 	cfg := common.NewModuleConfig()
 
 	// Save folder path using NormalizePath which now handles empty strings correctly
-	cfg.Set("folder", common.NormalizePath(m.folderPath.Text))
+	cfg.Set("folder", common.NormalizePath(m.folderEntry.Text))
 
 	// Save playlist ID
 	if m.playlistSelect.Selected != "" {
@@ -204,23 +195,31 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 
 // initializeUI sets up the user interface components.
 func (m *TracksUpdater) initializeUI() {
-	// Initialize folder path entry
-	m.folderPath = widget.NewEntry()
-	m.folderPath.OnChanged = m.CreateChangeHandler(func() {
+	// Create a text entry for the user to input the folder path.
+	// When the user changes the text in the entry, save the config.
+	m.folderEntry = widget.NewEntry()
+	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
 	})
 
-	// Initialize playlist selector with disabled state
+	// Create a disabled select widget for the user to choose a playlist.
+	// When the user chooses a playlist, save the config.
+	// The select widget is disabled to prevent the user from changing the playlist
+	// before the module is fully loaded.
 	m.playlistSelect = common.CreateDisabledSelect([]string{}, m.CreateSelectionChangeHandler(func() {
 		m.SaveConfig()
 	}), "common.select.plsplacehldrinact")
 
-	// Create folder selection field using standardized function
+	// Create a folder selection field using the standardized function.
+	// The folder selection field consists of a button and a text entry.
+	// When the user clicks the button, open a file dialog for the user to choose a folder.
+	// When the user chooses a folder, set the text entry to the path of the chosen folder
+	// and save the config.
 	folderSelectionField := common.CreateFolderSelectionField(
 		locales.Translate("updater.folder.newfiles"),
-		m.folderPath,
+		m.folderEntry,
 		func(path string) {
-			m.folderPath.SetText(path)
+			m.folderEntry.SetText(path)
 			m.SaveConfig()
 		},
 	)
@@ -228,41 +227,16 @@ func (m *TracksUpdater) initializeUI() {
 	// Store the button reference for backward compatibility
 	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
-	// Create submit button using standardized function
+	// Create a disabled submit button using the standardized function.
+	// The submit button is disabled to prevent the user from starting the module
+	// before the module is fully loaded.
+	// When the user clicks the submit button, start the module.
 	m.submitBtn = common.CreateDisabledSubmitButton(
 		locales.Translate("updater.button.libupd"),
 		func() {
 			go m.Start()
 		},
 	)
-
-	// Create form with playlist selector and folder selection field
-	form := &widget.Form{
-		Items: []*widget.FormItem{
-			{Text: locales.Translate("updater.label.replaced"), Widget: m.playlistSelect},
-			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderPath)},
-		},
-	}
-
-	// Create content container with form
-	contentContainer := container.NewVBox(
-		form,
-	)
-
-	// Create module content with description and separator
-	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("updater.label.info")),
-		widget.NewSeparator(),
-		contentContainer,
-	)
-
-	// Add submit button with right alignment if provided
-	if m.submitBtn != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
-		moduleContent.Add(buttonBox)
-	}
-
-	m.Content = moduleContent
 }
 
 // Start handles the module's main functionality
@@ -339,37 +313,54 @@ func (m *TracksUpdater) loadPlaylists() error {
 	m.playlistSelect.Options = playlistPaths
 	m.playlistSelect.Enable()
 	m.playlistSelect.PlaceHolder = locales.Translate("common.select.plsplaceholder")
+
+	// Apply pending PlaylistID after successful loading
+	if m.pendingPlaylistID != "" {
+		for i, playlist := range m.playlists {
+			if playlist.ID == m.pendingPlaylistID {
+				if i < len(m.playlistSelect.Options) {
+					m.playlistSelect.SetSelected(m.playlistSelect.Options[i])
+				}
+				break
+			}
+		}
+		m.pendingPlaylistID = "" // Reset pending PlaylistID
+	} else if len(m.playlistSelect.Options) > 0 {
+		m.playlistSelect.SetSelectedIndex(0)
+	}
+
 	return nil
 }
 func (m *TracksUpdater) Start() {
-	// Save configuration before starting the process
+	// Save the configuration before starting the process so that the most recent playlist and folder path are used.
 	m.SaveConfig()
 
-	// Clear any previous status messages
+	// Clear any previous status messages.
 	m.ClearStatusMessages()
 
-	// Get selected playlist
+	// Get the selected playlist.
 	if m.playlistSelect.Selected == "" {
 		m.AddErrorMessage(locales.Translate("updater.err.noplaylist"))
 		return
 	}
 
-	// Get folder path
-	folderPath := m.folderPath.Text
-	if folderPath == "" {
+	// Get the folder path.
+	folderEntry := m.folderEntry.Text
+	if folderEntry == "" {
 		m.AddErrorMessage(locales.Translate("updater.err.nofolder"))
 		return
 	}
 
-	// Show progress dialog
+	// Show the progress dialog.
 	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
 
-	// Start processing in a goroutine
+	// Start processing in a goroutine.
 	go func() {
-		// Track the number of updated files
+		// Track the number of updated files.
 		updateCount := 0
 
 		defer func() {
+			// Catch any panics or errors and show an error message.
 			if r := recover(); r != nil {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
@@ -381,7 +372,7 @@ func (m *TracksUpdater) Start() {
 			}
 		}()
 
-		// Backup database
+		// Backup the database.
 		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		err := m.dbMgr.BackupDatabase()
 		if err != nil {
@@ -390,17 +381,17 @@ func (m *TracksUpdater) Start() {
 			return
 		}
 
-		// Inform about successful database backup
+		// Inform about the successful backup.
 		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
-		// Check if operation was cancelled
+		// Check if the operation was cancelled.
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
-		// Database connection
+		// Connect to the database.
 		m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
 		err = m.dbMgr.Connect()
 		if err != nil {
@@ -409,7 +400,7 @@ func (m *TracksUpdater) Start() {
 			return
 		}
 
-		// Get selected playlist
+		// Get the selected playlist.
 		m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))
 		selectedPlaylist := ""
 		for _, p := range m.playlists {
@@ -424,21 +415,21 @@ func (m *TracksUpdater) Start() {
 			return
 		}
 
-		// Check if operation was cancelled
+		// Check if the operation was cancelled.
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
-		// Get tracks from playlist
+		// Get the tracks from the playlist.
 		m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettracks"))
 		rows, err := m.dbMgr.Query(`
-        SELECT c.ID, c.FileNameL
-        FROM djmdContent c
-        JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
-        WHERE sp.PlaylistID = ?
-    `, selectedPlaylist)
+		SELECT c.ID, c.FileNameL
+		FROM djmdContent c
+		JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
+		WHERE sp.PlaylistID = ?
+	`, selectedPlaylist)
 		if err != nil {
 			m.CloseProgressDialog()
 			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.dbquery"), err))
@@ -446,10 +437,10 @@ func (m *TracksUpdater) Start() {
 		}
 		defer rows.Close()
 
-		// Check if operation was cancelled
+		// Check if the operation was cancelled.
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
@@ -476,14 +467,14 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len(tracks))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
 		// Get all files in target folder
 		m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.scanfolder"))
-		files, err := filepath.Glob(filepath.Join(m.folderPath.Text, "*.*"))
+		files, err := filepath.Glob(filepath.Join(m.folderEntry.Text, "*.*"))
 		if err != nil {
 			m.CloseProgressDialog()
 			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("updater.err.glob"), err))
@@ -495,8 +486,8 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len(tracks))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
@@ -514,7 +505,7 @@ func (m *TracksUpdater) Start() {
 
 		for _, track := range tracks {
 			baseName := strings.TrimSuffix(track.FileName, filepath.Ext(track.FileName))
-			newFiles, err := filepath.Glob(filepath.Join(m.folderPath.Text, baseName+".*"))
+			newFiles, err := filepath.Glob(filepath.Join(m.folderEntry.Text, baseName+".*"))
 			if err != nil || len(newFiles) == 0 {
 				nonMatchingFiles++
 				mismatchedFiles = append(mismatchedFiles, track.FileName) // Store mismatched filename
@@ -562,8 +553,8 @@ func (m *TracksUpdater) Start() {
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-			m.CompleteProgressDialog()
+			m.HandleProcessCancellation("updater.status.stopped", updateCount, len(updateTracks))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
@@ -591,8 +582,8 @@ func (m *TracksUpdater) Start() {
 
 			// Check if operation was cancelled
 			if m.IsCancelled() {
-				m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.stopped"), updateCount))
-				m.CompleteProgressDialog()
+				m.HandleProcessCancellation("updater.status.stopped", updateCount, len(updateTracks))
+				common.UpdateButtonToCompleted(m.submitBtn)
 				return
 			}
 		}
@@ -603,5 +594,8 @@ func (m *TracksUpdater) Start() {
 
 		// Mark the progress dialog as completed
 		m.CompleteProgressDialog()
+
+		// Update submit button to show completion using standardized function
+		common.UpdateButtonToCompleted(m.submitBtn)
 	}()
 }

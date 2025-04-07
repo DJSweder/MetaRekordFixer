@@ -288,11 +288,18 @@ func CreateSubmitButton(title string, handler func()) *widget.Button {
 }
 
 // CreateSubmitButtonWithIcon creates a standardized submit button with an icon and high importance
-// This button is used to start a process or submit a form
+// This button is used after a process or form has been completed or canceled
 func CreateSubmitButtonWithIcon(title string, icon fyne.Resource, handler func()) *widget.Button {
 	btn := widget.NewButtonWithIcon(title, icon, handler)
 	btn.Importance = widget.HighImportance
 	return btn
+}
+
+// CreateRightAlignedSubmitButton creates a standardized submit button with high importance,
+// aligned to the right using a spacer
+func CreateRightAlignedSubmitButton(title string, handler func()) *fyne.Container {
+	btn := CreateSubmitButton(title, handler)
+	return container.NewHBox(layout.NewSpacer(), btn)
 }
 
 // CreateDescriptionLabel creates a standardized description label with wrapping and bold text
@@ -460,7 +467,7 @@ func CreateDisabledSelect(options []string, changed func(string), placeholderKey
 // CreatePlaylistSelect creates a select widget for playlist selection.
 // Used for components that require database access to be populated with playlists.
 // placeholderKey is an optional localization key for the placeholder text shown when no playlist is selected.
-// If placeholderKey is empty, default placeholder from common.select.plsplaceholder will be used.
+// If placeholderKey is empty, default placeholder from common.select.playlist.placeholder will be used.
 func CreatePlaylistSelect(changed func(string), placeholderKey string) *widget.Select {
 	selectWidget := widget.NewSelect([]string{}, changed)
 	if placeholderKey != "" {
@@ -468,6 +475,7 @@ func CreatePlaylistSelect(changed func(string), placeholderKey string) *widget.S
 	} else {
 		selectWidget.PlaceHolder = locales.Translate("common.select.plsplaceholder")
 	}
+	selectWidget.Disable()
 	return selectWidget
 }
 
@@ -477,4 +485,19 @@ func CreateDisabledSubmitButton(title string, handler func()) *widget.Button {
 	btn := CreateSubmitButton(title, handler)
 	btn.Disable()
 	return btn
+}
+
+// UpdateButtonToCompleted updates a button to show completion state with a confirm icon.
+// This is typically used for submit buttons after a process has completed successfully.
+func UpdateButtonToCompleted(button *widget.Button) {
+	button.SetIcon(theme.ConfirmIcon())
+}
+
+// DisableModuleControls disables multiple UI components at once
+// This is typically used when the module is in a state where user interaction should be prevented
+// For example, when database is not connected or when a process is running
+func DisableModuleControls(components ...fyne.Disableable) {
+	for _, component := range components {
+		component.Disable()
+	}
 }

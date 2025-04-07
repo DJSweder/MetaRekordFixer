@@ -3,7 +3,9 @@
 package common
 
 import (
+	"MetaRekordFixer/locales"
 	"database/sql"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -328,4 +330,17 @@ func (m *ModuleBase) SetDatabaseRequirements(needs bool, immediate bool) {
 // GetDatabaseRequirements returns the database requirements for this module
 func (m *ModuleBase) GetDatabaseRequirements() DatabaseRequirements {
 	return m.dbRequirements
+}
+
+// HandleProcessCancellation handles the standard process cancellation flow
+// message is the localization key for the status message
+// params are optional parameters for message formatting
+func (m *ModuleBase) HandleProcessCancellation(message string, params ...interface{}) {
+	// Update progress dialog status
+	stoppedMessage := fmt.Sprintf(locales.Translate(message), params...)
+	m.UpdateProgressStatus(1.0, stoppedMessage)
+	m.AddInfoMessage(stoppedMessage)
+
+	// Complete progress dialog and update UI
+	m.CompleteProgressDialog()
 }

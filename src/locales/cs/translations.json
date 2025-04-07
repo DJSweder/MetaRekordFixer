@@ -257,7 +257,7 @@
     "updater.status.matching": "Hledání odpovídajících skladeb k aktualizaci",
     "updater.status.process": "Aktualizováno",
     "updater.status.progress": "Aktualizováno %d skladeb z %d",
-    "updater.status.stopped": "Zastaveno. Počet aktualizovaných skladeb: %d",
+    "updater.status.stopped": "Zastaveno. Počet aktualizovaných skladeb: %d z celkového počtu: %d.",
     "updater.tracks.badfilenamescount": "Počet souborů s neodpovídajícími názvy: %d",
     "updater.tracks.badfileslist": "Neodpovídající soubory jsou: %v",
     "updater.tracks.countinfolder": "Počet souborů ve složce k aktualizaci: %d",
