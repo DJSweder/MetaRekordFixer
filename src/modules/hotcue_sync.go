@@ -52,10 +52,6 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 	// Initialize variables before UI
 	m.sourceFolderEntry = widget.NewEntry()
 	m.targetFolderEntry = widget.NewEntry()
-	m.sourcePlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
-	m.targetPlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
-	m.sourceType = widget.NewSelect([]string{}, nil)
-	m.targetType = widget.NewSelect([]string{}, nil)
 
 	// Initialize UI components
 	m.initializeUI()
@@ -299,10 +295,10 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components.
 func (m *HotCueSyncModule) initializeUI() {
 	// Initialize source type selector
-	m.sourceType.Options = []string{
+	m.sourceType = widget.NewSelect([]string{
 		locales.Translate("hotcuesync.dropdown.folder"),
 		locales.Translate("hotcuesync.dropdown.playlist"),
-	}
+	}, nil)
 	m.sourceType.OnChanged = m.CreateSelectionChangeHandler(func() {
 		var sourceType SourceType
 		if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
@@ -315,10 +311,10 @@ func (m *HotCueSyncModule) initializeUI() {
 	})
 
 	// Initialize target type selector
-	m.targetType.Options = []string{
+	m.targetType = widget.NewSelect([]string{
 		locales.Translate("hotcuesync.dropdown.folder"),
 		locales.Translate("hotcuesync.dropdown.playlist"),
-	}
+	}, nil)
 	m.targetType.OnChanged = m.CreateSelectionChangeHandler(func() {
 		var targetType SourceType
 		if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
@@ -357,6 +353,7 @@ func (m *HotCueSyncModule) initializeUI() {
 	)
 
 	// Initialize source playlist selector
+	m.sourcePlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
 	m.sourcePlaylistSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
 		// Find the playlist ID for the selected name
 		for _, p := range m.playlists {
@@ -369,6 +366,7 @@ func (m *HotCueSyncModule) initializeUI() {
 	})
 
 	// Initialize target playlist selector
+	m.targetPlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
 	m.targetPlaylistSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
 		// Find the playlist ID for the selected name
 		for _, p := range m.playlists {
@@ -395,110 +393,173 @@ func (m *HotCueSyncModule) initializeUI() {
 	m.submitBtn.Importance = widget.HighImportance
 }
 
-// updateControlsState updates the state of playlist selectors.
-func (m *HotCueSyncModule) updateControlsState() {
-	// Get current source and target types
-	var sourceType, targetType SourceType
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		sourceType = SourceTypeFolder
-	} else {
-		sourceType = SourceTypePlaylist
-	}
-
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		targetType = SourceTypeFolder
-	} else {
-		targetType = SourceTypePlaylist
-	}
-
-	// Update visibility based on selected source type
-	if sourceType == SourceTypeFolder {
-		m.sourceFolderField.Show()
-		m.sourcePlaylistSelect.Hide()
-	} else {
-		m.sourceFolderField.Hide()
-		m.sourcePlaylistSelect.Show()
-	}
-
-	// Update visibility based on selected target type
-	if targetType == SourceTypeFolder {
-		m.targetFolderField.Show()
-		m.targetPlaylistSelect.Hide()
-	} else {
-		m.targetFolderField.Hide()
-		m.targetPlaylistSelect.Show()
-	}
+// GetStatusMessagesContainer returns the status messages container.
+func (m *HotCueSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
+	return m.ModuleBase.GetStatusMessagesContainer()
 }
 
-// updateSourceVisibility updates the visibility of source input controls based on the selected source type.
-func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
-	if sourceType == SourceTypeFolder {
-		m.sourceFolderField.Show()
-		m.sourcePlaylistSelect.Hide()
-	} else {
-		m.sourceFolderField.Hide()
-		m.sourcePlaylistSelect.Show()
-	}
+// AddInfoMessage adds an information message to the status messages container.
+func (m *HotCueSyncModule) AddInfoMessage(message string) {
+	m.ModuleBase.AddInfoMessage(message)
 }
 
-// updateTargetVisibility updates the visibility of target input controls based on the selected target type.
-func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
-	if targetType == SourceTypeFolder {
-		m.targetFolderField.Show()
-		m.targetPlaylistSelect.Hide()
-	} else {
-		m.targetFolderField.Hide()
-		m.targetPlaylistSelect.Show()
-	}
+// AddErrorMessage adds an error message to the status messages container.
+func (m *HotCueSyncModule) AddErrorMessage(message string) {
+	m.ModuleBase.AddErrorMessage(message)
 }
 
-// loadPlaylists loads playlist items from the database and updates the playlist selectors.
-func (m *HotCueSyncModule) loadPlaylists() error {
-	// Update UI to show loading state
-	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.playlistload"))
+// ClearStatusMessages clears all status messages.
+func (m *HotCueSyncModule) ClearStatusMessages() {
+	m.ModuleBase.ClearStatusMessages()
+}
 
-	// Get playlists from database
-	playlists, err := m.dbMgr.GetPlaylists()
+// copyHotCues copies hot cues from the source track to the target track.
+func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
+	fmt.Printf("    Copying hot cues from source ID %s to target ID %s\n", sourceID, targetID)
+
+	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
 	if err != nil {
-		return err
+		fmt.Printf("    Error querying hot cues: %v\n", err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
 	}
 
-	// Store playlists for later use
-	m.playlists = playlists
+	// Counter for tracking the number of hot cues
+	hotCueCount := 0
 
-	// Create options list for selectors
-	options := make([]string, len(playlists))
-	for i, playlist := range playlists {
-		options[i] = playlist.Path // Use Path instead of Name to show hierarchy
-	}
+	// Process each hot cue
+	for _, hotCue := range hotCues {
+		// Increase the hot cue counter
+		hotCueCount++
 
-	// Update selectors
-	m.sourcePlaylistSelect.Options = options
-	m.targetPlaylistSelect.Options = options
-
-	// Restore previously selected values if they exist in the new options
-	if m.sourcePlaylistID != "" {
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.sourcePlaylistID {
-				if i < len(m.sourcePlaylistSelect.Options) {
-					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
-				}
-				break
-			}
+		// Get the Kind value from the hot cue
+		kind, ok := hotCue["Kind"]
+		if !ok {
+			fmt.Printf("    Warning: Hot cue without Kind value found\n")
+			continue
 		}
-	}
 
-	if m.targetPlaylistID != "" {
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.targetPlaylistID {
-				if i < len(m.targetPlaylistSelect.Options) {
-					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
-				}
-				break
-			}
+		// List the hot cue details
+		fmt.Printf("    Processing hot cue %d: ID=%v, Kind=%v\n",
+			hotCueCount, hotCue["ID"], kind)
+
+		// Delete existing hot cues with the same Kind value in the target track
+		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, kind)
+		if err != nil {
+			fmt.Printf("    Error deleting existing hot cue: %v\n", err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.deletecue"), err)
 		}
+
+		// Generate a new ID for the hot cue in the target track
+		var maxID int64
+		err = m.dbMgr.QueryRow("SELECT COALESCE(MAX(CAST(ID AS INTEGER)), 0) FROM djmdCue").Scan(&maxID)
+		if err != nil {
+			fmt.Printf("    Error getting max ID: %v\n", err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.maxidcheck"), err)
+		}
+		maxID++
+		newID := fmt.Sprintf("%d", maxID)
+		fmt.Printf("    Generated new ID: %s for hot cue\n", newID)
+
+		// Get current timestamp for created_at
+		currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
+
+		// SQL query preparation for inserting hot cue
+		query := `
+            INSERT INTO djmdCue (
+                ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
+                OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
+                InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
+                rb_local_deleted, rb_local_synced, created_at, updated_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?, ?, 
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
+        `
+
+		// Parameters for the insert preparation
+		params := []interface{}{
+			newID, targetID,
+			hotCue["InMsec"], hotCue["InFrame"], hotCue["InMpegFrame"], hotCue["InMpegAbs"],
+			hotCue["OutMsec"], hotCue["OutFrame"], hotCue["OutMpegFrame"], hotCue["OutMpegAbs"],
+			hotCue["Kind"], hotCue["Color"], hotCue["ColorTableIndex"], hotCue["ActiveLoop"],
+			hotCue["Comment"], hotCue["BeatLoopSize"], hotCue["CueMicrosec"],
+			hotCue["InPointSeekInfo"], hotCue["OutPointSeekInfo"], hotCue["ContentUUID"],
+			hotCue["UUID"], hotCue["rb_data_status"], hotCue["rb_local_data_status"],
+			hotCue["rb_local_deleted"], hotCue["rb_local_synced"],
+			currentTime, currentTime,
+		}
+
+		// Execute the insert
+		err = m.dbMgr.Execute(query, params...)
+		if err != nil {
+			fmt.Printf("    Error inserting hot cue: %v\n", err)
+			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.cueinsert"), err)
+		}
+		fmt.Printf("    Successfully inserted hot cue with ID %s\n", newID)
 	}
 
+	if hotCueCount == 0 {
+		fmt.Printf("    No hot cues found for source track ID %s\n", sourceID)
+	} else {
+		fmt.Printf("    Successfully copied %d hot cues from source ID %s to target ID %s\n",
+			hotCueCount, sourceID, targetID)
+	}
+
+	return nil
+}
+
+// copyTrackMetadata copies specific metadata fields from source track to target track.
+// Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
+func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
+	fmt.Printf("    Copying track metadata from source ID %s to target ID %s\n", sourceID, targetID)
+
+	// Query to get source track metadata
+	query := `
+        SELECT StockDate, DateCreated, ColorID, DJPlayCount
+        FROM djmdContent
+        WHERE ID = ?
+    `
+
+	row := m.dbMgr.QueryRow(query, sourceID)
+	if row == nil {
+		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.querysource"))
+	}
+
+	// Scan source track metadata using our custom null types
+	var stockDate common.NullString
+	var dateCreated common.NullString
+	var colorID common.NullInt64
+	var djPlayCount common.NullInt64
+
+	err := row.Scan(&stockDate, &dateCreated, &colorID, &djPlayCount)
+	if err != nil {
+		fmt.Printf("    Error scanning source track metadata: %v\n", err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadatascan"), err)
+	}
+
+	// Get current timestamp for updated_at
+	currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
+
+	// Update target track with source track metadata
+	updateQuery := `
+        UPDATE djmdContent
+        SET StockDate = ?, DateCreated = ?, ColorID = ?, DJPlayCount = ?, updated_at = ?
+        WHERE ID = ?
+    `
+
+	err = m.dbMgr.Execute(updateQuery,
+		stockDate.ValueOrNil(),
+		dateCreated.ValueOrNil(),
+		colorID.ValueOrNil(),
+		djPlayCount.ValueOrNil(),
+		currentTime, targetID)
+	if err != nil {
+		fmt.Printf("    Error updating target track metadata: %v\n", err)
+		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
+	}
+
+	fmt.Printf("    Successfully copied metadata from source ID %s to target ID %s\n", sourceID, targetID)
 	return nil
 }
 
@@ -673,154 +734,111 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 	return result, nil
 }
 
-// copyHotCues copies hot cues from the source track to the target track.
-func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
-	fmt.Printf("    Copying hot cues from source ID %s to target ID %s\n", sourceID, targetID)
+// loadPlaylists loads playlist items from the database and updates the playlist selectors.
+func (m *HotCueSyncModule) loadPlaylists() error {
+	// Update UI to show loading state
+	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.playlistload"))
 
-	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
+	// Get playlists from database
+	playlists, err := m.dbMgr.GetPlaylists()
 	if err != nil {
-		fmt.Printf("    Error querying hot cues: %v\n", err)
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
+		return err
 	}
 
-	// Counter for tracking the number of hot cues
-	hotCueCount := 0
+	// Store playlists for later use
+	m.playlists = playlists
 
-	// Process each hot cue
-	for _, hotCue := range hotCues {
-		// Increase the hot cue counter
-		hotCueCount++
-
-		// Get the Kind value from the hot cue
-		kind, ok := hotCue["Kind"]
-		if !ok {
-			fmt.Printf("    Warning: Hot cue without Kind value found\n")
-			continue
-		}
-
-		// List the hot cue details
-		fmt.Printf("    Processing hot cue %d: ID=%v, Kind=%v\n",
-			hotCueCount, hotCue["ID"], kind)
-
-		// Delete existing hot cues with the same Kind value in the target track
-		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, kind)
-		if err != nil {
-			fmt.Printf("    Error deleting existing hot cue: %v\n", err)
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.deletecue"), err)
-		}
-
-		// Generate a new ID for the hot cue in the target track
-		var maxID int64
-		err = m.dbMgr.QueryRow("SELECT COALESCE(MAX(CAST(ID AS INTEGER)), 0) FROM djmdCue").Scan(&maxID)
-		if err != nil {
-			fmt.Printf("    Error getting max ID: %v\n", err)
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.maxidcheck"), err)
-		}
-		maxID++
-		newID := fmt.Sprintf("%d", maxID)
-		fmt.Printf("    Generated new ID: %s for hot cue\n", newID)
-
-		// Get current timestamp for created_at
-		currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
-
-		// SQL query preparation for inserting hot cue
-		query := `
-            INSERT INTO djmdCue (
-                ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
-                OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
-                InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
-                rb_local_deleted, rb_local_synced, created_at, updated_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        `
-
-		// Parameters for the insert preparation
-		params := []interface{}{
-			newID, targetID,
-			hotCue["InMsec"], hotCue["InFrame"], hotCue["InMpegFrame"], hotCue["InMpegAbs"],
-			hotCue["OutMsec"], hotCue["OutFrame"], hotCue["OutMpegFrame"], hotCue["OutMpegAbs"],
-			hotCue["Kind"], hotCue["Color"], hotCue["ColorTableIndex"], hotCue["ActiveLoop"],
-			hotCue["Comment"], hotCue["BeatLoopSize"], hotCue["CueMicrosec"],
-			hotCue["InPointSeekInfo"], hotCue["OutPointSeekInfo"], hotCue["ContentUUID"],
-			hotCue["UUID"], hotCue["rb_data_status"], hotCue["rb_local_data_status"],
-			hotCue["rb_local_deleted"], hotCue["rb_local_synced"],
-			currentTime, currentTime,
-		}
-
-		// Execute the insert
-		err = m.dbMgr.Execute(query, params...)
-		if err != nil {
-			fmt.Printf("    Error inserting hot cue: %v\n", err)
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.cueinsert"), err)
-		}
-		fmt.Printf("    Successfully inserted hot cue with ID %s\n", newID)
+	// Create options list for selectors
+	options := make([]string, len(playlists))
+	for i, playlist := range playlists {
+		options[i] = playlist.Path // Use Path instead of Name to show hierarchy
 	}
 
-	if hotCueCount == 0 {
-		fmt.Printf("    No hot cues found for source track ID %s\n", sourceID)
-	} else {
-		fmt.Printf("    Successfully copied %d hot cues from source ID %s to target ID %s\n",
-			hotCueCount, sourceID, targetID)
+	// Update selectors
+	m.sourcePlaylistSelect.Options = options
+	m.targetPlaylistSelect.Options = options
+
+	// Restore previously selected values if they exist in the new options
+	if m.sourcePlaylistID != "" {
+		for i, playlist := range m.playlists {
+			if playlist.ID == m.sourcePlaylistID {
+				if i < len(m.sourcePlaylistSelect.Options) {
+					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
+				}
+				break
+			}
+		}
+	}
+
+	if m.targetPlaylistID != "" {
+		for i, playlist := range m.playlists {
+			if playlist.ID == m.targetPlaylistID {
+				if i < len(m.targetPlaylistSelect.Options) {
+					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
+				}
+				break
+			}
+		}
 	}
 
 	return nil
 }
 
-// copyTrackMetadata copies specific metadata fields from source track to target track.
-// Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
-func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
-	fmt.Printf("    Copying track metadata from source ID %s to target ID %s\n", sourceID, targetID)
-
-	// Query to get source track metadata
-	query := `
-        SELECT StockDate, DateCreated, ColorID, DJPlayCount
-        FROM djmdContent
-        WHERE ID = ?
-    `
-
-	row := m.dbMgr.QueryRow(query, sourceID)
-	if row == nil {
-		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.querysource"))
+// updateControlsState updates the state of playlist selectors.
+func (m *HotCueSyncModule) updateControlsState() {
+	// Get current source and target types
+	var sourceType, targetType SourceType
+	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		sourceType = SourceTypeFolder
+	} else {
+		sourceType = SourceTypePlaylist
 	}
 
-	// Scan source track metadata using our custom null types
-	var stockDate common.NullString
-	var dateCreated common.NullString
-	var colorID common.NullInt64
-	var djPlayCount common.NullInt64
-
-	err := row.Scan(&stockDate, &dateCreated, &colorID, &djPlayCount)
-	if err != nil {
-		fmt.Printf("    Error scanning source track metadata: %v\n", err)
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadatascan"), err)
+	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		targetType = SourceTypeFolder
+	} else {
+		targetType = SourceTypePlaylist
 	}
 
-	// Get current timestamp for updated_at
-	currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
-
-	// Update target track with source track metadata
-	updateQuery := `
-        UPDATE djmdContent
-        SET StockDate = ?, DateCreated = ?, ColorID = ?, DJPlayCount = ?, updated_at = ?
-        WHERE ID = ?
-    `
-
-	err = m.dbMgr.Execute(updateQuery,
-		stockDate.ValueOrNil(),
-		dateCreated.ValueOrNil(),
-		colorID.ValueOrNil(),
-		djPlayCount.ValueOrNil(),
-		currentTime, targetID)
-	if err != nil {
-		fmt.Printf("    Error updating target track metadata: %v\n", err)
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
+	// Update visibility based on selected source type
+	if sourceType == SourceTypeFolder {
+		m.sourceFolderField.Show()
+		m.sourcePlaylistSelect.Hide()
+	} else {
+		m.sourceFolderField.Hide()
+		m.sourcePlaylistSelect.Show()
 	}
 
-	fmt.Printf("    Successfully copied metadata from source ID %s to target ID %s\n", sourceID, targetID)
-	return nil
+	// Update visibility based on selected target type
+	if targetType == SourceTypeFolder {
+		m.targetFolderField.Show()
+		m.targetPlaylistSelect.Hide()
+	} else {
+		m.targetFolderField.Hide()
+		m.targetPlaylistSelect.Show()
+	}
+}
+
+// updateSourceVisibility updates the visibility of source input controls based on the selected source type.
+func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
+	if sourceType == SourceTypeFolder {
+		m.sourceFolderField.Show()
+		m.sourcePlaylistSelect.Hide()
+	} else {
+		m.sourceFolderField.Hide()
+		m.sourcePlaylistSelect.Show()
+	}
+}
+
+// updateTargetVisibility updates the visibility of target input controls based on the selected target type.
+func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
+	if targetType == SourceTypeFolder {
+		m.targetFolderField.Show()
+		m.targetPlaylistSelect.Hide()
+	} else {
+		m.targetFolderField.Hide()
+		m.targetPlaylistSelect.Show()
+	}
 }
 
 // Start performs the main hot cue synchronization process.
@@ -1031,24 +1049,4 @@ func (m *HotCueSyncModule) Start() error {
 	}()
 
 	return nil
-}
-
-// GetStatusMessagesContainer returns the status messages container.
-func (m *HotCueSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-// AddInfoMessage adds an information message to the status messages container.
-func (m *HotCueSyncModule) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-// AddErrorMessage adds an error message to the status messages container.
-func (m *HotCueSyncModule) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-// ClearStatusMessages clears all status messages.
-func (m *HotCueSyncModule) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
 }
