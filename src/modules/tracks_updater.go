@@ -247,20 +247,23 @@ func (m *TracksUpdater) initializeUI() {
 	)
 }
 
-// Start handles the module's main functionality
 
+// GetStatusMessagesContainer returns the status messages container.
 func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
 	return m.ModuleBase.GetStatusMessagesContainer()
 }
 
+// AddInfoMessage adds an information message to the status messages container.
 func (m *TracksUpdater) AddInfoMessage(message string) {
 	m.ModuleBase.AddInfoMessage(message)
 }
 
+// AddErrorMessage adds an error message to the status messages container.
 func (m *TracksUpdater) AddErrorMessage(message string) {
 	m.ModuleBase.AddErrorMessage(message)
 }
 
+// ClearStatusMessages clears all status messages.
 func (m *TracksUpdater) ClearStatusMessages() {
 	m.ModuleBase.ClearStatusMessages()
 }
