@@ -21,17 +21,17 @@ import (
 // DateSyncModule implements a module for synchronizing dates in the Rekordbox database
 type DateSyncModule struct {
 	*common.ModuleBase
-	dbMgr               *common.DBManager
-	excludeFoldersCheck *widget.Check
-	customDateFolders   []*widget.Entry
-	excludedFolders     []*widget.Entry
-	datePicker          *widget.Entry
-	foldersContainer    *fyne.Container
-	customDateContainer *fyne.Container
-	datePickerContainer *fyne.Container
-	standardUpdateBtn   *widget.Button
-	customDateUpdateBtn *widget.Button
-	calendarBtn         *widget.Button
+	dbMgr                  *common.DBManager
+	excludeFoldersCheck    *widget.Check
+	customDateFoldersEntry []*widget.Entry
+	excludedFoldersEntry   []*widget.Entry
+	datePickerEntry        *widget.Entry
+	foldersContainer       *fyne.Container
+	customDateContainer    *fyne.Container
+	datePickerContainer    *fyne.Container
+	standardUpdateBtn      *widget.Button
+	customDateUpdateBtn    *widget.Button
+	calendarBtn            *widget.Button
 }
 
 // CustomCalendar implements a custom calendar widget for date selection
@@ -95,7 +95,7 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 	rightHeader.TextStyle = fyne.TextStyle{Bold: true}
 
 	// Date picker with calendar button
-	m.datePickerContainer = container.NewBorder(nil, nil, nil, m.calendarBtn, m.datePicker)
+	m.datePickerContainer = container.NewBorder(nil, nil, nil, m.calendarBtn, m.datePickerEntry)
 
 	rightSection := container.NewVBox(
 		rightHeader,
@@ -116,7 +116,7 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("datesync.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("datesync.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)
@@ -145,17 +145,17 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	// Clear existing entries
 	m.foldersContainer.Objects = nil
 	m.customDateContainer.Objects = nil
-	m.excludedFolders = nil
-	m.customDateFolders = nil
+	m.excludedFoldersEntry = nil
+	m.customDateFoldersEntry = nil
 
 	// Load excluded folders - use the dedicated checkbox state field
 	excludeFoldersEnabled := cfg.GetBool("exclude_folders_enabled", false)
 	m.excludeFoldersCheck.SetChecked(excludeFoldersEnabled)
 
-	excludedFolders := cfg.Get("excluded_folders", "")
+	excludedFoldersEntry := cfg.Get("excluded_folders", "")
 
-	if excludedFolders != "" {
-		folderPaths := strings.Split(excludedFolders, "|")
+	if excludedFoldersEntry != "" {
+		folderPaths := strings.Split(excludedFoldersEntry, "|")
 		for _, folderPath := range folderPaths {
 			if folderPath != "" {
 				m.addFolderEntryForConfig(folderPath, true)
@@ -165,15 +165,15 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 
 	// Ensure there's at least one empty entry for excluded folders
 	// Also ensure that the last entry is empty for better UX
-	if len(m.excludedFolders) == 0 || m.excludedFolders[len(m.excludedFolders)-1].Text != "" {
+	if len(m.excludedFoldersEntry) == 0 || m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1].Text != "" {
 		m.addExcludedFolderEntry()
 	}
 
 	// Load custom date folders
-	customDateFolders := cfg.Get("custom_date_folders", "")
+	customDateFoldersEntry := cfg.Get("custom_date_folders", "")
 
-	if customDateFolders != "" {
-		folderPaths := strings.Split(customDateFolders, "|")
+	if customDateFoldersEntry != "" {
+		folderPaths := strings.Split(customDateFoldersEntry, "|")
 		for _, folderPath := range folderPaths {
 			if folderPath != "" {
 				m.addFolderEntryForConfig(folderPath, false)
@@ -183,14 +183,14 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 
 	// Ensure there's at least one empty entry for custom date folders
 	// Also ensure that the last entry is empty for better UX
-	if len(m.customDateFolders) == 0 || m.customDateFolders[len(m.customDateFolders)-1].Text != "" {
+	if len(m.customDateFoldersEntry) == 0 || m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1].Text != "" {
 		m.addCustomDateFolderEntry()
 	}
 
 	// Load custom date
 	customDate := cfg.Get("custom_date", "")
 	if customDate != "" {
-		m.datePicker.SetText(customDate)
+		m.datePickerEntry.SetText(customDate)
 	}
 }
 
@@ -207,25 +207,25 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	cfg.SetBool("exclude_folders_enabled", m.excludeFoldersCheck.Checked)
 
 	// Save excluded folders
-	var excludedFolders []string
-	for _, entry := range m.excludedFolders {
+	var excludedFoldersEntry []string
+	for _, entry := range m.excludedFoldersEntry {
 		if entry.Text != "" {
-			excludedFolders = append(excludedFolders, entry.Text)
+			excludedFoldersEntry = append(excludedFoldersEntry, entry.Text)
 		}
 	}
-	cfg.Set("excluded_folders", strings.Join(excludedFolders, "|"))
+	cfg.Set("excluded_folders", strings.Join(excludedFoldersEntry, "|"))
 
 	// Save custom date folders
-	var customDateFolders []string
-	for _, entry := range m.customDateFolders {
+	var customDateFoldersEntry []string
+	for _, entry := range m.customDateFoldersEntry {
 		if entry.Text != "" {
-			customDateFolders = append(customDateFolders, entry.Text)
+			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
 		}
 	}
-	cfg.Set("custom_date_folders", strings.Join(customDateFolders, "|"))
+	cfg.Set("custom_date_folders", strings.Join(customDateFoldersEntry, "|"))
 
 	// Save custom date
-	cfg.Set("custom_date", m.datePicker.Text)
+	cfg.Set("custom_date", m.datePickerEntry.Text)
 
 	// Store to config manager
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
@@ -366,16 +366,16 @@ func (m *DateSyncModule) initializeUI() {
 	m.customDateContainer = container.NewVBox()
 
 	// Create date picker
-	m.datePicker = widget.NewEntry()
-	m.datePicker.SetPlaceHolder("YYYY-MM-DD")
-	m.datePicker.OnChanged = m.CreateChangeHandler(func() {
+	m.datePickerEntry = widget.NewEntry()
+	m.datePickerEntry.SetPlaceHolder(locales.Translate("datesync.date.placeholder"))
+	m.datePickerEntry.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
 	})
 
 	// Create calendar button
 	m.calendarBtn = widget.NewButtonWithIcon("", theme.HistoryIcon(), func() {
 		calendar := NewCustomCalendar(func(selectedDate time.Time) {
-			m.datePicker.SetText(selectedDate.Format("2006-01-02"))
+			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
 		})
 		dialog.ShowCustom(locales.Translate("datesync.dialog.calendar"), locales.Translate("common.button.close"), calendar, m.Window)
@@ -506,15 +506,15 @@ func (m *DateSyncModule) customUpdate() {
 	}
 
 	// Get custom date folders
-	var customDateFolders []string
-	for _, entry := range m.customDateFolders {
+	var customDateFoldersEntry []string
+	for _, entry := range m.customDateFoldersEntry {
 		if entry.Text != "" {
-			customDateFolders = append(customDateFolders, entry.Text)
+			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
 		}
 	}
 
 	// Parse custom date
-	customDate, err := time.Parse("2006-01-02", m.datePicker.Text)
+	customDate, err := time.Parse("2006-01-02", m.datePickerEntry.Text)
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
@@ -527,7 +527,7 @@ func (m *DateSyncModule) customUpdate() {
 	}
 
 	// Execute custom date sync
-	if err := m.setCustomDates(customDateFolders, customDate); err != nil {
+	if err := m.setCustomDates(customDateFoldersEntry, customDate); err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Custom Date Sync",
@@ -541,7 +541,7 @@ func (m *DateSyncModule) customUpdate() {
 
 // addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add
 func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded bool) {
-	if (isExcluded && len(m.excludedFolders) >= 6) || (!isExcluded && len(m.customDateFolders) >= 6) {
+	if (isExcluded && len(m.excludedFoldersEntry) >= 6) || (!isExcluded && len(m.customDateFoldersEntry) >= 6) {
 		return
 	}
 
@@ -557,7 +557,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 			func(path string) {
 				entry.SetText(path)
 				// Add new field if this is the last non-empty one and we haven't reached the limit
-				if !m.IsLoadingConfig && entry.Text != "" && len(m.excludedFolders) < 6 && entry == m.excludedFolders[len(m.excludedFolders)-1] {
+				if !m.IsLoadingConfig && entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
 					m.addExcludedFolderEntry()
 				}
 				m.SaveConfig()
@@ -566,7 +566,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 				m.removeExcludedFolderEntry(entry)
 			},
 		)
-		m.excludedFolders = append(m.excludedFolders, entry)
+		m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
 		m.foldersContainer.Add(folderField)
 	} else {
 		folderField = common.CreateFolderSelectionFieldWithDelete(
@@ -575,7 +575,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 			func(path string) {
 				entry.SetText(path)
 				// Add new field if this is the last non-empty one and we haven't reached the limit
-				if !m.IsLoadingConfig && entry.Text != "" && len(m.customDateFolders) < 6 && entry == m.customDateFolders[len(m.customDateFolders)-1] {
+				if !m.IsLoadingConfig && entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
 					m.addCustomDateFolderEntry()
 				}
 				m.SaveConfig()
@@ -584,14 +584,14 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 				m.removeCustomDateFolderEntry(entry)
 			},
 		)
-		m.customDateFolders = append(m.customDateFolders, entry)
+		m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
 		m.customDateContainer.Add(folderField)
 	}
 }
 
 // addExcludedFolderEntry adds a new entry for excluded folder selection
 func (m *DateSyncModule) addExcludedFolderEntry() {
-	if len(m.excludedFolders) >= 6 {
+	if len(m.excludedFoldersEntry) >= 6 {
 		return
 	}
 
@@ -603,7 +603,7 @@ func (m *DateSyncModule) addExcludedFolderEntry() {
 		func(path string) {
 			entry.SetText(path)
 			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.excludedFolders) < 6 && entry == m.excludedFolders[len(m.excludedFolders)-1] {
+			if entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
 				m.addExcludedFolderEntry()
 			}
 			m.SaveConfig()
@@ -613,13 +613,13 @@ func (m *DateSyncModule) addExcludedFolderEntry() {
 		},
 	)
 
-	m.excludedFolders = append(m.excludedFolders, entry)
+	m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
 	m.foldersContainer.Add(folderField)
 }
 
 // addCustomDateFolderEntry adds a new entry for custom date folder selection
 func (m *DateSyncModule) addCustomDateFolderEntry() {
-	if len(m.customDateFolders) >= 6 {
+	if len(m.customDateFoldersEntry) >= 6 {
 		return
 	}
 
@@ -631,7 +631,7 @@ func (m *DateSyncModule) addCustomDateFolderEntry() {
 		func(path string) {
 			entry.SetText(path)
 			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.customDateFolders) < 6 && entry == m.customDateFolders[len(m.customDateFolders)-1] {
+			if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
 				m.addCustomDateFolderEntry()
 			}
 			m.SaveConfig()
@@ -641,7 +641,7 @@ func (m *DateSyncModule) addCustomDateFolderEntry() {
 		},
 	)
 
-	m.customDateFolders = append(m.customDateFolders, entry)
+	m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
 	m.customDateContainer.Add(customDateFolderField)
 }
 
@@ -649,7 +649,7 @@ func (m *DateSyncModule) addCustomDateFolderEntry() {
 func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) {
 	// Find the index of the entry to remove
 	indexToRemove := -1
-	for i, entry := range m.excludedFolders {
+	for i, entry := range m.excludedFoldersEntry {
 		if entry == entryToRemove {
 			indexToRemove = i
 			break
@@ -662,18 +662,18 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 	}
 
 	// Remove the entry from the list
-	m.excludedFolders = append(m.excludedFolders[:indexToRemove], m.excludedFolders[indexToRemove+1:]...)
+	m.excludedFoldersEntry = append(m.excludedFoldersEntry[:indexToRemove], m.excludedFoldersEntry[indexToRemove+1:]...)
 
 	// Clear and rebuild the container
 	m.foldersContainer.Objects = nil
-	for _, entry := range m.excludedFolders {
+	for _, entry := range m.excludedFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
 			locales.Translate("datesync.label.excluded"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
 				// Add new field if this is the last non-empty one and we haven't reached the limit
-				if entry.Text != "" && len(m.excludedFolders) < 6 && entry == m.excludedFolders[len(m.excludedFolders)-1] {
+				if entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
 					m.addExcludedFolderEntry()
 				}
 				m.SaveConfig()
@@ -686,7 +686,7 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 	}
 
 	// Ensure there's at least one empty entry
-	if len(m.excludedFolders) == 0 {
+	if len(m.excludedFoldersEntry) == 0 {
 		m.addExcludedFolderEntry()
 	}
 
@@ -699,7 +699,7 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry) {
 	// Find the index of the entry to remove
 	indexToRemove := -1
-	for i, entry := range m.customDateFolders {
+	for i, entry := range m.customDateFoldersEntry {
 		if entry == entryToRemove {
 			indexToRemove = i
 			break
@@ -712,18 +712,18 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 	}
 
 	// Remove the entry from the list
-	m.customDateFolders = append(m.customDateFolders[:indexToRemove], m.customDateFolders[indexToRemove+1:]...)
+	m.customDateFoldersEntry = append(m.customDateFoldersEntry[:indexToRemove], m.customDateFoldersEntry[indexToRemove+1:]...)
 
 	// Clear and rebuild the container
 	m.customDateContainer.Objects = nil
-	for _, entry := range m.customDateFolders {
+	for _, entry := range m.customDateFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
 			locales.Translate("datesync.label.customdate"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
 				// Add new field if this is the last non-empty one and we haven't reached the limit
-				if entry.Text != "" && len(m.customDateFolders) < 6 && entry == m.customDateFolders[len(m.customDateFolders)-1] {
+				if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
 					m.addCustomDateFolderEntry()
 				}
 				m.SaveConfig()
@@ -736,7 +736,7 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 	}
 
 	// Ensure there's at least one empty entry
-	if len(m.customDateFolders) == 0 {
+	if len(m.customDateFoldersEntry) == 0 {
 		m.addCustomDateFolderEntry()
 	}
 
@@ -754,20 +754,20 @@ func (m *DateSyncModule) synchronizeDates() error {
 	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Get excluded folders if enabled
-	var excludedFolders []string
+	var excludedFoldersEntry []string
 	if m.excludeFoldersCheck.Checked {
-		for _, entry := range m.excludedFolders {
+		for _, entry := range m.excludedFoldersEntry {
 			if entry.Text != "" {
-				excludedFolders = append(excludedFolders, entry.Text)
+				excludedFoldersEntry = append(excludedFoldersEntry, entry.Text)
 			}
 		}
 	}
 
 	// Build the WHERE clause for excluded folders
 	var excludeClause string
-	if len(excludedFolders) > 0 {
-		excludeConditions := make([]string, len(excludedFolders))
-		for i, folder := range excludedFolders {
+	if len(excludedFoldersEntry) > 0 {
+		excludeConditions := make([]string, len(excludedFoldersEntry))
+		for i, folder := range excludedFoldersEntry {
 			excludeConditions[i] = fmt.Sprintf("FolderPath NOT LIKE '%s%%'", common.ToDbPath(folder, true))
 		}
 		excludeClause = " AND " + strings.Join(excludeConditions, " AND ")
@@ -793,7 +793,7 @@ func (m *DateSyncModule) synchronizeDates() error {
 }
 
 // setCustomDates sets custom dates for tracks in selected folders
-func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate time.Time) error {
+func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) error {
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
@@ -801,13 +801,13 @@ func (m *DateSyncModule) setCustomDates(customDateFolders []string, customDate t
 	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Check if any folders are selected
-	if len(customDateFolders) == 0 {
+	if len(customDateFoldersEntry) == 0 {
 		return fmt.Errorf(locales.Translate("datesync.err.nofolders"))
 	}
 
 	// Build the WHERE clause for custom date folders
 	var conditions []string
-	for _, folder := range customDateFolders {
+	for _, folder := range customDateFoldersEntry {
 		conditions = append(conditions, fmt.Sprintf("FolderPath LIKE '%s%%'", common.ToDbPath(folder, true)))
 	}
 	whereClause := strings.Join(conditions, " OR ")

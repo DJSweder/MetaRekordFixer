@@ -30,33 +30,33 @@ type MusicConverterModule struct {
 	*common.ModuleBase // Embedded pointer to shared base
 
 	// Source and target settings
-	entrySourceFolder        *widget.Entry
-	entryTargetFolder        *widget.Entry
-	selectSourceFormat       *widget.Select
-	selectTargetFormat       *widget.Select
-	checkboxRewriteExisting  *widget.Check
-	checkboxMakeTargetFolder *widget.Check
+	sourceFolderEntry        *widget.Entry
+	targetFolderEntry        *widget.Entry
+	sourceFormatSelect       *widget.Select
+	targetFormatSelect       *widget.Select
+	rewriteExistingCheckbox  *widget.Check
+	makeTargetFolderCheckbox *widget.Check
 
 	// Format-specific settings
 	// MP3 settings
-	selectMP3Bitrate    *widget.Select
-	selectMP3SampleRate *widget.Select
+	MP3BitrateSelect    *widget.Select
+	MP3SampleRateSelect *widget.Select
 	// FLAC settings
-	selectFLACCompression *widget.Select
-	selectFLACSampleRate  *widget.Select
-	selectFLACBitDepth    *widget.Select
+	FLACCompressionSelect *widget.Select
+	FLACSampleRateSelect  *widget.Select
+	FLACBitDepthSelect    *widget.Select
 	// WAV settings
-	selectWAVSampleRate *widget.Select
-	selectWAVBitDepth   *widget.Select
+	WAVSampleRateSelect *widget.Select
+	WAVBitDepthSelect   *widget.Select
 
 	// Format settings containers
-	mp3SettingsContainer    *fyne.Container
-	flacSettingsContainer   *fyne.Container
-	wavSettingsContainer    *fyne.Container
+	MP3SettingsContainer    *fyne.Container
+	FLACSettingsContainer   *fyne.Container
+	WAVSettingsContainer    *fyne.Container
 	formatSettingsContainer *fyne.Container
 
 	// Submit button
-	submitButton *widget.Button
+	submitBtn *widget.Button
 
 	// Current state
 	currentTargetFormat string
@@ -121,14 +121,14 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 		locales.Translate("convert.label.sourcefolder"),
 		"",
 		func(path string) {
-			m.entrySourceFolder.SetText(path)
+			m.sourceFolderEntry.SetText(path)
 			m.SaveConfig()
 		},
 	)
 	sourceContainer := container.NewBorder(
 		nil, nil,
-		m.selectSourceFormat, sourceBrowseBtn,
-		m.entrySourceFolder,
+		m.sourceFormatSelect, sourceBrowseBtn,
+		m.sourceFolderEntry,
 	)
 
 	// Target folder container
@@ -136,14 +136,14 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 		locales.Translate("convert.label.targetfolder"),
 		"",
 		func(path string) {
-			m.entryTargetFolder.SetText(path)
+			m.targetFolderEntry.SetText(path)
 			m.SaveConfig()
 		},
 	)
 	targetContainer := container.NewBorder(
 		nil, nil,
-		m.selectTargetFormat, targetBrowseBtn,
-		m.entryTargetFolder,
+		m.targetFormatSelect, targetBrowseBtn,
+		m.targetFolderEntry,
 	)
 
 	// Create form for source and target inputs
@@ -158,8 +158,8 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 
 	// Checkboxes for additional options
 	checkboxesContainer := container.NewVBox(
-		m.checkboxRewriteExisting,
-		m.checkboxMakeTargetFolder,
+		m.rewriteExistingCheckbox,
+		m.makeTargetFolderCheckbox,
 	)
 
 	// Combine all elements for the left section
@@ -191,14 +191,14 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("convert.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("convert.label.info")),
 		widget.NewSeparator(),
 		horizontalLayout,
 	)
 
 	// Add submit button if provided
-	if m.submitButton != nil {
-		moduleContent.Add(container.NewHBox(layout.NewSpacer(), m.submitButton))
+	if m.submitBtn != nil {
+		moduleContent.Add(container.NewHBox(layout.NewSpacer(), m.submitBtn))
 	}
 
 	return moduleContent
@@ -213,12 +213,12 @@ func (m *MusicConverterModule) GetContent() fyne.CanvasObject {
 // initializeUI sets up the user interface components
 func (m *MusicConverterModule) initializeUI() {
 	// Source folder selection
-	m.entrySourceFolder = widget.NewEntry()
-	m.entrySourceFolder.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
+	m.sourceFolderEntry = widget.NewEntry()
+	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
 
 	// Target folder selection
-	m.entryTargetFolder = widget.NewEntry()
-	m.entryTargetFolder.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
+	m.targetFolderEntry = widget.NewEntry()
+	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
 
 	// Source format selection
 	sourceFormats := []string{
@@ -227,7 +227,7 @@ func (m *MusicConverterModule) initializeUI() {
 		"FLAC",
 		"WAV",
 	}
-	m.selectSourceFormat = widget.NewSelect(sourceFormats, func(format string) {
+	m.sourceFormatSelect = widget.NewSelect(sourceFormats, func(format string) {
 		m.onSourceFormatChanged(format)
 	})
 
@@ -237,27 +237,27 @@ func (m *MusicConverterModule) initializeUI() {
 		"FLAC",
 		"WAV",
 	}
-	m.selectTargetFormat = widget.NewSelect(targetFormats, func(format string) {
+	m.targetFormatSelect = widget.NewSelect(targetFormats, func(format string) {
 		m.onTargetFormatChanged(format)
 		m.SaveConfig()
 	})
 
 	// Checkboxes
-	m.checkboxRewriteExisting = widget.NewCheck(locales.Translate("convert.chkbox.rewrite"), nil)
-	m.checkboxRewriteExisting.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
+	m.rewriteExistingCheckbox = widget.NewCheck(locales.Translate("convert.chkbox.rewrite"), nil)
+	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
 
-	m.checkboxMakeTargetFolder = widget.NewCheck(locales.Translate("convert.chkbox.maketargetfolder"), nil)
-	m.checkboxMakeTargetFolder.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
+	m.makeTargetFolderCheckbox = widget.NewCheck(locales.Translate("convert.chkbox.maketargetfolder"), nil)
+	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
 
 	// Initialize format-specific settings
 	// MP3 settings
 	mp3BitrateOptions := []string{"320 kbps", "256 kbps", "192 kbps", "128 kbps"}
-	m.selectMP3Bitrate = widget.NewSelect(mp3BitrateOptions, nil)
-	m.selectMP3Bitrate.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.MP3BitrateSelect = widget.NewSelect(mp3BitrateOptions, nil)
+	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	mp3SampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
-	m.selectMP3SampleRate = widget.NewSelect(mp3SampleRateOptions, nil)
-	m.selectMP3SampleRate.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.MP3SampleRateSelect = widget.NewSelect(mp3SampleRateOptions, nil)
+	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	// FLAC settings
 	flacCompressionOptions := []string{
@@ -265,55 +265,55 @@ func (m *MusicConverterModule) initializeUI() {
 		locales.Translate("convert.configpar.compressmed"),
 		locales.Translate("convert.configpar.nocompress"),
 	}
-	m.selectFLACCompression = widget.NewSelect(flacCompressionOptions, nil)
-	m.selectFLACCompression.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACCompressionSelect = widget.NewSelect(flacCompressionOptions, nil)
+	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	flacSampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
-	m.selectFLACSampleRate = widget.NewSelect(flacSampleRateOptions, nil)
-	m.selectFLACSampleRate.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACSampleRateSelect = widget.NewSelect(flacSampleRateOptions, nil)
+	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	flacBitDepthOptions := []string{locales.Translate("convert.configpar.copypar"), "32", "24", "16"}
-	m.selectFLACBitDepth = widget.NewSelect(flacBitDepthOptions, nil)
-	m.selectFLACBitDepth.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACBitDepthSelect = widget.NewSelect(flacBitDepthOptions, nil)
+	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	// WAV settings
 	wavSampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
-	m.selectWAVSampleRate = widget.NewSelect(wavSampleRateOptions, nil)
-	m.selectWAVSampleRate.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.WAVSampleRateSelect = widget.NewSelect(wavSampleRateOptions, nil)
+	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	wavBitDepthOptions := []string{locales.Translate("convert.configpar.copypar"), "32", "24", "16"}
-	m.selectWAVBitDepth = widget.NewSelect(wavBitDepthOptions, nil)
-	m.selectWAVBitDepth.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.WAVBitDepthSelect = widget.NewSelect(wavBitDepthOptions, nil)
+	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	// Create format settings containers
 	mp3BitrateLabel := widget.NewLabel(locales.Translate("convert.configpar.bitrate"))
 	mp3SampleRateLabel := widget.NewLabel(locales.Translate("convert.configpar.samplerate"))
-	m.mp3SettingsContainer = container.NewVBox(
-		container.NewGridWithColumns(2, mp3BitrateLabel, m.selectMP3Bitrate),
-		container.NewGridWithColumns(2, mp3SampleRateLabel, m.selectMP3SampleRate),
+	m.MP3SettingsContainer = container.NewVBox(
+		container.NewGridWithColumns(2, mp3BitrateLabel, m.MP3BitrateSelect),
+		container.NewGridWithColumns(2, mp3SampleRateLabel, m.MP3SampleRateSelect),
 	)
 
-	flacCompressionLabel := widget.NewLabel(locales.Translate("convert.configpar.compress"))
-	flacSampleRateLabel := widget.NewLabel(locales.Translate("convert.configpar.samplerate"))
-	flacBitDepthLabel := widget.NewLabel(locales.Translate("convert.configpar.bitdepth"))
-	m.flacSettingsContainer = container.NewVBox(
-		container.NewGridWithColumns(2, flacCompressionLabel, m.selectFLACCompression),
-		container.NewGridWithColumns(2, flacSampleRateLabel, m.selectFLACSampleRate),
-		container.NewGridWithColumns(2, flacBitDepthLabel, m.selectFLACBitDepth),
+	FLACCompressionLabel := widget.NewLabel(locales.Translate("convert.configpar.compress"))
+	FLACSampleRateLabel := widget.NewLabel(locales.Translate("convert.configpar.samplerate"))
+	FLACBitDepthLabel := widget.NewLabel(locales.Translate("convert.configpar.bitdepth"))
+	m.FLACSettingsContainer = container.NewVBox(
+		container.NewGridWithColumns(2, FLACCompressionLabel, m.FLACCompressionSelect),
+		container.NewGridWithColumns(2, FLACSampleRateLabel, m.FLACSampleRateSelect),
+		container.NewGridWithColumns(2, FLACBitDepthLabel, m.FLACBitDepthSelect),
 	)
 
-	wavSampleRateLabel := widget.NewLabel(locales.Translate("convert.configpar.samplerate"))
-	wavBitDepthLabel := widget.NewLabel(locales.Translate("convert.configpar.bitdepth"))
-	m.wavSettingsContainer = container.NewVBox(
-		container.NewGridWithColumns(2, wavSampleRateLabel, m.selectWAVSampleRate),
-		container.NewGridWithColumns(2, wavBitDepthLabel, m.selectWAVBitDepth),
+	WAVSampleRateLabel := widget.NewLabel(locales.Translate("convert.configpar.samplerate"))
+	WAVBitDepthLabel := widget.NewLabel(locales.Translate("convert.configpar.bitdepth"))
+	m.WAVSettingsContainer = container.NewVBox(
+		container.NewGridWithColumns(2, WAVSampleRateLabel, m.WAVSampleRateSelect),
+		container.NewGridWithColumns(2, WAVBitDepthLabel, m.WAVBitDepthSelect),
 	)
 
 	// Main format settings container (will hold the appropriate settings based on selected format)
 	m.formatSettingsContainer = container.NewVBox()
 
 	// Submit button
-	m.submitButton = common.CreateSubmitButton(
+	m.submitBtn = common.CreateSubmitButton(
 		locales.Translate("convert.button.start"),
 		func() {
 			m.ClearStatusMessages()
@@ -361,22 +361,22 @@ func (m *MusicConverterModule) updateFormatSettings(format string) {
 	// Exact string comparison for format types
 	switch format {
 	case "MP3":
-		if m.mp3SettingsContainer != nil {
-			m.formatSettingsContainer.Add(m.mp3SettingsContainer)
+		if m.MP3SettingsContainer != nil {
+			m.formatSettingsContainer.Add(m.MP3SettingsContainer)
 			m.debugLog("Adding MP3 settings container")
 		} else {
 			m.debugLog("WARNING: MP3 settings container is nil")
 		}
 	case "FLAC":
-		if m.flacSettingsContainer != nil {
-			m.formatSettingsContainer.Add(m.flacSettingsContainer)
+		if m.FLACSettingsContainer != nil {
+			m.formatSettingsContainer.Add(m.FLACSettingsContainer)
 			m.debugLog("Adding FLAC settings container")
 		} else {
 			m.debugLog("WARNING: FLAC settings container is nil")
 		}
 	case "WAV":
-		if m.wavSettingsContainer != nil {
-			m.formatSettingsContainer.Add(m.wavSettingsContainer)
+		if m.WAVSettingsContainer != nil {
+			m.formatSettingsContainer.Add(m.WAVSettingsContainer)
 			m.debugLog("Adding WAV settings container")
 		} else {
 			m.debugLog("WARNING: WAV settings container is nil")
@@ -397,89 +397,89 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load source and target folder paths
-	if m.entrySourceFolder != nil {
+	if m.sourceFolderEntry != nil {
 		if sourceFolder := cfg.Get("source_folder", ""); sourceFolder != "" {
-			m.entrySourceFolder.SetText(sourceFolder)
+			m.sourceFolderEntry.SetText(sourceFolder)
 		}
 	}
 
-	if m.entryTargetFolder != nil {
+	if m.targetFolderEntry != nil {
 		if targetFolder := cfg.Get("target_folder", ""); targetFolder != "" {
-			m.entryTargetFolder.SetText(targetFolder)
+			m.targetFolderEntry.SetText(targetFolder)
 		}
 	}
 
 	// Load format selections
-	if m.selectSourceFormat != nil {
+	if m.sourceFormatSelect != nil {
 		if sourceFormat := cfg.Get("source_format", ""); sourceFormat != "" {
-			m.selectSourceFormat.SetSelected(sourceFormat)
+			m.sourceFormatSelect.SetSelected(sourceFormat)
 		} else {
-			m.selectSourceFormat.SetSelected(locales.Translate("convert.srcformats.all"))
+			m.sourceFormatSelect.SetSelected(locales.Translate("convert.srcformats.all"))
 		}
 	}
 
-	if m.selectTargetFormat != nil {
+	if m.targetFormatSelect != nil {
 		if targetFormat := cfg.Get("target_format", ""); targetFormat != "" {
-			m.selectTargetFormat.SetSelected(targetFormat)
+			m.targetFormatSelect.SetSelected(targetFormat)
 			// Aktualizujeme panel s parametry podle vybranu00e9ho formu00e1tu
 			m.updateFormatSettings(targetFormat)
 		} else {
-			m.selectTargetFormat.SetSelected("MP3")
+			m.targetFormatSelect.SetSelected("MP3")
 			// Aktualizujeme panel s parametry pro MP3
 			m.updateFormatSettings("MP3")
 		}
 	}
 
 	// Load checkboxes
-	if m.checkboxRewriteExisting != nil {
-		m.checkboxRewriteExisting.SetChecked(cfg.GetBool("rewrite_existing", false))
+	if m.rewriteExistingCheckbox != nil {
+		m.rewriteExistingCheckbox.SetChecked(cfg.GetBool("rewrite_existing", false))
 	}
-	if m.checkboxMakeTargetFolder != nil {
-		m.checkboxMakeTargetFolder.SetChecked(cfg.GetBool("make_target_folder", false))
+	if m.makeTargetFolderCheckbox != nil {
+		m.makeTargetFolderCheckbox.SetChecked(cfg.GetBool("make_target_folder", false))
 	}
 
 	// Load format-specific settings
 	// MP3
-	if m.selectMP3Bitrate != nil {
+	if m.MP3BitrateSelect != nil {
 		if mp3Bitrate := cfg.Get("mp3_bitrate", ""); mp3Bitrate != "" {
-			m.selectMP3Bitrate.SetSelected(mp3Bitrate)
+			m.MP3BitrateSelect.SetSelected(mp3Bitrate)
 		}
 	}
 
-	if m.selectMP3SampleRate != nil {
+	if m.MP3SampleRateSelect != nil {
 		if mp3SampleRate := cfg.Get("mp3_samplerate", ""); mp3SampleRate != "" {
-			m.selectMP3SampleRate.SetSelected(mp3SampleRate)
+			m.MP3SampleRateSelect.SetSelected(mp3SampleRate)
 		}
 	}
 
 	// FLAC
-	if m.selectFLACCompression != nil {
+	if m.FLACCompressionSelect != nil {
 		if flacCompression := cfg.Get("flac_compression", ""); flacCompression != "" {
-			m.selectFLACCompression.SetSelected(flacCompression)
+			m.FLACCompressionSelect.SetSelected(flacCompression)
 		}
 	}
 
-	if m.selectFLACSampleRate != nil {
+	if m.FLACSampleRateSelect != nil {
 		if flacSampleRate := cfg.Get("flac_samplerate", ""); flacSampleRate != "" {
-			m.selectFLACSampleRate.SetSelected(flacSampleRate)
+			m.FLACSampleRateSelect.SetSelected(flacSampleRate)
 		}
 	}
 
-	if m.selectFLACBitDepth != nil {
+	if m.FLACBitDepthSelect != nil {
 		if flacBitDepth := cfg.Get("flac_bitdepth", ""); flacBitDepth != "" {
-			m.selectFLACBitDepth.SetSelected(flacBitDepth)
+			m.FLACBitDepthSelect.SetSelected(flacBitDepth)
 		}
 	}
 
 	// WAV
-	if m.selectWAVSampleRate != nil {
+	if m.WAVSampleRateSelect != nil {
 		if wavSampleRate := cfg.Get("wav_samplerate", ""); wavSampleRate != "" {
-			m.selectWAVSampleRate.SetSelected(wavSampleRate)
+			m.WAVSampleRateSelect.SetSelected(wavSampleRate)
 		}
 	}
-	if m.selectWAVBitDepth != nil {
+	if m.WAVBitDepthSelect != nil {
 		if wavBitDepth := cfg.Get("wav_bitdepth", ""); wavBitDepth != "" {
-			m.selectWAVBitDepth.SetSelected(wavBitDepth)
+			m.WAVBitDepthSelect.SetSelected(wavBitDepth)
 		}
 	}
 
@@ -498,58 +498,58 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 	cfg := common.ModuleConfig{Extra: make(map[string]string)}
 
 	// Save source and target folder paths
-	if m.entrySourceFolder != nil {
-		cfg.Set("source_folder", m.entrySourceFolder.Text)
+	if m.sourceFolderEntry != nil {
+		cfg.Set("source_folder", m.sourceFolderEntry.Text)
 	}
-	if m.entryTargetFolder != nil {
-		cfg.Set("target_folder", m.entryTargetFolder.Text)
+	if m.targetFolderEntry != nil {
+		cfg.Set("target_folder", m.targetFolderEntry.Text)
 	}
 
 	// Save format selections
-	if m.selectSourceFormat != nil {
-		cfg.Set("source_format", m.selectSourceFormat.Selected)
+	if m.sourceFormatSelect != nil {
+		cfg.Set("source_format", m.sourceFormatSelect.Selected)
 	}
-	if m.selectTargetFormat != nil {
-		cfg.Set("target_format", m.selectTargetFormat.Selected)
+	if m.targetFormatSelect != nil {
+		cfg.Set("target_format", m.targetFormatSelect.Selected)
 	}
 
 	// Save checkboxes
-	if m.checkboxRewriteExisting != nil {
-		cfg.SetBool("rewrite_existing", m.checkboxRewriteExisting.Checked)
+	if m.rewriteExistingCheckbox != nil {
+		cfg.SetBool("rewrite_existing", m.rewriteExistingCheckbox.Checked)
 	}
-	if m.checkboxMakeTargetFolder != nil {
-		cfg.SetBool("make_target_folder", m.checkboxMakeTargetFolder.Checked)
+	if m.makeTargetFolderCheckbox != nil {
+		cfg.SetBool("make_target_folder", m.makeTargetFolderCheckbox.Checked)
 	}
 
 	// Save format-specific settings
 	// MP3
-	if m.selectMP3Bitrate != nil {
-		cfg.Set("mp3_bitrate", m.selectMP3Bitrate.Selected)
+	if m.MP3BitrateSelect != nil {
+		cfg.Set("mp3_bitrate", m.MP3BitrateSelect.Selected)
 	}
 
-	if m.selectMP3SampleRate != nil {
-		cfg.Set("mp3_samplerate", m.selectMP3SampleRate.Selected)
+	if m.MP3SampleRateSelect != nil {
+		cfg.Set("mp3_samplerate", m.MP3SampleRateSelect.Selected)
 	}
 
 	// FLAC
-	if m.selectFLACCompression != nil {
-		cfg.Set("flac_compression", m.selectFLACCompression.Selected)
+	if m.FLACCompressionSelect != nil {
+		cfg.Set("flac_compression", m.FLACCompressionSelect.Selected)
 	}
 
-	if m.selectFLACSampleRate != nil {
-		cfg.Set("flac_samplerate", m.selectFLACSampleRate.Selected)
+	if m.FLACSampleRateSelect != nil {
+		cfg.Set("flac_samplerate", m.FLACSampleRateSelect.Selected)
 	}
 
-	if m.selectFLACBitDepth != nil {
-		cfg.Set("flac_bitdepth", m.selectFLACBitDepth.Selected)
+	if m.FLACBitDepthSelect != nil {
+		cfg.Set("flac_bitdepth", m.FLACBitDepthSelect.Selected)
 	}
 
 	// WAV
-	if m.selectWAVSampleRate != nil {
-		cfg.Set("wav_samplerate", m.selectWAVSampleRate.Selected)
+	if m.WAVSampleRateSelect != nil {
+		cfg.Set("wav_samplerate", m.WAVSampleRateSelect.Selected)
 	}
-	if m.selectWAVBitDepth != nil {
-		cfg.Set("wav_bitdepth", m.selectWAVBitDepth.Selected)
+	if m.WAVBitDepthSelect != nil {
+		cfg.Set("wav_bitdepth", m.WAVBitDepthSelect.Selected)
 	}
 
 	// Store to config manager
@@ -573,19 +573,19 @@ func (m *MusicConverterModule) startConversion() {
 	defer func() { m.isConverting = false }()
 
 	// Disable the button during processing and set icon after completion
-	m.submitButton.Disable()
+	m.submitBtn.Disable()
 	defer func() {
-		m.submitButton.Enable()
-		m.submitButton.SetIcon(theme.ConfirmIcon())
+		m.submitBtn.Enable()
+		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
 	// Validate inputs
-	sourceFolder := m.entrySourceFolder.Text
-	targetFolder := m.entryTargetFolder.Text
-	targetFormat := m.selectTargetFormat.Selected
+	sourceFolder := m.sourceFolderEntry.Text
+	targetFolder := m.targetFolderEntry.Text
+	targetFormat := m.targetFormatSelect.Selected
 
 	if sourceFolder == "" {
 		m.ShowError(errors.New(locales.Translate("convert.err.nosource")))
@@ -608,28 +608,28 @@ func (m *MusicConverterModule) startConversion() {
 	switch targetFormat {
 	case "MP3":
 		// MP3 settings
-		bitrate := m.selectMP3Bitrate.Selected
-		sampleRateSetting := m.selectMP3SampleRate.Selected
+		bitrate := m.MP3BitrateSelect.Selected
+		sampleRateSetting := m.MP3SampleRateSelect.Selected
 		formatSettings["bitrate"] = bitrate
 		formatSettings["sample_rate"] = sampleRateSetting
 	case "FLAC":
 		// FLAC settings
-		compression := m.selectFLACCompression.Selected
-		sampleRate := m.selectFLACSampleRate.Selected
-		bitDepth := m.selectFLACBitDepth.Selected
+		compression := m.FLACCompressionSelect.Selected
+		sampleRate := m.FLACSampleRateSelect.Selected
+		bitDepth := m.FLACBitDepthSelect.Selected
 		formatSettings["compression"] = compression
 		formatSettings["sample_rate"] = sampleRate
 		formatSettings["bit_depth"] = bitDepth
 	case "WAV":
 		// WAV settings
-		sampleRate := m.selectWAVSampleRate.Selected
-		bitDepth := m.selectWAVBitDepth.Selected
+		sampleRate := m.WAVSampleRateSelect.Selected
+		bitDepth := m.WAVBitDepthSelect.Selected
 		formatSettings["sample_rate"] = sampleRate
 		formatSettings["bit_depth"] = bitDepth
 	}
 
 	// Check if target folder exists, create if needed and option is selected
-	if m.checkboxMakeTargetFolder.Checked {
+	if m.makeTargetFolderCheckbox.Checked {
 		// Create target folder if it doesn't exist
 		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
 			err := os.MkdirAll(targetFolder, 0755)
@@ -676,7 +676,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	}
 
 	// Find all audio files in the source folder
-	files, err := m.findAudioFiles(sourceFolder, m.selectSourceFormat.Selected)
+	files, err := m.findAudioFiles(sourceFolder, m.sourceFormatSelect.Selected)
 	if err != nil {
 		m.AddErrorMessage(fmt.Sprintf(locales.Translate("convert.err.nosourcefiles"), err))
 		m.CompleteProgressDialog() // Mark as completed instead of closing
@@ -720,7 +720,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 
 		// Determine target path
 		targetPath := targetFolder
-		if m.checkboxMakeTargetFolder.Checked {
+		if m.makeTargetFolderCheckbox.Checked {
 			// Create target folder if it doesn't exist
 			sourceFolderBase := filepath.Base(sourceFolder)
 			targetPath = filepath.Join(targetFolder, sourceFolderBase)
@@ -769,7 +769,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		targetFile := filepath.Join(targetPath, fileNameWithoutExt+targetExt)
 
 		// Check if target file exists and if we should skip it
-		if _, err := os.Stat(targetFile); err == nil && !m.checkboxRewriteExisting.Checked {
+		if _, err := os.Stat(targetFile); err == nil && !m.rewriteExistingCheckbox.Checked {
 			m.AddInfoMessage(fmt.Sprintf("Skipping existing file: %s", filepath.Base(targetFile)))
 			skippedCount++
 			continue
