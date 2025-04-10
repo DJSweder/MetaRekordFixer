@@ -1,35 +1,44 @@
-// modules/metadata_sync.go
-
+// Package modules provides functionality for different modules in the MetaRekordFixer application.
 package modules
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"MetaRekordFixer/common"
-	"MetaRekordFixer/locales"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"MetaRekordFixer/common"
+	"MetaRekordFixer/locales"
 )
 
 // MetadataSyncModule handles metadata synchronization between different file formats.
+// It implements the standard Module interface and provides functionality for synchronizing
+// metadata between files in a specified folder.
 type MetadataSyncModule struct {
-	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
+	// ModuleBase is the base struct for all modules, which contains the module's window,
+	// error handler, and configuration manager.
 	*common.ModuleBase
-	dbMgr             *common.DBManager
-	entrySourceFolder *widget.Entry
-	checkRecursive    *widget.Check
-	btnSync           *widget.Button
+	// dbMgr handles database operations
+	dbMgr *common.DBManager
+	// sourceFolderEntry is the entry field for source folder path
+	sourceFolderEntry *widget.Entry
+	// folderSelect is the folder selection button
+	folderSelect *widget.Button
+	// recursiveCheck determines if the sync should process subfolders
+	recursiveCheck *widget.Check
+	// submitBtn triggers the synchronization process
+	submitBtn *widget.Button
 }
 
 // NewMetadataSyncModule creates a new instance of MetadataSyncModule.
+// It initializes the module with the provided window, configuration manager,
+// database manager, and error handler.
 func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *MetadataSyncModule {
 	m := &MetadataSyncModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
@@ -53,7 +62,7 @@ func (m *MetadataSyncModule) GetName() string {
 	return locales.Translate("metsync.mod.name")
 }
 
-// GetConfigName returns the module's configuration key.
+// GetConfigName returns the configuration key for this module.
 func (m *MetadataSyncModule) GetConfigName() string {
 	return "metadata_sync"
 }
@@ -63,41 +72,21 @@ func (m *MetadataSyncModule) GetIcon() fyne.Resource {
 	return theme.HomeIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
-// This implements the method from ModuleBase to provide the module-specific UI
+// GetModuleContent returns the module's specific content without status messages.
+// This implements the method from ModuleBase to provide the module-specific UI.
 func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
-	// Create folder selection field using standardized function
-	folderSelectionField := common.CreateFolderSelectionField(
-		locales.Translate("metsync.label.source"),
-		m.entrySourceFolder,
-		func(path string) {
-			// Normalize path, save config
-			m.entrySourceFolder.SetText(common.NormalizePath(path))
-			m.SaveConfig()
-		},
-	)
-
 	// Create form with folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("metsync.label.source"), Widget: container.NewBorder(nil, nil, nil, folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button), m.entrySourceFolder)},
+			{Text: locales.Translate("metsync.label.source"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.sourceFolderEntry)},
 		},
-	}
-
-	// Create additional widgets array
-	additionalWidgets := []fyne.CanvasObject{
-		m.checkRecursive,
 	}
 
 	// Create content container with form and additional widgets
 	contentContainer := container.NewVBox(
 		form,
+		m.recursiveCheck,
 	)
-
-	// Add additional widgets to content container
-	for _, widget := range additionalWidgets {
-		contentContainer.Add(widget)
-	}
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
@@ -107,8 +96,8 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 	)
 
 	// Add submit button with right alignment if provided
-	if m.btnSync != nil {
-		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.btnSync)
+	if m.submitBtn != nil {
+		buttonBox := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), m.submitBtn)
 		moduleContent.Add(buttonBox)
 	}
 
@@ -116,32 +105,40 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 }
 
 // GetContent returns the module's main UI content.
+// Note: This module intentionally does not implement database availability checks
+// as it operates without an active database connection until backup is created.
+// The module also does not implement enable/disable logic for its controls
+// as it needs to remain functional even when database is not available.
 func (m *MetadataSyncModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
 // LoadConfig applies the configuration to the UI components.
+// If the configuration is nil, it creates a new one with default values.
 func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	if common.IsNilConfig(cfg) {
+	// Check if configuration is nil or Extra field is not initialized
+	if cfg.Extra == nil {
 		// Initialize with default values and save them
 		cfg = common.NewModuleConfig()
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 		return
 	}
 
-	src := cfg.Get("source_folder", "")
-	if src != "" {
-		m.entrySourceFolder.SetText(src)
+	// Load source folder path
+	if folder, ok := cfg.Extra["source_folder"]; ok && folder != "" {
+		m.sourceFolderEntry.SetText(folder)
 	}
 
-	m.checkRecursive.SetChecked(cfg.GetBool("recursive", false))
+	// Load recursive flag with default value false
+	m.recursiveCheck.SetChecked(cfg.GetBool("recursive", false))
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
+// It normalizes paths and saves boolean values for recursive processing.
 func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
@@ -150,9 +147,11 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 	// Build fresh config
 	cfg := common.NewModuleConfig()
 
-	// Use NormalizePath which now handles empty strings correctly
-	cfg.Set("source_folder", common.NormalizePath(m.entrySourceFolder.Text))
-	cfg.SetBool("recursive", m.checkRecursive.Checked)
+	// Save source folder path using NormalizePath
+	cfg.Set("source_folder", common.NormalizePath(m.sourceFolderEntry.Text))
+
+	// Save recursive flag
+	cfg.SetBool("recursive", m.recursiveCheck.Checked)
 
 	// Store to config manager
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
@@ -160,34 +159,80 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 }
 
 // initializeUI sets up the user interface components.
+// It creates and configures the entry fields, checkboxes, and buttons,
+// and sets up their event handlers.
 func (m *MetadataSyncModule) initializeUI() {
 	// Initialize entry fields
-	m.entrySourceFolder = widget.NewEntry()
-	m.checkRecursive = widget.NewCheck(locales.Translate("metsync.chkbox.recursive"), nil)
-	m.checkRecursive.OnChanged = m.CreateBoolChangeHandler(func() {
+	m.sourceFolderEntry = widget.NewEntry()
+	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
 	})
 
-	// Create sync button
-	m.btnSync = common.CreateSubmitButtonWithIcon(
-		locales.Translate("metsync.button.sync"),
-		theme.MediaPlayIcon(),
-		func() {
-			if err := m.Start(); err != nil {
-				m.ErrorHandler.ShowStandardError(err, nil)
-			}
+	// Initialize folder selection button using standardized function
+	folderSelectionField := common.CreateFolderSelectionField(
+		locales.Translate("metsync.label.source"),
+		m.sourceFolderEntry,
+		func(path string) {
+			m.sourceFolderEntry.SetText(common.NormalizePath(path))
+			m.SaveConfig()
 		},
 	)
+	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
-	// Disable sync button if database is not available
-	if m.dbMgr == nil {
-		m.btnSync.Disable()
-		m.AddErrorMessage(locales.Translate("common.err.dbnotset"))
-	}
+	// Initialize recursive checkbox using standardized function
+	m.recursiveCheck = common.CreateCheckbox(locales.Translate("metsync.chkbox.recursive"), func(checked bool) {
+		m.SaveConfig()
+	})
+
+	// Initialize sync button
+	m.submitBtn = common.CreateSubmitButton(locales.Translate("metsync.button.sync"), func() {
+		go func() {
+			if err := m.Start(); err != nil {
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Metadata Sync",
+					Severity:    common.ErrorWarning,
+					Recoverable: true,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
+			} else {
+				common.UpdateButtonToCompleted(m.submitBtn)
+			}
+		}()
+	})
 }
 
-// Start initiates the metadata synchronization process
+// GetStatusMessagesContainer returns the status messages container.
+func (m *MetadataSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
+	return m.ModuleBase.GetStatusMessagesContainer()
+}
+
+// AddInfoMessage adds an information message to the status messages container.
+func (m *MetadataSyncModule) AddInfoMessage(message string) {
+	m.ModuleBase.AddInfoMessage(message)
+}
+
+// AddErrorMessage adds an error message to the status messages container.
+func (m *MetadataSyncModule) AddErrorMessage(message string) {
+	m.ModuleBase.AddErrorMessage(message)
+}
+
+// ClearStatusMessages clears all status messages.
+func (m *MetadataSyncModule) ClearStatusMessages() {
+	m.ModuleBase.ClearStatusMessages()
+}
+
+// Start initiates the metadata synchronization process.
+// It validates the input, clears previous status messages,
+// and executes the synchronization.
 func (m *MetadataSyncModule) Start() error {
+	// Disable the button during processing
+	m.submitBtn.Disable()
+	defer func() {
+		m.submitBtn.Enable()
+		m.submitBtn.SetIcon(theme.ConfirmIcon())
+	}()
+
 	// Save configuration before starting
 	m.SaveConfig()
 
@@ -195,96 +240,88 @@ func (m *MetadataSyncModule) Start() error {
 	m.ClearStatusMessages()
 
 	// Validate source folder
-	if m.entrySourceFolder.Text == "" {
+	if m.sourceFolderEntry.Text == "" {
 		m.AddErrorMessage(locales.Translate("metsync.err.nosource"))
 		return fmt.Errorf("source folder not selected")
 	}
 
-	// Create progress dialog
-	progress := common.NewProgressDialog(
-		m.Window,
-		locales.Translate("metsync.progress.title"),
-		locales.Translate("metsync.progress.msg"),
-		func() {
-			// Cancel handler - currently empty as we don't support cancellation
-		},
-	)
-	defer progress.Hide()
+	// Show progress dialog with cancel support
+	m.ShowProgressDialog(locales.Translate("metsync.dialog.header"))
 
-	// Create error context for database operations
-	context := &common.ErrorContext{
-		Module:      m.GetConfigName(),
-		Operation:   "Metadata Sync",
-		Severity:    common.ErrorCritical,
-		Recoverable: false,
-	}
+	// Start processing in a goroutine
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Metadata Sync",
+					Severity:    common.ErrorCritical,
+					Recoverable: false,
+				}
+				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
+			}
+		}()
 
-	// Create database backup
-	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backup"))
-	if err := m.dbMgr.BackupDatabase(); err != nil {
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
-		return err
-	}
-	m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
+		// Add initial status message
+		m.AddInfoMessage(locales.Translate("common.status.start"))
 
-	// Connect to database
-	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
-	if err := m.dbMgr.Connect(); err != nil {
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbconn"), err), context)
-		return err
-	}
-	defer m.dbMgr.Finalize()
-
-	// Execute metadata sync
-	if err := m.syncMetadata(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Metadata Sync",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
+		// Create database backup
+		m.UpdateProgressStatus(0.1, fmt.Sprintf(locales.Translate("common.db.backupcreate")))
+		if err := m.dbMgr.BackupDatabase(); err != nil {
+			m.CloseProgressDialog()
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Database Backup",
+				Severity:    common.ErrorCritical,
+				Recoverable: false,
+			})
+			return
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		return err
-	}
+		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
-	return nil
-}
+		// Check if cancelled
+		if m.IsCancelled() {
+			m.HandleProcessCancellation("metsync.status.stopped", 0, 0)
+			common.UpdateButtonToCompleted(m.submitBtn)
+			return
+		}
 
-// syncMetadata executes the metadata synchronization process.
-func (m *MetadataSyncModule) syncMetadata() error {
-	// Disable the button and set icon after completion
-	m.btnSync.Disable()
-	defer func() {
-		m.btnSync.Enable()
-		m.btnSync.SetIcon(theme.ConfirmIcon())
-	}()
+		// Connect to database
+		m.UpdateProgressStatus(0.2, fmt.Sprintf(locales.Translate("common.db.conn")))
+		if err := m.dbMgr.Connect(); err != nil {
+			m.CloseProgressDialog()
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbconn"), err), &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Database Connection",
+				Severity:    common.ErrorCritical,
+				Recoverable: false,
+			})
+			return
+		}
+		defer m.dbMgr.Finalize()
 
-	// Basic validation
-	if m.entrySourceFolder.Text == "" {
-		return errors.New(locales.Translate("metsync.err.emptypaths"))
-	}
+		// Check if cancelled
+		if m.IsCancelled() {
+			m.HandleProcessCancellation("metsync.status.stopped", 0, 0)
+			common.UpdateButtonToCompleted(m.submitBtn)
+			return
+		}
 
-	// Clear previous status messages
-	m.ClearStatusMessages()
+		// Normalize paths
+		sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
 
-	// Add real status message about starting the synchronization
-	m.AddInfoMessage(locales.Translate("common.status.start"))
+		// Prepare a slice to hold MP3 file information
+		var mp3Files []struct {
+			FileName    string
+			AlbumID     common.NullString
+			ArtistID    common.NullString
+			OrgArtistID common.NullString
+			ReleaseDate common.NullString
+			Subtitle    common.NullString
+		}
 
-	// Normalize paths
-	sourcePath := common.NormalizePath(m.entrySourceFolder.Text)
-
-	// Prepare a slice to hold MP3 file information
-	var mp3Files []struct {
-		FileName    string
-		AlbumID     common.NullString
-		ArtistID    common.NullString
-		OrgArtistID common.NullString
-		ReleaseDate common.NullString
-		Subtitle    common.NullString
-	}
-
-	// Query to get MP3 files from database
-	rows, err := m.dbMgr.Query(`
+		// Query to get MP3 files from database
+		rows, err := m.dbMgr.Query(`
 			SELECT 
 				c1.FileNameL,
 				c1.AlbumID,
@@ -297,63 +334,89 @@ func (m *MetadataSyncModule) syncMetadata() error {
 			AND c1.FolderPath LIKE ? || '%'
 		`, common.ToDbPath(sourcePath, true))
 
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	// Read all MP3 records from database
-	for rows.Next() {
-		var mp3File struct {
-			FileName    string
-			AlbumID     common.NullString
-			ArtistID    common.NullString
-			OrgArtistID common.NullString
-			ReleaseDate common.NullString
-			Subtitle    common.NullString
-		}
-
-		err := rows.Scan(
-			&mp3File.FileName,
-			&mp3File.AlbumID,
-			&mp3File.ArtistID,
-			&mp3File.OrgArtistID,
-			&mp3File.ReleaseDate,
-			&mp3File.Subtitle,
-		)
-
 		if err != nil {
-			return err
+			m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Database Query",
+				Severity:    common.ErrorWarning,
+				Recoverable: true,
+			})
+			return
+		}
+		defer rows.Close()
+
+		// Read all MP3 records from database
+		for rows.Next() {
+			var mp3File struct {
+				FileName    string
+				AlbumID     common.NullString
+				ArtistID    common.NullString
+				OrgArtistID common.NullString
+				ReleaseDate common.NullString
+				Subtitle    common.NullString
+			}
+
+			err := rows.Scan(
+				&mp3File.FileName,
+				&mp3File.AlbumID,
+				&mp3File.ArtistID,
+				&mp3File.OrgArtistID,
+				&mp3File.ReleaseDate,
+				&mp3File.Subtitle,
+			)
+
+			if err != nil {
+				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Read Database Records",
+					Severity:    common.ErrorWarning,
+					Recoverable: true,
+				})
+				return
+			}
+
+			mp3Files = append(mp3Files, mp3File)
 		}
 
-		mp3Files = append(mp3Files, mp3File)
-	}
+		// Check if we found any MP3 files in the database
+		totalDbFiles := len(mp3Files)
+		if totalDbFiles == 0 {
+			// Add error message to status
+			m.AddErrorMessage(locales.Translate("common.err.noentryfound"))
+			
+			// Update progress and complete dialog
+			m.UpdateProgressStatus(1.0, locales.Translate("common.err.noentryfound"))
+			m.CompleteProgressDialog()
+			common.UpdateButtonToCompleted(m.submitBtn)
+			return
+		}
 
-	// Check if we found any MP3 files in the database
-	totalDbFiles := len(mp3Files)
-	if totalDbFiles == 0 {
-		return errors.New(locales.Translate("common.err.noentryfound"))
-	}
+		// Add status message about number of files found
+		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
 
-	// Add status message about number of files found
-	m.AddInfoMessage(fmt.Sprint(locales.Translate("common.status.filesfound"), totalDbFiles))
+		// Process each MP3 file and update corresponding FLAC files
+		m.UpdateProgressStatus(0.3, fmt.Sprintf(locales.Translate("common.status.updating")))
 
-	// Process each MP3 file and update corresponding FLAC files
-	m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
+		// Add status message about starting the update process
+		m.AddInfoMessage(locales.Translate("common.status.updating"))
 
-	// Add status message about starting the update process
-	m.AddInfoMessage(locales.Translate("common.status.updating"))
+		for i, mp3File := range mp3Files {
+			// Update progress
+			progress := 0.3 + (float64(i+1) / float64(totalDbFiles) * 0.7)
+			m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
 
-	for i, mp3File := range mp3Files {
-		// Update progress
-		progress := 0.2 + (float64(i+1) / float64(totalDbFiles) * 0.8)
-		m.UpdateProgressStatus(progress, fmt.Sprint(locales.Translate("metsync.status.process"), i+1, "/", totalDbFiles))
+			// Check if cancelled
+			if m.IsCancelled() {
+				m.HandleProcessCancellation("common.status.stopped", i, totalDbFiles)
+				common.UpdateButtonToCompleted(m.submitBtn)
+				return
+			}
 
-		// Generate FLAC filename from MP3 filename
-		flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
+			// Generate FLAC filename from MP3 filename
+			flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
 
-		// Update the FLAC file with the metadata from the MP3 file
-		err = m.dbMgr.Execute(`
+			// Update the FLAC file with the metadata from the MP3 file
+			err = m.dbMgr.Execute(`
 					UPDATE djmdContent
 					SET AlbumID = CAST(? AS INTEGER),
 						ArtistID = CAST(? AS INTEGER),
@@ -362,28 +425,36 @@ func (m *MetadataSyncModule) syncMetadata() error {
 						Subtitle = ?
 					WHERE FileNameL = ?
 				`,
-			mp3File.AlbumID.ValueOrNil(),
-			mp3File.ArtistID.ValueOrNil(),
-			mp3File.OrgArtistID.ValueOrNil(),
-			mp3File.ReleaseDate.ValueOrNil(),
-			mp3File.Subtitle.ValueOrNil(),
-			flacFileName,
-		)
+				mp3File.AlbumID.ValueOrNil(),
+				mp3File.ArtistID.ValueOrNil(),
+				mp3File.OrgArtistID.ValueOrNil(),
+				mp3File.ReleaseDate.ValueOrNil(),
+				mp3File.Subtitle.ValueOrNil(),
+				flacFileName,
+			)
 
-		if err != nil {
-			return err
+			if err != nil {
+				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Update FLAC Metadata",
+					Severity:    common.ErrorWarning,
+					Recoverable: true,
+				})
+				return
+			}
+
+			// Small delay to prevent database overload
+			time.Sleep(10 * time.Millisecond)
 		}
 
-		// Small delay to prevent database overload
-		time.Sleep(10 * time.Millisecond)
-	}
+		// Update progress to completion
+		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
+		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
 
-	// Mark done and update progress
-	m.UpdateProgressStatus(1.0, fmt.Sprint(locales.Translate("common.status.completed"), totalDbFiles))
+		// Mark the progress dialog as completed and update button
+		m.CompleteProgressDialog()
+		common.UpdateButtonToCompleted(m.submitBtn)
+	}()
 
-	// Add final status message about completion
-	m.AddInfoMessage(fmt.Sprint(locales.Translate("common.status.completed"), totalDbFiles))
-
-	m.CompleteProgressDialog()
 	return nil
 }

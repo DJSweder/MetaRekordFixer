@@ -505,3 +505,13 @@ func SetPlaylistSelectState(selectWidget *widget.Select, enabled bool, selectedV
 		selectWidget.Disable()
 	}
 }
+
+// CreateCheckbox creates a standardized checkbox with a label.
+// The checkbox is created with a given label text and change handler.
+// Parameters:
+//   - labelText: Text to display next to the checkbox
+//   - onChanged: Function to call when the checkbox state changes
+func CreateCheckbox(labelText string, onChanged func(bool)) *widget.Check {
+	checkbox := widget.NewCheck(labelText, onChanged)
+	return checkbox
+}

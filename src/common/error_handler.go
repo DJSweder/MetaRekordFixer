@@ -50,8 +50,8 @@ func NewErrorContext(module, operation string) ErrorContext {
 
 // ErrorHandler handles application errors and logging
 type ErrorHandler struct {
-	logger  *Logger
-	window  fyne.Window
+	logger    *Logger
+	window    fyne.Window
 	isLogging bool
 }
 
@@ -144,7 +144,7 @@ func (h *ErrorHandler) showErrorDialog(context ErrorContext) {
 	}
 
 	customDialog := dialog.NewCustom(
-		locales.Translate("common.dialog.error"),
+		locales.Translate("common.dialog.errorheader"),
 		locales.Translate("common.button.ok"),
 		content,
 		h.window,
