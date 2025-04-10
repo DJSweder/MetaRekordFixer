@@ -198,7 +198,6 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 func (m *TracksUpdater) initializeUI() {
 	// Create a text entry for the user to input the folder path.
 	// When the user changes the text in the entry, save the config.
-	m.folderEntry = widget.NewEntry()
 	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
 		m.SaveConfig()
 	})
@@ -246,7 +245,6 @@ func (m *TracksUpdater) initializeUI() {
 		},
 	)
 }
-
 
 // GetStatusMessagesContainer returns the status messages container.
 func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
