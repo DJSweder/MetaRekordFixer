@@ -449,21 +449,6 @@ func ShowErrorDetails(window fyne.Window, details *ErrorDialogDetails) *dialog.C
 	)
 }
 
-// CreateDisabledSelect creates a select widget that is disabled by default.
-// Used for components that require database access to be populated.
-// placeholderKey is an optional localization key for the placeholder text shown when no option is selected.
-// If placeholderKey is empty, default placeholder from common.select.placeholderiact will be used.
-func CreateDisabledSelect(options []string, changed func(string), placeholderKey string) *widget.Select {
-	selectWidget := widget.NewSelect(options, changed)
-	if placeholderKey != "" {
-		selectWidget.PlaceHolder = locales.Translate(placeholderKey)
-	} else {
-		selectWidget.PlaceHolder = locales.Translate("common.select.placeholderinact")
-	}
-	selectWidget.Disable()
-	return selectWidget
-}
-
 // CreatePlaylistSelect creates a select widget for playlist selection.
 // Used for components that require database access to be populated with playlists.
 // placeholderKey is an optional localization key for the placeholder text shown when no playlist is selected.
@@ -499,5 +484,24 @@ func UpdateButtonToCompleted(button *widget.Button) {
 func DisableModuleControls(components ...fyne.Disableable) {
 	for _, component := range components {
 		component.Disable()
+	}
+}
+
+// SetPlaylistSelectState updates the state of a playlist select widget.
+// This helper ensures consistent behavior when enabling/disabling playlist selects across modules.
+// Parameters:
+//   - selectWidget: The select widget to update
+//   - enabled: Whether the select should be enabled
+//   - selectedValue: Optional value to select (only applied if enabled is true)
+func SetPlaylistSelectState(selectWidget *widget.Select, enabled bool, selectedValue string) {
+	if enabled {
+		selectWidget.Enable()
+		selectWidget.PlaceHolder = locales.Translate("common.select.plsplaceholder")
+		if selectedValue != "" {
+			selectWidget.SetSelected(selectedValue)
+		}
+	} else {
+		selectWidget.PlaceHolder = locales.Translate("common.select.plsplacehldrinact")
+		selectWidget.Disable()
 	}
 }

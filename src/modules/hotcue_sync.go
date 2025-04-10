@@ -26,20 +26,23 @@ const (
 
 // HotCueSyncModule handles hot cue synchronization.
 type HotCueSyncModule struct {
+	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
 	*common.ModuleBase
-	dbMgr                *common.DBManager
-	sourceType           *widget.Select
-	targetType           *widget.Select
-	sourceFolderField    fyne.CanvasObject
-	targetFolderField    fyne.CanvasObject
-	sourceFolderEntry    *widget.Entry
-	targetFolderEntry    *widget.Entry
-	sourcePlaylistSelect *widget.Select
-	targetPlaylistSelect *widget.Select
-	playlists            []common.PlaylistItem
-	sourcePlaylistID     string
-	targetPlaylistID     string
-	submitBtn            *widget.Button
+	dbMgr                   *common.DBManager
+	sourceType              *widget.Select
+	targetType              *widget.Select
+	sourceFolderField       fyne.CanvasObject
+	targetFolderField       fyne.CanvasObject
+	sourceFolderEntry       *widget.Entry
+	targetFolderEntry       *widget.Entry
+	sourcePlaylistSelect    *widget.Select
+	targetPlaylistSelect    *widget.Select
+	playlists               []common.PlaylistItem
+	pendingSourcePlaylistID string
+	pendingTargetPlaylistID string
+	sourcePlaylistID        string
+	targetPlaylistID        string
+	submitBtn               *widget.Button
 }
 
 // NewHotCueSyncModule creates a new HotCueSyncModule instance and initializes its UI.
@@ -127,8 +130,42 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 	return contentContainer
 }
 
-// GetContent returns the module's main UI content and initializes database connection.
+// GetContent returns the main UI container for the module.
 func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
+	// Load playlists before creating UI
+	playlists, err := m.dbMgr.GetPlaylists()
+	if err != nil {
+		fmt.Printf("Error loading playlists: %v\n", err)
+	} else {
+		m.playlists = playlists
+		playlistOptions := make([]string, len(playlists))
+		for i, p := range playlists {
+			playlistOptions[i] = p.Path
+		}
+
+		// Update playlist selectors with loaded options
+		m.sourcePlaylistSelect.Options = playlistOptions
+		m.targetPlaylistSelect.Options = playlistOptions
+
+		// If we have pending playlist IDs from LoadConfig, set them now
+		if m.pendingSourcePlaylistID != "" {
+			for i, p := range playlists {
+				if p.ID == m.pendingSourcePlaylistID && i < len(playlistOptions) {
+					m.sourcePlaylistSelect.SetSelected(playlistOptions[i])
+					break
+				}
+			}
+		}
+		if m.pendingTargetPlaylistID != "" {
+			for i, p := range playlists {
+				if p.ID == m.pendingTargetPlaylistID && i < len(playlistOptions) {
+					m.targetPlaylistSelect.SetSelected(playlistOptions[i])
+					break
+				}
+			}
+		}
+	}
+
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
 		context := &common.ErrorContext{
@@ -155,19 +192,6 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 	defer m.dbMgr.Finalize()
-
-	// Load playlists
-	if err := m.loadPlaylists(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Access",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
-		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
-		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
-	}
 
 	// Enable interactive components if all checks passed
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) {
@@ -207,28 +231,30 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.targetFolderEntry.SetText(cfg.Get("target_folder", ""))
 
 	// Save playlist IDs for later use when playlists are loaded
-	m.sourcePlaylistID = cfg.Get("source_playlist", "")
-	m.targetPlaylistID = cfg.Get("target_playlist", "")
+	m.pendingSourcePlaylistID = cfg.Get("source_playlist", "")
+	m.pendingTargetPlaylistID = cfg.Get("target_playlist", "")
 
 	// Load playlist selections if playlists are loaded
 	if len(m.playlists) > 0 {
 		// Find and set source playlist
 		for i, playlist := range m.playlists {
-			if playlist.ID == m.sourcePlaylistID {
+			if playlist.ID == m.pendingSourcePlaylistID {
 				if i < len(m.sourcePlaylistSelect.Options) {
 					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
+					m.sourcePlaylistID = m.pendingSourcePlaylistID
+					break
 				}
-				break
 			}
 		}
 
 		// Find and set target playlist
 		for i, playlist := range m.playlists {
-			if playlist.ID == m.targetPlaylistID {
+			if playlist.ID == m.pendingTargetPlaylistID {
 				if i < len(m.targetPlaylistSelect.Options) {
 					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
+					m.targetPlaylistID = m.pendingTargetPlaylistID
+					break
 				}
-				break
 			}
 		}
 	}
@@ -353,8 +379,7 @@ func (m *HotCueSyncModule) initializeUI() {
 	)
 
 	// Initialize source playlist selector
-	m.sourcePlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
-	m.sourcePlaylistSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+	m.sourcePlaylistSelect = common.CreatePlaylistSelect(m.CreateSelectionChangeHandler(func() {
 		// Find the playlist ID for the selected name
 		for _, p := range m.playlists {
 			if p.Path == m.sourcePlaylistSelect.Selected {
@@ -363,11 +388,10 @@ func (m *HotCueSyncModule) initializeUI() {
 			}
 		}
 		m.SaveConfig()
-	})
+	}), "common.select.plsplacehldrinact")
 
 	// Initialize target playlist selector
-	m.targetPlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
-	m.targetPlaylistSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+	m.targetPlaylistSelect = common.CreatePlaylistSelect(m.CreateSelectionChangeHandler(func() {
 		// Find the playlist ID for the selected name
 		for _, p := range m.playlists {
 			if p.Path == m.targetPlaylistSelect.Selected {
@@ -376,7 +400,7 @@ func (m *HotCueSyncModule) initializeUI() {
 			}
 		}
 		m.SaveConfig()
-	})
+	}), "common.select.plsplacehldrinact")
 
 	// Create a standardized submit button
 	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("hotcuesync.button.start"), func() {
@@ -759,22 +783,24 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	m.targetPlaylistSelect.Options = options
 
 	// Restore previously selected values if they exist in the new options
-	if m.sourcePlaylistID != "" {
+	if m.pendingSourcePlaylistID != "" {
 		for i, playlist := range m.playlists {
-			if playlist.ID == m.sourcePlaylistID {
+			if playlist.ID == m.pendingSourcePlaylistID {
 				if i < len(m.sourcePlaylistSelect.Options) {
 					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
+					m.sourcePlaylistID = m.pendingSourcePlaylistID
 				}
 				break
 			}
 		}
 	}
 
-	if m.targetPlaylistID != "" {
+	if m.pendingTargetPlaylistID != "" {
 		for i, playlist := range m.playlists {
-			if playlist.ID == m.targetPlaylistID {
+			if playlist.ID == m.pendingTargetPlaylistID {
 				if i < len(m.targetPlaylistSelect.Options) {
 					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
+					m.targetPlaylistID = m.pendingTargetPlaylistID
 				}
 				break
 			}
@@ -805,7 +831,38 @@ func (m *HotCueSyncModule) updateControlsState() {
 		m.sourceFolderField.Show()
 		m.sourcePlaylistSelect.Hide()
 	} else {
+		// Hide folder field first
 		m.sourceFolderField.Hide()
+
+		// Load playlists if needed
+		var loadError error
+		if len(m.playlists) == 0 {
+			loadError = m.loadPlaylists()
+			if loadError != nil {
+				m.AddErrorMessage(locales.Translate("common.error.plsload"))
+				// Set disabled state with appropriate placeholder
+				common.SetPlaylistSelectState(m.sourcePlaylistSelect, false, "")
+				m.sourcePlaylistSelect.Show()
+				return
+			}
+		}
+
+		// Prepare selected value if exists
+		var selectedValue string
+		if m.pendingSourcePlaylistID != "" {
+			for _, p := range m.playlists {
+				if p.ID == m.pendingSourcePlaylistID {
+					selectedValue = p.Path
+					m.sourcePlaylistID = m.pendingSourcePlaylistID
+					break
+				}
+			}
+		}
+
+		// Set active state with appropriate placeholder BEFORE showing the widget
+		common.SetPlaylistSelectState(m.sourcePlaylistSelect, true, selectedValue)
+
+		// Show the widget after setting its state
 		m.sourcePlaylistSelect.Show()
 	}
 
@@ -814,7 +871,38 @@ func (m *HotCueSyncModule) updateControlsState() {
 		m.targetFolderField.Show()
 		m.targetPlaylistSelect.Hide()
 	} else {
+		// Hide folder field first
 		m.targetFolderField.Hide()
+
+		// Load playlists if needed
+		var loadError error
+		if len(m.playlists) == 0 {
+			loadError = m.loadPlaylists()
+			if loadError != nil {
+				m.AddErrorMessage(locales.Translate("common.error.plsload"))
+				// Set disabled state with appropriate placeholder
+				common.SetPlaylistSelectState(m.targetPlaylistSelect, false, "")
+				m.targetPlaylistSelect.Show()
+				return
+			}
+		}
+
+		// Prepare selected value if exists
+		var selectedValue string
+		if m.pendingTargetPlaylistID != "" {
+			for _, p := range m.playlists {
+				if p.ID == m.pendingTargetPlaylistID {
+					selectedValue = p.Path
+					m.targetPlaylistID = m.pendingTargetPlaylistID
+					break
+				}
+			}
+		}
+
+		// Set active state with appropriate placeholder BEFORE showing the widget
+		common.SetPlaylistSelectState(m.targetPlaylistSelect, true, selectedValue)
+
+		// Show the widget after setting its state
 		m.targetPlaylistSelect.Show()
 	}
 }
@@ -825,7 +913,38 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 		m.sourceFolderField.Show()
 		m.sourcePlaylistSelect.Hide()
 	} else {
+		// Hide folder field first
 		m.sourceFolderField.Hide()
+
+		// Load playlists if needed
+		var loadError error
+		if len(m.playlists) == 0 {
+			loadError = m.loadPlaylists()
+			if loadError != nil {
+				m.AddErrorMessage(locales.Translate("common.error.plsload"))
+				// Set disabled state with appropriate placeholder
+				common.SetPlaylistSelectState(m.sourcePlaylistSelect, false, "")
+				m.sourcePlaylistSelect.Show()
+				return
+			}
+		}
+
+		// Prepare selected value if exists
+		var selectedValue string
+		if m.pendingSourcePlaylistID != "" {
+			for _, p := range m.playlists {
+				if p.ID == m.pendingSourcePlaylistID {
+					selectedValue = p.Path
+					m.sourcePlaylistID = m.pendingSourcePlaylistID
+					break
+				}
+			}
+		}
+
+		// Set active state with appropriate placeholder BEFORE showing the widget
+		common.SetPlaylistSelectState(m.sourcePlaylistSelect, true, selectedValue)
+
+		// Show the widget after setting its state
 		m.sourcePlaylistSelect.Show()
 	}
 }
@@ -836,7 +955,38 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 		m.targetFolderField.Show()
 		m.targetPlaylistSelect.Hide()
 	} else {
+		// Hide folder field first
 		m.targetFolderField.Hide()
+
+		// Load playlists if needed
+		var loadError error
+		if len(m.playlists) == 0 {
+			loadError = m.loadPlaylists()
+			if loadError != nil {
+				m.AddErrorMessage(locales.Translate("common.error.plsload"))
+				// Set disabled state with appropriate placeholder
+				common.SetPlaylistSelectState(m.targetPlaylistSelect, false, "")
+				m.targetPlaylistSelect.Show()
+				return
+			}
+		}
+
+		// Prepare selected value if exists
+		var selectedValue string
+		if m.pendingTargetPlaylistID != "" {
+			for _, p := range m.playlists {
+				if p.ID == m.pendingTargetPlaylistID {
+					selectedValue = p.Path
+					m.targetPlaylistID = m.pendingTargetPlaylistID
+					break
+				}
+			}
+		}
+
+		// Set active state with appropriate placeholder BEFORE showing the widget
+		common.SetPlaylistSelectState(m.targetPlaylistSelect, true, selectedValue)
+
+		// Show the widget after setting its state
 		m.targetPlaylistSelect.Show()
 	}
 }

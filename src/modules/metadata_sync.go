@@ -21,11 +21,12 @@ import (
 
 // MetadataSyncModule handles metadata synchronization between different file formats.
 type MetadataSyncModule struct {
-	*common.ModuleBase // Embedded pointer to shared base
-	dbMgr              *common.DBManager
-	entrySourceFolder  *widget.Entry
-	checkRecursive     *widget.Check
-	btnSync            *widget.Button
+	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
+	*common.ModuleBase
+	dbMgr             *common.DBManager
+	entrySourceFolder *widget.Entry
+	checkRecursive    *widget.Check
+	btnSync           *widget.Button
 }
 
 // NewMetadataSyncModule creates a new instance of MetadataSyncModule.
@@ -100,7 +101,7 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		widget.NewLabel(locales.Translate("metsync.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("metsync.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)

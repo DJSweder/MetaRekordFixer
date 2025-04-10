@@ -14,13 +14,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// TracksUpdater handles updating track file paths and formats in the database
-// Implements the standard Module interface
-// TracksUpdater is a module that handles updating track file paths and formats in the database.
-// It implements the standard Module interface.
+// TracksUpdater is a module that handles updating track format in database.
 type TracksUpdater struct {
-	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and
-	// configuration manager.
+	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
 	*common.ModuleBase
 	dbMgr             *common.DBManager
 	playlistSelect    *widget.Select
@@ -163,6 +159,17 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 
 	if playlistID, ok := cfg.Extra["playlist_id"]; ok && playlistID != "" {
 		m.pendingPlaylistID = playlistID // Save temporary PlaylistID for later use
+
+		// Load playlist selection if playlists are already loaded
+		if len(m.playlists) > 0 {
+			// Find and set playlist
+			for _, playlist := range m.playlists {
+				if playlist.ID == m.pendingPlaylistID {
+					m.playlistSelect.SetSelected(playlist.Path)
+					break
+				}
+			}
+		}
 	}
 }
 
@@ -177,14 +184,9 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 	// Save folder path using NormalizePath which now handles empty strings correctly
 	cfg.Set("folder", common.NormalizePath(m.folderEntry.Text))
 
-	// Save playlist ID
-	if m.playlistSelect.Selected != "" {
-		for _, playlist := range m.playlists {
-			if playlist.Path == m.playlistSelect.Selected {
-				cfg.Set("playlist_id", playlist.ID)
-				break
-			}
-		}
+	// Always save the pendingPlaylistID if it exists
+	if m.pendingPlaylistID != "" {
+		cfg.Set("playlist_id", m.pendingPlaylistID)
 	}
 
 	// Store to config manager
@@ -205,7 +207,14 @@ func (m *TracksUpdater) initializeUI() {
 	// When the user chooses a playlist, save the config.
 	// The select widget is disabled to prevent the user from changing the playlist
 	// before the module is fully loaded.
-	m.playlistSelect = common.CreateDisabledSelect([]string{}, m.CreateSelectionChangeHandler(func() {
+	m.playlistSelect = common.CreatePlaylistSelect(m.CreateSelectionChangeHandler(func() {
+		// Find the playlist ID for the selected name
+		for _, p := range m.playlists {
+			if p.Path == m.playlistSelect.Selected {
+				m.pendingPlaylistID = p.ID
+				break
+			}
+		}
 		m.SaveConfig()
 	}), "common.select.plsplacehldrinact")
 
@@ -296,24 +305,24 @@ func (m *TracksUpdater) loadPlaylists() error {
 		playlistPaths[i] = playlist.Path
 	}
 
+	// Update select widget options
 	m.playlistSelect.Options = playlistPaths
-	m.playlistSelect.Enable()
-	m.playlistSelect.PlaceHolder = locales.Translate("common.select.plsplaceholder")
 
-	// Apply pending PlaylistID after successful loading
+	// Set active state with appropriate placeholder
+	var selectedValue string
+
+	// Find selected value from pending ID if exists
 	if m.pendingPlaylistID != "" {
-		for i, playlist := range m.playlists {
+		for _, playlist := range m.playlists {
 			if playlist.ID == m.pendingPlaylistID {
-				if i < len(m.playlistSelect.Options) {
-					m.playlistSelect.SetSelected(m.playlistSelect.Options[i])
-				}
+				selectedValue = playlist.Path
 				break
 			}
 		}
-		m.pendingPlaylistID = "" // Reset pending PlaylistID
-	} else if len(m.playlistSelect.Options) > 0 {
-		m.playlistSelect.SetSelectedIndex(0)
 	}
+
+	// Set active state with found value (or empty if no pending ID)
+	common.SetPlaylistSelectState(m.playlistSelect, true, selectedValue)
 
 	return nil
 }
