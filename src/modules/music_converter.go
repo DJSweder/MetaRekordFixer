@@ -30,30 +30,30 @@ type MusicConverterModule struct {
 	*common.ModuleBase // Embedded pointer to shared base
 
 	// Source and target settings
+	makeTargetFolderCheckbox *widget.Check
 	sourceFolderEntry        *widget.Entry
-	targetFolderEntry        *widget.Entry
 	sourceFormatSelect       *widget.Select
+	targetFolderEntry        *widget.Entry
 	targetFormatSelect       *widget.Select
 	rewriteExistingCheckbox  *widget.Check
-	makeTargetFolderCheckbox *widget.Check
 
 	// Format-specific settings
 	// MP3 settings
 	MP3BitrateSelect    *widget.Select
 	MP3SampleRateSelect *widget.Select
 	// FLAC settings
+	FLACBitDepthSelect    *widget.Select
 	FLACCompressionSelect *widget.Select
 	FLACSampleRateSelect  *widget.Select
-	FLACBitDepthSelect    *widget.Select
 	// WAV settings
-	WAVSampleRateSelect *widget.Select
 	WAVBitDepthSelect   *widget.Select
+	WAVSampleRateSelect *widget.Select
 
 	// Format settings containers
-	MP3SettingsContainer    *fyne.Container
 	FLACSettingsContainer   *fyne.Container
-	WAVSettingsContainer    *fyne.Container
 	formatSettingsContainer *fyne.Container
+	MP3SettingsContainer    *fyne.Container
+	WAVSettingsContainer    *fyne.Container
 
 	// Submit button
 	submitBtn *widget.Button
@@ -113,8 +113,7 @@ func (m *MusicConverterModule) GetIcon() fyne.Resource {
 // This implements the method from ModuleBase to provide the module-specific UI
 func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	// Left section - Source and target settings
-	leftHeader := widget.NewLabel(locales.Translate("convert.label.leftpanel"))
-	leftHeader.TextStyle = fyne.TextStyle{Bold: true}
+	leftHeader := common.CreateDescriptionLabel(locales.Translate("convert.label.leftpanel"))
 
 	// Source folder container
 	sourceBrowseBtn := common.CreateNativeFolderBrowseButton(
@@ -174,8 +173,7 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	)
 
 	// Right section - Format-specific settings
-	rightHeader := widget.NewLabel(locales.Translate("convert.label.rightpanel"))
-	rightHeader.TextStyle = fyne.TextStyle{Bold: true}
+	rightHeader := common.CreateDescriptionLabel(locales.Translate("convert.label.rightpanel"))
 
 	// Combine all elements for the right section
 	rightSection := container.NewVBox(
@@ -243,10 +241,10 @@ func (m *MusicConverterModule) initializeUI() {
 	})
 
 	// Checkboxes
-	m.rewriteExistingCheckbox = widget.NewCheck(locales.Translate("convert.chkbox.rewrite"), nil)
+	m.rewriteExistingCheckbox = common.CreateCheckbox(locales.Translate("convert.chkbox.rewrite"), nil)
 	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
 
-	m.makeTargetFolderCheckbox = widget.NewCheck(locales.Translate("convert.chkbox.maketargetfolder"), nil)
+	m.makeTargetFolderCheckbox = common.CreateCheckbox(locales.Translate("convert.chkbox.maketargetfolder"), nil)
 	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
 
 	// Initialize format-specific settings

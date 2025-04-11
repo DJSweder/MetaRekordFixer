@@ -74,6 +74,7 @@
     "common.status.reading": "",
     "common.status.start": "",
     "common.status.stopped": "",
+    "common.status.toupdatecount": "",
     "common.status.updating": "",
     "convert.button.start": "Start encoding",
     "convert.button.stop": "Stop",

@@ -74,6 +74,7 @@
     "common.status.reading": "Probíhá načítání dat",
     "common.status.start": "Proces spuštěn.",
     "common.status.stopped": "Zastaveno. Počet aktualizovaných skladeb: %d z celkového počtu: %d.",
+    "common.status.toupdatecount": "Počet skladeb k aktualizaci:  %d",
     "common.status.updating": "Probíhá aktualizace dat.",
     "convert.button.start": "Spustit",
     "convert.button.stop": "Zastavit",

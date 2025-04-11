@@ -22,27 +22,145 @@ import (
 type DateSyncModule struct {
 	*common.ModuleBase
 	dbMgr                  *common.DBManager
-	excludeFoldersCheck    *widget.Check
-	customDateFoldersEntry []*widget.Entry
-	excludedFoldersEntry   []*widget.Entry
-	datePickerEntry        *widget.Entry
-	foldersContainer       *fyne.Container
-	customDateContainer    *fyne.Container
-	datePickerContainer    *fyne.Container
-	standardUpdateBtn      *widget.Button
-	customDateUpdateBtn    *widget.Button
 	calendarBtn            *widget.Button
+	customDateContainer    *fyne.Container
+	customDateFoldersEntry []*widget.Entry
+	customDateUpdateBtn    *widget.Button
+	datePickerContainer    *fyne.Container
+	datePickerEntry        *widget.Entry
+	excludeFoldersCheck    *widget.Check
+	excludedFoldersEntry   []*widget.Entry
+	foldersContainer       *fyne.Container
+	standardUpdateBtn      *widget.Button
 }
 
 // CustomCalendar implements a custom calendar widget for date selection
 type CustomCalendar struct {
 	widget.BaseWidget
-	yearSelect   *widget.Select
-	monthSelect  *widget.Select
-	daysGrid     *fyne.Container
-	onSelected   func(time.Time)
 	currentYear  int
 	currentMonth time.Month
+	daysGrid     *fyne.Container
+	monthSelect  *widget.Select
+	onSelected   func(time.Time)
+	yearSelect   *widget.Select
+}
+
+// NewCustomCalendar creates a new custom calendar widget
+func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
+	c := &CustomCalendar{
+		onSelected: callback,
+		daysGrid:   container.New(layout.NewGridLayout(7)),
+	}
+
+	c.ExtendBaseWidget(c)
+	now := time.Now()
+	c.currentYear = now.Year()
+	c.currentMonth = now.Month()
+
+	years := make([]string, 51)
+	for i := 0; i < 51; i++ {
+		years[i] = fmt.Sprintf("%d", now.Year()-25+i)
+	}
+
+	months := []string{
+		locales.Translate("datesync.month.jan"),
+		locales.Translate("datesync.month.feb"),
+		locales.Translate("datesync.month.mar"),
+		locales.Translate("datesync.month.apr"),
+		locales.Translate("datesync.month.may"),
+		locales.Translate("datesync.month.jun"),
+		locales.Translate("datesync.month.jul"),
+		locales.Translate("datesync.month.aug"),
+		locales.Translate("datesync.month.sep"),
+		locales.Translate("datesync.month.okt"),
+		locales.Translate("datesync.month.nov"),
+		locales.Translate("datesync.month.dec"),
+	}
+
+	c.yearSelect = widget.NewSelect(years, func(s string) {
+		year := 0
+		fmt.Sscanf(s, "%d", &year)
+		c.currentYear = year
+		c.updateDays()
+	})
+	c.monthSelect = widget.NewSelect(months, func(s string) {
+		months := map[string]time.Month{
+			locales.Translate("datesync.month.jan"): time.January,
+			locales.Translate("datesync.month.feb"): time.February,
+			locales.Translate("datesync.month.mar"): time.March,
+			locales.Translate("datesync.month.apr"): time.April,
+			locales.Translate("datesync.month.may"): time.May,
+			locales.Translate("datesync.month.jun"): time.June,
+			locales.Translate("datesync.month.jul"): time.July,
+			locales.Translate("datesync.month.aug"): time.August,
+			locales.Translate("datesync.month.sep"): time.September,
+			locales.Translate("datesync.month.okt"): time.October,
+			locales.Translate("datesync.month.nov"): time.November,
+			locales.Translate("datesync.month.dec"): time.December,
+		}
+
+		c.currentMonth = months[s]
+		c.updateDays()
+	})
+
+	c.yearSelect.SetSelected(fmt.Sprintf("%d", now.Year()))
+	c.monthSelect.SetSelected(months[now.Month()-1])
+	c.updateDays()
+	return c
+}
+
+// CreateRenderer implements the fyne.Widget interface
+func (c *CustomCalendar) CreateRenderer() fyne.WidgetRenderer {
+	header := container.NewHBox(c.monthSelect, c.yearSelect)
+	content := container.NewVBox(header, c.daysGrid)
+	return widget.NewSimpleRenderer(content)
+}
+
+// updateDays updates the day grid in the calendar
+func (c *CustomCalendar) updateDays() {
+	if c.daysGrid == nil {
+		return
+	}
+
+	c.daysGrid.Objects = []fyne.CanvasObject{}
+
+	days := []string{
+		locales.Translate("datesync.day.mon"),
+		locales.Translate("datesync.day.tue"),
+		locales.Translate("datesync.day.wed"),
+		locales.Translate("datesync.day.thu"),
+		locales.Translate("datesync.day.fri"),
+		locales.Translate("datesync.day.sat"),
+		locales.Translate("datesync.day.sun"),
+	}
+
+	for _, day := range days {
+		c.daysGrid.Add(widget.NewLabel(day))
+	}
+
+	firstDay := time.Date(c.currentYear, c.currentMonth, 1, 0, 0, 0, 0, time.Local)
+	lastDay := firstDay.AddDate(0, 1, -1)
+	weekday := int(firstDay.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+
+	for i := 1; i < weekday; i++ {
+		c.daysGrid.Add(widget.NewLabel(""))
+	}
+
+	for day := 1; day <= lastDay.Day(); day++ {
+		currentDay := day
+		dayBtn := common.CreateCalendarDayButton(day, func() {
+			date := time.Date(c.currentYear, c.currentMonth, currentDay, 0, 0, 0, 0, time.Local)
+			if c.onSelected != nil {
+				c.onSelected(date)
+			}
+		})
+		c.daysGrid.Add(dayBtn)
+	}
+
+	c.Refresh()
 }
 
 // NewDateSyncModule creates a new instance of DateSyncModule.
@@ -232,124 +350,6 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	return cfg
 }
 
-// NewCustomCalendar creates a new custom calendar widget
-func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
-	c := &CustomCalendar{
-		onSelected: callback,
-		daysGrid:   container.New(layout.NewGridLayout(7)),
-	}
-
-	c.ExtendBaseWidget(c)
-	now := time.Now()
-	c.currentYear = now.Year()
-	c.currentMonth = now.Month()
-
-	years := make([]string, 51)
-	for i := 0; i < 51; i++ {
-		years[i] = fmt.Sprintf("%d", now.Year()-25+i)
-	}
-
-	months := []string{
-		locales.Translate("datesync.month.jan"),
-		locales.Translate("datesync.month.feb"),
-		locales.Translate("datesync.month.mar"),
-		locales.Translate("datesync.month.apr"),
-		locales.Translate("datesync.month.may"),
-		locales.Translate("datesync.month.jun"),
-		locales.Translate("datesync.month.jul"),
-		locales.Translate("datesync.month.aug"),
-		locales.Translate("datesync.month.sep"),
-		locales.Translate("datesync.month.okt"),
-		locales.Translate("datesync.month.nov"),
-		locales.Translate("datesync.month.dec"),
-	}
-
-	c.yearSelect = widget.NewSelect(years, func(s string) {
-		year := 0
-		fmt.Sscanf(s, "%d", &year)
-		c.currentYear = year
-		c.updateDays()
-	})
-	c.monthSelect = widget.NewSelect(months, func(s string) {
-		months := map[string]time.Month{
-			locales.Translate("datesync.month.jan"): time.January,
-			locales.Translate("datesync.month.feb"): time.February,
-			locales.Translate("datesync.month.mar"): time.March,
-			locales.Translate("datesync.month.apr"): time.April,
-			locales.Translate("datesync.month.may"): time.May,
-			locales.Translate("datesync.month.jun"): time.June,
-			locales.Translate("datesync.month.jul"): time.July,
-			locales.Translate("datesync.month.aug"): time.August,
-			locales.Translate("datesync.month.sep"): time.September,
-			locales.Translate("datesync.month.okt"): time.October,
-			locales.Translate("datesync.month.nov"): time.November,
-			locales.Translate("datesync.month.dec"): time.December,
-		}
-
-		c.currentMonth = months[s]
-		c.updateDays()
-	})
-
-	c.yearSelect.SetSelected(fmt.Sprintf("%d", now.Year()))
-	c.monthSelect.SetSelected(months[now.Month()-1])
-	c.updateDays()
-	return c
-}
-
-// updateDays updates the day grid in the calendar
-func (c *CustomCalendar) updateDays() {
-	if c.daysGrid == nil {
-		return
-	}
-
-	c.daysGrid.Objects = []fyne.CanvasObject{}
-
-	days := []string{
-		locales.Translate("datesync.day.mon"),
-		locales.Translate("datesync.day.tue"),
-		locales.Translate("datesync.day.wed"),
-		locales.Translate("datesync.day.thu"),
-		locales.Translate("datesync.day.fri"),
-		locales.Translate("datesync.day.sat"),
-		locales.Translate("datesync.day.sun"),
-	}
-
-	for _, day := range days {
-		c.daysGrid.Add(widget.NewLabel(day))
-	}
-
-	firstDay := time.Date(c.currentYear, c.currentMonth, 1, 0, 0, 0, 0, time.Local)
-	lastDay := firstDay.AddDate(0, 1, -1)
-	weekday := int(firstDay.Weekday())
-	if weekday == 0 {
-		weekday = 7
-	}
-
-	for i := 1; i < weekday; i++ {
-		c.daysGrid.Add(widget.NewLabel(""))
-	}
-
-	for day := 1; day <= lastDay.Day(); day++ {
-		currentDay := day
-		dayBtn := common.CreateCalendarDayButton(day, func() {
-			date := time.Date(c.currentYear, c.currentMonth, currentDay, 0, 0, 0, 0, time.Local)
-			if c.onSelected != nil {
-				c.onSelected(date)
-			}
-		})
-		c.daysGrid.Add(dayBtn)
-	}
-
-	c.Refresh()
-}
-
-// CreateRenderer implements the fyne.Widget interface
-func (c *CustomCalendar) CreateRenderer() fyne.WidgetRenderer {
-	header := container.NewHBox(c.monthSelect, c.yearSelect)
-	content := container.NewVBox(header, c.daysGrid)
-	return widget.NewSimpleRenderer(content)
-}
-
 // initializeUI sets up the user interface components
 func (m *DateSyncModule) initializeUI() {
 	// Create excluded folders checkbox
@@ -402,141 +402,80 @@ func (m *DateSyncModule) initializeUI() {
 	m.addCustomDateFolderEntry()
 }
 
-// standardUpdate performs the standard date synchronization
-func (m *DateSyncModule) standardUpdate() {
-	// Save configuration before starting
-	m.SaveConfig()
-
-	// Show progress dialog
-	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-	defer m.CloseProgressDialog()
-
-	// Check database path
-	if m.dbMgr.GetDatabasePath() == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
-		return
-	}
-
-	// Create database backup
-	if err := m.dbMgr.BackupDatabase(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Backup",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		return
-	}
-
-	// Try to connect to database
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
-		return
-	}
-
-	// Execute standard date sync
-	if err := m.synchronizeDates(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Date Sync",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		return
-	}
+// GetStatusMessagesContainer returns the status messages container for this module
+func (m *DateSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
+	return m.ModuleBase.GetStatusMessagesContainer()
 }
 
-// customUpdate performs the custom date synchronization
-func (m *DateSyncModule) customUpdate() {
-	// Save configuration before starting
-	m.SaveConfig()
+// AddInfoMessage adds an informational message to the status container
+func (m *DateSyncModule) AddInfoMessage(message string) {
+	m.ModuleBase.AddInfoMessage(message)
+}
 
-	// Show progress dialog
-	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-	defer m.CloseProgressDialog()
+// AddErrorMessage adds an error message to the status container
+func (m *DateSyncModule) AddErrorMessage(message string) {
+	m.ModuleBase.AddErrorMessage(message)
+}
 
-	// Check database path
-	if m.dbMgr.GetDatabasePath() == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+// ClearStatusMessages clears all status messages
+func (m *DateSyncModule) ClearStatusMessages() {
+	m.ModuleBase.ClearStatusMessages()
+}
+
+// addCustomDateFolderEntry adds a new entry for custom date folder selection
+func (m *DateSyncModule) addCustomDateFolderEntry() {
+	if len(m.customDateFoldersEntry) >= 6 {
 		return
 	}
 
-	// Create database backup
-	if err := m.dbMgr.BackupDatabase(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Backup",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
+	// Initialize entry field for custom date folder selection
+	entry := widget.NewEntry()
+	customDateFolderField := common.CreateFolderSelectionFieldWithDelete(
+		locales.Translate("datesync.label.customdate"),
+		entry,
+		func(path string) {
+			entry.SetText(path)
+			// Add new field if this is the last non-empty one and we haven't reached the limit
+			if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
+				m.addCustomDateFolderEntry()
+			}
+			m.SaveConfig()
+		},
+		func() {
+			m.removeCustomDateFolderEntry(entry)
+		},
+	)
+
+	m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
+	m.customDateContainer.Add(customDateFolderField)
+}
+
+// addExcludedFolderEntry adds a new entry for excluded folder selection
+func (m *DateSyncModule) addExcludedFolderEntry() {
+	if len(m.excludedFoldersEntry) >= 6 {
 		return
 	}
 
-	// Try to connect to database
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
-		return
-	}
+	// Initialize entry field for folder selection
+	entry := widget.NewEntry()
+	folderField := common.CreateFolderSelectionFieldWithDelete(
+		locales.Translate("datesync.label.excluded"),
+		entry,
+		func(path string) {
+			entry.SetText(path)
+			// Add new field if this is the last non-empty one and we haven't reached the limit
+			if entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
+				m.addExcludedFolderEntry()
+			}
+			m.SaveConfig()
+		},
+		func() {
+			m.removeExcludedFolderEntry(entry)
+		},
+	)
 
-	// Get custom date folders
-	var customDateFoldersEntry []string
-	for _, entry := range m.customDateFoldersEntry {
-		if entry.Text != "" {
-			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
-		}
-	}
-
-	// Parse custom date
-	customDate, err := time.Parse("2006-01-02", m.datePickerEntry.Text)
-	if err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Date Parse",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.invaliddate")), context)
-		return
-	}
-
-	// Execute custom date sync
-	if err := m.setCustomDates(customDateFoldersEntry, customDate); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Custom Date Sync",
-			Severity:    common.ErrorWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		return
-	}
+	m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
+	m.foldersContainer.Add(folderField)
 }
 
 // addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add
@@ -589,60 +528,54 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 	}
 }
 
-// addExcludedFolderEntry adds a new entry for excluded folder selection
-func (m *DateSyncModule) addExcludedFolderEntry() {
-	if len(m.excludedFoldersEntry) >= 6 {
+// removeCustomDateFolderEntry removes a folder entry from the custom date folders list
+func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry) {
+	// Find the index of the entry to remove
+	indexToRemove := -1
+	for i, entry := range m.customDateFoldersEntry {
+		if entry == entryToRemove {
+			indexToRemove = i
+			break
+		}
+	}
+
+	// If entry not found, return
+	if indexToRemove == -1 {
 		return
 	}
 
-	// Initialize entry field for folder selection
-	entry := widget.NewEntry()
-	folderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.excluded"),
-		entry,
-		func(path string) {
-			entry.SetText(path)
-			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
-				m.addExcludedFolderEntry()
-			}
-			m.SaveConfig()
-		},
-		func() {
-			m.removeExcludedFolderEntry(entry)
-		},
-	)
+	// Remove the entry from the list
+	m.customDateFoldersEntry = append(m.customDateFoldersEntry[:indexToRemove], m.customDateFoldersEntry[indexToRemove+1:]...)
 
-	m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
-	m.foldersContainer.Add(folderField)
-}
-
-// addCustomDateFolderEntry adds a new entry for custom date folder selection
-func (m *DateSyncModule) addCustomDateFolderEntry() {
-	if len(m.customDateFoldersEntry) >= 6 {
-		return
+	// Clear and rebuild the container
+	m.customDateContainer.Objects = nil
+	for _, entry := range m.customDateFoldersEntry {
+		folderField := common.CreateFolderSelectionFieldWithDelete(
+			locales.Translate("datesync.label.customdate"),
+			entry,
+			func(path string) {
+				entry.SetText(path)
+				// Add new field if this is the last non-empty one and we haven't reached the limit
+				if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
+					m.addCustomDateFolderEntry()
+				}
+				m.SaveConfig()
+			},
+			func() {
+				m.removeCustomDateFolderEntry(entry)
+			},
+		)
+		m.customDateContainer.Add(folderField)
 	}
 
-	// Initialize entry field for custom date folder selection
-	entry := widget.NewEntry()
-	customDateFolderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.customdate"),
-		entry,
-		func(path string) {
-			entry.SetText(path)
-			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
-				m.addCustomDateFolderEntry()
-			}
-			m.SaveConfig()
-		},
-		func() {
-			m.removeCustomDateFolderEntry(entry)
-		},
-	)
+	// Ensure there's at least one empty entry
+	if len(m.customDateFoldersEntry) == 0 {
+		m.addCustomDateFolderEntry()
+	}
 
-	m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
-	m.customDateContainer.Add(customDateFolderField)
+	// Refresh the container and save config
+	m.customDateContainer.Refresh()
+	m.SaveConfig()
 }
 
 // removeExcludedFolderEntry removes a folder entry from the excluded folders list
@@ -695,158 +628,331 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 	m.SaveConfig()
 }
 
-// removeCustomDateFolderEntry removes a folder entry from the custom date folders list
-func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry) {
-	// Find the index of the entry to remove
-	indexToRemove := -1
-	for i, entry := range m.customDateFoldersEntry {
-		if entry == entryToRemove {
-			indexToRemove = i
-			break
-		}
-	}
-
-	// If entry not found, return
-	if indexToRemove == -1 {
-		return
-	}
-
-	// Remove the entry from the list
-	m.customDateFoldersEntry = append(m.customDateFoldersEntry[:indexToRemove], m.customDateFoldersEntry[indexToRemove+1:]...)
-
-	// Clear and rebuild the container
-	m.customDateContainer.Objects = nil
-	for _, entry := range m.customDateFoldersEntry {
-		folderField := common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.customdate"),
-			entry,
-			func(path string) {
-				entry.SetText(path)
-				// Add new field if this is the last non-empty one and we haven't reached the limit
-				if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
-					m.addCustomDateFolderEntry()
-				}
-				m.SaveConfig()
-			},
-			func() {
-				m.removeCustomDateFolderEntry(entry)
-			},
-		)
-		m.customDateContainer.Add(folderField)
-	}
-
-	// Ensure there's at least one empty entry
-	if len(m.customDateFoldersEntry) == 0 {
-		m.addCustomDateFolderEntry()
-	}
-
-	// Refresh the container and save config
-	m.customDateContainer.Refresh()
-	m.SaveConfig()
-}
-
-// synchronizeDates updates the dates in the Rekordbox database
-func (m *DateSyncModule) synchronizeDates() error {
-	// Clear previous status messages
-	m.ClearStatusMessages()
-
-	// Add status message about starting the process
-	m.AddInfoMessage(locales.Translate("common.status.start"))
-
-	// Get excluded folders if enabled
-	var excludedFoldersEntry []string
+// setStandardDates updates the dates in the Rekordbox database
+func (m *DateSyncModule) setStandardDates() (int, error) {
+	// Build WHERE clause for excluded folders
+	whereClause := "WHERE ReleaseDate IS NOT NULL"
 	if m.excludeFoldersCheck.Checked {
+		var excludedFolders []string
 		for _, entry := range m.excludedFoldersEntry {
 			if entry.Text != "" {
-				excludedFoldersEntry = append(excludedFoldersEntry, entry.Text)
+				excludedFolders = append(excludedFolders, entry.Text)
+			}
+		}
+		if len(excludedFolders) > 0 {
+			for _, folder := range excludedFolders {
+				whereClause += fmt.Sprintf(" AND FolderPath NOT LIKE '%s%%'", common.ToDbPath(folder, true))
 			}
 		}
 	}
 
-	// Build the WHERE clause for excluded folders
-	var excludeClause string
-	if len(excludedFoldersEntry) > 0 {
-		excludeConditions := make([]string, len(excludedFoldersEntry))
-		for i, folder := range excludedFoldersEntry {
-			excludeConditions[i] = fmt.Sprintf("FolderPath NOT LIKE '%s%%'", common.ToDbPath(folder, true))
-		}
-		excludeClause = " AND " + strings.Join(excludeConditions, " AND ")
+	// Get total number of records to be updated
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM djmdContent %s", whereClause)
+	var totalCount int
+	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
+	if err != nil {
+		return 0, fmt.Errorf("error counting records: %w", err)
 	}
 
-	// Query to update dates
-	updateQuery := fmt.Sprintf(`
-		UPDATE djmdContent
-		SET DateCreated = DateModified
-		WHERE FileType = 1%s
-	`, excludeClause)
+	// Add info message about number of records to update
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.toupdatecount"), totalCount))
 
-	// Execute the update
-	if err := m.dbMgr.Execute(updateQuery); err != nil {
-		m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
-		return err
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, totalCount)
+		return 0, nil
 	}
 
-	// Add success message
-	m.AddInfoMessage(locales.Translate("common.status.completed"))
-	m.CompleteProgressDialog()
-	return nil
+	// Update query
+	updateQuery := fmt.Sprintf("UPDATE djmdContent SET StockDate = ReleaseDate, DateCreated = ReleaseDate %s", whereClause)
+	err = m.dbMgr.Execute(updateQuery)
+	if err != nil {
+		return 0, fmt.Errorf("error updating dates: %w", err)
+	}
+
+	return totalCount, nil
 }
 
 // setCustomDates sets custom dates for tracks in selected folders
-func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) error {
+func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
+	if len(customDateFoldersEntry) == 0 {
+		return 0, fmt.Errorf(locales.Translate("datesync.err.nofolders"))
+	}
+
+	// Build WHERE clause for selected folders
+	whereClause := "WHERE"
+	for i, folder := range customDateFoldersEntry {
+		if i > 0 {
+			whereClause += " OR"
+		}
+		whereClause += fmt.Sprintf(" FolderPath LIKE '%s%%'", common.ToDbPath(folder, true))
+	}
+
+	// Get total number of records to be updated
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM djmdContent %s", whereClause)
+	var totalCount int
+	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
+	if err != nil {
+		return 0, fmt.Errorf("error counting records: %w", err)
+	}
+
+	// Add info message about number of records to update
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.toupdatecount"), totalCount))
+
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, totalCount)
+		return 0, nil
+	}
+
+	// Update query
+	updateQuery := fmt.Sprintf(`
+		UPDATE djmdContent
+		SET StockDate = ?,
+			DateCreated = ?
+		%s`, whereClause)
+
+	err = m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02"), customDate.Format("2006-01-02"))
+	if err != nil {
+		return 0, fmt.Errorf("error updating dates: %w", err)
+	}
+
+	return totalCount, nil
+}
+
+// standardUpdate performs the standard date synchronization
+func (m *DateSyncModule) standardUpdate() {
+	// Disable the button during processing
+	m.standardUpdateBtn.Disable()
+	defer func() {
+		m.standardUpdateBtn.Enable()
+		m.standardUpdateBtn.SetIcon(theme.ConfirmIcon())
+	}()
+
+	// Save configuration before starting
+	m.SaveConfig()
+
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
-	// Add status message about starting the process
+	// Show progress dialog
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+
+	// Add initial status message
 	m.AddInfoMessage(locales.Translate("common.status.start"))
 
-	// Check if any folders are selected
-	if len(customDateFoldersEntry) == 0 {
-		return fmt.Errorf(locales.Translate("datesync.err.nofolders"))
+	// Check database path
+	if m.dbMgr.GetDatabasePath() == "" {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.nodbpath"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		return
 	}
 
-	// Build the WHERE clause for custom date folders
-	var conditions []string
-	for _, folder := range customDateFoldersEntry {
-		conditions = append(conditions, fmt.Sprintf("FolderPath LIKE '%s%%'", common.ToDbPath(folder, true)))
+	// Create database backup
+	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.backupdb"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
 	}
-	whereClause := strings.Join(conditions, " OR ")
+	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
-	// Query to update dates
-	updateQuery := fmt.Sprintf(`
-		UPDATE djmdContent
-		SET StockDate = ?
-		WHERE FileType = 1 AND (%s)
-	`, whereClause)
-
-	// Execute the update
-	if err := m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02")); err != nil {
-		m.AddErrorMessage(fmt.Sprintf(locales.Translate("datesync.err.dateupd"), err))
-		return err
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
+		common.UpdateButtonToCompleted(m.standardUpdateBtn)
+		return
 	}
 
-	// Add success message
-	m.AddInfoMessage(locales.Translate("common.status.completed"))
+	// Try to connect to database
+	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
+	if err := m.dbMgr.Connect(); err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.connectdb"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		return
+	}
+	defer m.dbMgr.Finalize()
+
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
+		common.UpdateButtonToCompleted(m.standardUpdateBtn)
+		return
+	}
+
+	// Execute standard date sync
+	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
+	m.AddInfoMessage(locales.Translate("common.status.updating"))
+	updatedCount, err := m.setStandardDates()
+	if err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.failed"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Date Sync",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+
+	// Update progress with count
+	m.UpdateProgressStatus(0.9, fmt.Sprintf(locales.Translate("common.status.progress"), updatedCount, updatedCount))
+
+	// Update progress and complete dialog with final count
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
 	m.CompleteProgressDialog()
-	return nil
 }
 
-// GetStatusMessagesContainer returns the status messages container for this module
-func (m *DateSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
+// customUpdate performs the custom date synchronization
+func (m *DateSyncModule) customUpdate() {
+	// Disable the button during processing
+	m.customDateUpdateBtn.Disable()
+	defer func() {
+		m.customDateUpdateBtn.Enable()
+		m.customDateUpdateBtn.SetIcon(theme.ConfirmIcon())
+	}()
 
-// AddInfoMessage adds an informational message to the status container
-func (m *DateSyncModule) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
+	// Save configuration before starting
+	m.SaveConfig()
 
-// AddErrorMessage adds an error message to the status container
-func (m *DateSyncModule) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
+	// Clear previous status messages
+	m.ClearStatusMessages()
 
-// ClearStatusMessages clears all status messages
-func (m *DateSyncModule) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
+	// Show progress dialog
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+
+	// Add initial status message
+	m.AddInfoMessage(locales.Translate("common.status.start"))
+
+	// Check database path
+	if m.dbMgr.GetDatabasePath() == "" {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.nodbpath"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Validation",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		return
+	}
+
+	// Create database backup
+	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.backupdb"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
+
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
+		common.UpdateButtonToCompleted(m.customDateUpdateBtn)
+		return
+	}
+
+	// Try to connect to database
+	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
+	if err := m.dbMgr.Connect(); err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.connectdb"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		return
+	}
+	defer m.dbMgr.Finalize()
+
+	// Check if cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
+		common.UpdateButtonToCompleted(m.customDateUpdateBtn)
+		return
+	}
+
+	// Get custom date folders
+	var customDateFoldersEntry []string
+	for _, entry := range m.customDateFoldersEntry {
+		if entry.Text != "" {
+			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
+		}
+	}
+
+	// Parse custom date
+	customDate, err := time.Parse("2006-01-02", m.datePickerEntry.Text)
+	if err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("datesync.err.invaliddate"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Date Parse",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.invaliddate")), context)
+		return
+	}
+
+	// Execute custom date sync
+	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
+	m.AddInfoMessage(locales.Translate("common.status.updating"))
+	updatedCount, err := m.setCustomDates(customDateFoldersEntry, customDate)
+	if err != nil {
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.failed"))
+		m.CompleteProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Custom Date Sync",
+			Severity:    common.ErrorWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		return
+	}
+
+	// Update progress with count
+	m.UpdateProgressStatus(0.9, fmt.Sprintf(locales.Translate("common.status.progress"), updatedCount, updatedCount))
+
+	// Update progress and complete dialog with final count
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
+	m.CompleteProgressDialog()
 }
