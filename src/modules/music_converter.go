@@ -1037,19 +1037,14 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		}
 
 		if found {
-			// If value contains spaces or special characters, we need to wrap it in quotes
+			// Escape special characters in the value part
 			escapedValue := foundValue
-
-			// Escape special characters
 			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
 			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
 
-			// If value contains spaces or special characters, wrap it in quotes
-			if strings.ContainsAny(escapedValue, " \t\n\r\"'=;") {
-				escapedValue = "\"" + escapedValue + "\""
-			}
-
-			args = append(args, "-metadata", fmt.Sprintf("%s=%s", targetField, escapedValue))
+			// Create metadata argument in format KEY=VALUE
+			metadataArg := fmt.Sprintf("%s=%s", targetField, escapedValue)
+			args = append(args, "-metadata", metadataArg)
 		}
 	}
 
@@ -1063,46 +1058,8 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	}
 	m.debugLog("DEBUG: Executing command: %s", cmdStr)
 
-	// Create a batch file to run the command
-	tmpBatFile := filepath.Join(os.TempDir(), "ffmpeg_convert.bat")
-
-	// Create batch file content with quotes around paths and properly separated parameters
-	cmdArgs := make([]string, len(args))
-	for i, arg := range args {
-		// Add quotes only around file paths (first and last argument)
-		// and around metadata values that already contain quotes
-		if i == 1 || i == len(args)-1 || (i > 0 && strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"")) {
-			// If argument already contains quotes, don't add them again
-			if strings.HasPrefix(arg, "\"") && strings.HasSuffix(arg, "\"") {
-				cmdArgs[i] = arg
-			} else {
-				cmdArgs[i] = fmt.Sprintf("\"%s\"", arg)
-			}
-		} else if i > 0 && strings.Contains(arg, "=") {
-			// If it's a metadata (contains '='), we need to ensure the value after '=' is in quotes if it contains spaces
-			parts := strings.SplitN(arg, "=", 2)
-			if len(parts) == 2 && strings.ContainsAny(parts[1], " \t\n\r") &&
-				!strings.HasPrefix(parts[1], "\"") && !strings.HasSuffix(parts[1], "\"") {
-				cmdArgs[i] = fmt.Sprintf("%s=\"%s\"", parts[0], parts[1])
-			} else {
-				cmdArgs[i] = arg
-			}
-		} else {
-			cmdArgs[i] = arg
-		}
-	}
-
-	// Create batch file content with UTF-8 encoding
-	cmdContent := fmt.Sprintf("@echo off\r\nchcp 65001 >nul\r\ntools\\ffmpeg.exe %s\r\n", strings.Join(cmdArgs, " "))
-	m.debugLog("DEBUG: Writing batch file: %s", tmpBatFile)
-	m.debugLog("DEBUG: Batch content: %s", cmdContent)
-
-	if err := os.WriteFile(tmpBatFile, []byte(cmdContent), 0644); err != nil {
-		return fmt.Errorf("failed to create batch file: %v", err)
-	}
-
-	// Execute the batch file
-	cmd := exec.Command("cmd", "/c", tmpBatFile)
+	// Execute ffmpeg directly
+	cmd := exec.Command("tools/ffmpeg.exe", args...)
 
 	// Capture stderr for error reporting
 	var stderr bytes.Buffer
@@ -1112,9 +1069,6 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%v: %s", err, stderr.String())
 	}
-
-	// Clean up the temporary batch file
-	os.Remove(tmpBatFile)
 
 	return nil
 }
@@ -1312,11 +1266,11 @@ func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth str
 	// Parse JSON output
 	var result struct {
 		Streams []struct {
-			CodecType   string `json:"codec_type"`
-			SampleRate  string `json:"sample_rate"`
-			SampleFmt   string `json:"sample_fmt"`
-			BitsPerRaw  string `json:"bits_per_raw_sample"`
-			BitsPerSamp string `json:"bits_per_sample"`
+			CodecType   string      `json:"codec_type"`
+			SampleRate  string      `json:"sample_rate"`
+			SampleFmt   string      `json:"sample_fmt"`
+			BitsPerRaw  json.Number `json:"bits_per_raw_sample"`
+			BitsPerSamp json.Number `json:"bits_per_sample"`
 		} `json:"streams"`
 	}
 
@@ -1333,9 +1287,9 @@ func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth str
 
 			// Try to determine bit depth
 			if stream.BitsPerRaw != "" {
-				bitDepth = stream.BitsPerRaw
+				bitDepth = string(stream.BitsPerRaw)
 			} else if stream.BitsPerSamp != "" {
-				bitDepth = stream.BitsPerSamp
+				bitDepth = string(stream.BitsPerSamp)
 			} else {
 				// Try to determine from sample format
 				switch stream.SampleFmt {
