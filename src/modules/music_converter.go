@@ -22,6 +22,7 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -994,20 +995,15 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 		}
 	}
 
-	// Add metadata arguments based on the mapping
-	var targetMetadataMap map[string]string
-
-	switch targetFormat {
-	case "MP3":
-		targetMetadataMap = metadataMap.InternalToMP3
-	case "FLAC":
-		targetMetadataMap = metadataMap.InternalToFLAC
-	case "WAV":
-		targetMetadataMap = metadataMap.InternalToWAV
+	// Create a sorted slice of metadata items to ensure consistent order
+	type metadataItem struct {
+		key   string
+		value string
 	}
+	var metadataItems []metadataItem
 
 	// Map metadata from source to target format
-	for internalName, targetField := range targetMetadataMap {
+	for internalName, targetField := range metadataMap.InternalToMP3 {
 		// Find a matching metadata field in the source
 		var foundValue string
 		var found bool
@@ -1042,10 +1038,22 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
 			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
 
-			// Create metadata argument in format KEY=VALUE
-			metadataArg := fmt.Sprintf("%s=%s", targetField, escapedValue)
-			args = append(args, "-metadata", metadataArg)
+			// Add to metadata items slice
+			metadataItems = append(metadataItems, metadataItem{
+				key:   targetField,
+				value: escapedValue,
+			})
 		}
+	}
+
+	// Sort metadata items by key to ensure consistent order
+	sort.Slice(metadataItems, func(i, j int) bool {
+		return metadataItems[i].key < metadataItems[j].key
+	})
+
+	// Add sorted metadata to ffmpeg arguments
+	for _, item := range metadataItems {
+		args = append(args, "-metadata", fmt.Sprintf("%s=%s", item.key, item.value))
 	}
 
 	// Add output file path
