@@ -8,7 +8,7 @@ comment,COMM,comment,comment
 composer,TCOM,composer,
 contentgroup,TIT1,contentgroup,
 copyright,TCOP,copyright,copyright
-date,DATE,date,date
+date,TDRC,date,date
 discnumber,TPOS,disc,
 genre,TCON,genre,genre
 grouping,GRP1,grouping,
@@ -32,4 +32,3 @@ subtitle,TIT3,subtitle,
 title,TIT2,title,title
 tracknumber,TRCK,track,track
 version,VERSION,version,
-year,TDRC,year,
