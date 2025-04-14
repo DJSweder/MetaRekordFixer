@@ -319,6 +319,58 @@ func (m *MusicConverterModule) initializeUI() {
 			go m.startConversion()
 		},
 	)
+
+	// Set up change handlers for all UI components
+	// Source and target format selections
+	m.sourceFormatSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		m.onSourceFormatChanged(m.sourceFormatSelect.Selected)
+	})
+	m.targetFormatSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		m.onTargetFormatChanged(m.targetFormatSelect.Selected)
+	})
+
+	// Checkboxes
+	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+
+	// MP3 settings
+	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+
+	// FLAC settings
+	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+
+	// WAV settings
+	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+
+	// Folder entries
+	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
+	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		_ = m.SaveConfig()
+	})
 }
 
 // onSourceFormatChanged handles changes in source format selection
@@ -870,7 +922,6 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 
 		// Set ID3v2.4 version
 		args = append(args, "-id3v2_version", "4")
-
 	case "FLAC":
 		// Add FLAC specific settings
 		compression := formatSettings["compression"]
