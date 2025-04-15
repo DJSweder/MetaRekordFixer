@@ -9,7 +9,7 @@
     "common.button.copy": "Kopírovat",
     "common.button.hidedetails": "Skrýt podrobnosti",
     "common.button.ok": "OK",
-    "common.button.showdetails": "Zobrazit podrobnosti",
+    "common.button.openlogs": "Více info (log)",
     "common.button.stop": "Zastavit",
     "common.button.submit": "Potvrdit",
     "common.config.filenotfound": "Nenalezen konfigurační soubor %s",

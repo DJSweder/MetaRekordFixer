@@ -227,24 +227,33 @@ func (m *ModuleBase) ShowError(err error) {
 	m.ErrorHandler.ShowError(err)
 }
 
-// AddInfoMessage adds an information message to the status messages container
+// AddInfoMessage adds an information message to the status messages container and logs it
 func (m *ModuleBase) AddInfoMessage(message string) {
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageInfo, message)
 	}
+	if m.Logger != nil {
+		m.Logger.Info("%s", message)
+	}
 }
 
-// AddWarningMessage adds a warning message to the status messages container
+// AddWarningMessage adds a warning message to the status messages container and logs it
 func (m *ModuleBase) AddWarningMessage(message string) {
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageWarning, message)
 	}
+	if m.Logger != nil {
+		m.Logger.Warning("%s", message)
+	}
 }
 
-// AddErrorMessage adds an error message to the status messages container
+// AddErrorMessage adds an error message to the status messages container and logs it
 func (m *ModuleBase) AddErrorMessage(message string) {
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageError, message)
+	}
+	if m.Logger != nil {
+		m.Logger.Error("%s", message)
 	}
 }
 

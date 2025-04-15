@@ -12,13 +12,15 @@ import (
 )
 
 // MessageType defines the type of status message
-type MessageType int
+type MessageType string
 
-// Message types constants
+// Deprecated: Will be removed after new error handling implementation is complete.
+// Use SeverityXXX constants from severity.go instead.
 const (
-	MessageInfo MessageType = iota
-	MessageWarning
-	MessageError
+	MessageInfo     MessageType = MessageType(SeverityInfo)     // Use SeverityInfo instead
+	MessageWarning  MessageType = MessageType(SeverityWarning)  // Use SeverityWarning instead
+	MessageError    MessageType = MessageType(SeverityError)    // Use SeverityError instead
+	MessageCritical MessageType = MessageType(SeverityCritical) // Use SeverityCritical instead
 )
 
 // StatusMessage represents a single status message with its type and content
@@ -67,14 +69,14 @@ func (smc *StatusMessagesContainer) AddMessage(messageType MessageType, content 
 		icon = theme.InfoIcon()
 	case MessageWarning:
 		icon = theme.WarningIcon()
-	case MessageError:
+	case MessageError, MessageCritical:
 		icon = theme.ErrorIcon()
 	}
 
 	// Create label with the message content
 	messageLabel := widget.NewLabel(content)
 	messageLabel.Alignment = fyne.TextAlignLeading
-	messageLabel.TextStyle.Bold = messageType != MessageInfo // Bold for warnings and errors
+	messageLabel.TextStyle.Bold = messageType != MessageInfo // Bold for warnings, errors and critical errors
 
 	// Create a smaller icon with fixed size
 	iconWidget := widget.NewIcon(icon)
@@ -111,6 +113,11 @@ func (smc *StatusMessagesContainer) AddWarningMessage(content string) {
 // AddErrorMessage adds an error message
 func (smc *StatusMessagesContainer) AddErrorMessage(content string) {
 	smc.AddMessage(MessageError, content)
+}
+
+// AddCriticalMessage adds a critical error message
+func (smc *StatusMessagesContainer) AddCriticalMessage(content string) {
+	smc.AddMessage(MessageCritical, content)
 }
 
 // ClearMessages removes all messages from the container

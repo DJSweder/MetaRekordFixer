@@ -6,6 +6,9 @@ import (
 	"MetaRekordFixer/locales"
 	"fmt"
 	"image/color"
+	"os"
+	"os/exec"
+	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -330,7 +333,7 @@ type ErrorDialogDetails struct {
 	StackTrace  string
 }
 
-// ShowStandardError displays a standardized error dialog with optional details
+// ShowStandardError displays a standardized error dialog with log folder access
 func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *dialog.CustomDialog {
 	// Get header based on severity
 	var header string
@@ -354,35 +357,21 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 	messageLabel.Wrapping = fyne.TextWrapWord
 
 	// Create buttons container
-	var buttons *fyne.Container
-	if context != nil && context.Recoverable {
-		// Create details button
-		detailsBtn := widget.NewButtonWithIcon(
-			locales.Translate("common.button.showdetails"),
-			theme.InfoIcon(),
-			func() {
-				ShowErrorDetails(window, &ErrorDialogDetails{
-					Module:      context.Module,
-					Operation:   context.Operation,
-					Error:       context.Error,
-					Severity:    context.Severity,
-					Recoverable: context.Recoverable,
-					Timestamp:   context.Timestamp.Format("2006-01-02 15:04:05"),
-					StackTrace:  context.StackTrace,
-				})
-			},
-		)
+	openLogsBtn := widget.NewButtonWithIcon(
+		locales.Translate("common.button.openlogs"),
+		theme.FolderOpenIcon(),
+		func() {
+			logDir := filepath.Dir(GetLogFilePath())
+			cmd := exec.Command("explorer", logDir)
+			err := cmd.Run()
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("Failed to open log directory: %v", err), window)
+			}
+		},
+	)
 
-		// Create OK and Cancel buttons
-		okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
-		cancelBtn := widget.NewButtonWithIcon(locales.Translate("common.button.cancel"), theme.CancelIcon(), nil)
-
-		buttons = container.NewHBox(layout.NewSpacer(), detailsBtn, cancelBtn, okBtn)
-	} else {
-		// Create OK button only
-		okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
-		buttons = container.NewHBox(layout.NewSpacer(), okBtn)
-	}
+	okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
+	buttons := container.NewHBox(layout.NewSpacer(), openLogsBtn, okBtn)
 
 	// Create content container
 	content := container.NewVBox(
@@ -392,61 +381,6 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 
 	// Create and return dialog
 	return dialog.NewCustom(header, "", content, window)
-}
-
-// ShowErrorDetails displays a dialog with detailed error information
-func ShowErrorDetails(window fyne.Window, details *ErrorDialogDetails) *dialog.CustomDialog {
-	// Create text area for details
-	detailsText := fmt.Sprintf(
-		"Module: %s\nOperation: %s\nError: %v\nSeverity: %v\nRecoverable: %v\nTimestamp: %s\n\nStack Trace:\n%s",
-		details.Module,
-		details.Operation,
-		details.Error,
-		details.Severity,
-		details.Recoverable,
-		details.Timestamp,
-		details.StackTrace,
-	)
-
-	textArea := widget.NewMultiLineEntry()
-	textArea.SetText(detailsText)
-	textArea.Disable() // Make it read-only
-
-	// Create copy button
-	copyBtn := widget.NewButtonWithIcon(
-		locales.Translate("common.button.copy"),
-		theme.ContentCopyIcon(),
-		func() {
-			window.Clipboard().SetContent(detailsText)
-		},
-	)
-
-	// Create close button
-	closeBtn := widget.NewButtonWithIcon(
-		locales.Translate("common.button.close"),
-		theme.CancelIcon(),
-		nil,
-	)
-
-	// Create buttons container
-	buttons := container.NewHBox(layout.NewSpacer(), copyBtn, closeBtn)
-
-	// Create content container with minimum size
-	content := container.NewVBox(
-		textArea,
-		buttons,
-	)
-	rect := canvas.NewRectangle(color.Transparent)
-	rect.SetMinSize(fyne.NewSize(600, 400))
-	content.Add(rect)
-
-	// Create and return dialog
-	return dialog.NewCustom(
-		locales.Translate("common.dialog.errordetails"),
-		"",
-		content,
-		window,
-	)
 }
 
 // CreatePlaylistSelect creates a select widget for playlist selection.
@@ -514,4 +448,19 @@ func SetPlaylistSelectState(selectWidget *widget.Select, enabled bool, selectedV
 func CreateCheckbox(labelText string, onChanged func(bool)) *widget.Check {
 	checkbox := widget.NewCheck(labelText, onChanged)
 	return checkbox
+}
+
+// GetLogFilePath returns the path to the log file
+func GetLogFilePath() string {
+	// Get the application data directory
+	appDataDir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+
+	// Construct the path to the log file
+	logDir := filepath.Join(appDataDir, "MetaRekordFixer", "logs")
+	logFile := filepath.Join(logDir, "app.log")
+
+	return logFile
 }

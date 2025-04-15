@@ -11,13 +11,15 @@ import (
 )
 
 // LogLevel represents the severity of a log message
-type LogLevel int
+type LogLevel string
 
+// Deprecated: Will be removed after new error handling implementation is complete.
+// Use SeverityXXX constants from severity.go instead.
 const (
-	LogLevelDebug LogLevel = iota
-	LogLevelInfo
-	LogLevelWarning
-	LogLevelError
+	LogLevelDebug   LogLevel = "DEBUG"   // Use SeverityInfo instead
+	LogLevelInfo    LogLevel = "INFO"    // Use SeverityInfo instead
+	LogLevelWarning LogLevel = "WARNING" // Use SeverityWarning instead
+	LogLevelError   LogLevel = "ERROR"   // Use SeverityError instead
 )
 
 // Logger handles application logging with file rotation
@@ -67,10 +69,9 @@ func (l *Logger) Log(level LogLevel, format string, args ...interface{}) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	// Format log message
+	// Format log message with timestamp and level
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	levelStr := []string{"DEBUG", "INFO", "WARNING", "ERROR"}[level]
-	message := fmt.Sprintf("%s [%s] %s\n", timestamp, levelStr, fmt.Sprintf(format, args...))
+	message := fmt.Sprintf("%s [%s] %s\n", timestamp, level, fmt.Sprintf(format, args...))
 
 	// Check if rotation is needed
 	if l.currentSize >= int64(l.maxSizeMB*1024*1024) {
@@ -154,10 +155,7 @@ func (l *Logger) rotate() error {
 	// Generate new filename with timestamp
 	timestamp := time.Now().Format("2006-01-02@15_04_05")
 	dir := filepath.Dir(l.logPath)
-	base := filepath.Base(l.logPath)
-	ext := filepath.Ext(base)
-	name := base[:len(base)-len(ext)]
-	rotatedPath := filepath.Join(dir, fmt.Sprintf("%s_%s%s", name, timestamp, ext))
+	rotatedPath := filepath.Join(dir, fmt.Sprintf("metarekordfixer_%s.log", timestamp))
 
 	// Rename current log file
 	if err := os.Rename(l.logPath, rotatedPath); err != nil {

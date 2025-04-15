@@ -1,29 +1,23 @@
-// common/error_handler.go
-
 package common
 
 import (
-	"MetaRekordFixer/locales"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 )
 
 // ErrorSeverity represents the severity level of an error
 type ErrorSeverity int
 
+// Deprecated: Will be removed after new error handling implementation is complete.
+// Use SeverityXXX constants from severity.go instead.
 const (
-	ErrorInfo ErrorSeverity = iota
-	ErrorWarning
-	ErrorCritical
-	ErrorFatal
+	ErrorInfo     ErrorSeverity = iota // Use SeverityInfo instead
+	ErrorWarning                       // Use SeverityWarning instead
+	ErrorCritical                      // Use SeverityError instead
+	ErrorFatal                         // Use SeverityCritical instead
 )
 
 // ErrorContext provides additional information about an error
@@ -52,7 +46,6 @@ func NewErrorContext(module, operation string) ErrorContext {
 type ErrorHandler struct {
 	logger    *Logger
 	window    fyne.Window
-	isLogging bool
 }
 
 // NewErrorHandler creates a new error handler instance
@@ -63,8 +56,7 @@ func NewErrorHandler(logger *Logger) *ErrorHandler {
 	}
 
 	return &ErrorHandler{
-		logger:    logger,
-		isLogging: true,
+		logger: logger,
 	}
 }
 
@@ -80,77 +72,32 @@ func (h *ErrorHandler) GetLogger() *Logger {
 
 // ShowError displays an error dialog and logs the error
 func (h *ErrorHandler) ShowError(err error) {
-	if err == nil {
-		return
-	}
+    if err == nil {
+        return
+    }
 
-	if h.isLogging {
-		h.logger.Error("%v", err)
-	}
+    // Log error without context
+    h.logger.Error("%s", err.Error())
 
-	if h.window != nil {
-		dialog.ShowError(err, h.window)
-	}
+    if h.window != nil {
+        context := NewErrorContext("", "")
+        context.Error = err
+        ShowStandardError(h.window, err, &context)
+    }
 }
 
 // ShowErrorWithContext displays an error dialog with context and logs the error
 func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
-	if context.Error == nil {
-		return
-	}
+    if context.Error == nil {
+        return
+    }
 
-	if h.isLogging {
-		h.logger.Error("%s: %v", context.Operation, context.Error)
-	}
+    // Log error with context
+    h.logger.Error("Module: %s, Operation: %s - %s", context.Module, context.Operation, context.Error.Error())
 
-	if h.window != nil {
-		h.showErrorDialog(context)
-	}
-}
-
-func (h *ErrorHandler) showErrorDialog(context ErrorContext) {
-	message := widget.NewLabel(context.Error.Error())
-	message.Wrapping = fyne.TextWrapWord
-	message.Resize(fyne.NewSize(400, message.MinSize().Height))
-
-	detailsLabel := widget.NewLabel(fmt.Sprintf("Module: %s\nOperation: %s", context.Module, context.Operation))
-	detailsLabel.Wrapping = fyne.TextWrapWord
-	detailsLabel.Resize(fyne.NewSize(400, detailsLabel.MinSize().Height))
-
-	content := container.NewVBox(
-		message,
-		widget.NewSeparator(),
-		detailsLabel,
-	)
-
-	showStackTraceBtn := widget.NewButtonWithIcon(locales.Translate("common.button.showdetails"), theme.InfoIcon(), nil)
-
-	if context.StackTrace != "" {
-		stackTraceArea := widget.NewMultiLineEntry()
-		stackTraceArea.SetText(context.StackTrace)
-		stackTraceArea.Disable()
-
-		showStackTraceBtn.OnTapped = func() {
-			if strings.Contains(showStackTraceBtn.Text, locales.Translate("common.button.showdetails")) {
-				content.Add(stackTraceArea)
-				showStackTraceBtn.SetText(locales.Translate("common.button.hidedetails"))
-			} else {
-				content.Remove(stackTraceArea)
-				showStackTraceBtn.SetText(locales.Translate("common.button.showdetails"))
-			}
-		}
-
-		content.Add(showStackTraceBtn)
-	}
-
-	customDialog := dialog.NewCustom(
-		locales.Translate("common.dialog.errorheader"),
-		locales.Translate("common.button.ok"),
-		content,
-		h.window,
-	)
-
-	customDialog.Show()
+    if h.window != nil {
+        ShowStandardError(h.window, context.Error, &context)
+    }
 }
 
 // FormatError creates a standardized error message
@@ -163,17 +110,27 @@ func (h *ErrorHandler) IsRecoverable(err error) bool {
 	return true
 }
 
-// SetLoggingEnabled enables or disables error logging
-func (h *ErrorHandler) SetLoggingEnabled(enabled bool) {
-	h.isLogging = enabled
-}
-
 // ShowStandardError displays an error with standard formatting and context
 func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {
 	if err == nil {
 		return
 	}
 
+	// Log error with context
+	if context != nil {
+		h.logger.Error("Module: %s, Operation: %s - %s", context.Module, context.Operation, err.Error())
+	} else {
+		h.logger.Error(err.Error())
+	}
+
+	// Update context with error and show dialog
 	context.Error = err
-	h.showErrorDialog(*context)
+	if h.window != nil {
+		ShowStandardError(h.window, err, context)
+	}
+}
+
+// Deprecated: Use ShowStandardError instead
+func (h *ErrorHandler) showErrorDialog(context ErrorContext) {
+	ShowStandardError(h.window, context.Error, &context)
 }
