@@ -748,7 +748,7 @@ func (m *DateSyncModule) standardUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
@@ -763,7 +763,7 @@ func (m *DateSyncModule) standardUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Backup",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(err, context)
@@ -786,7 +786,7 @@ func (m *DateSyncModule) standardUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
@@ -811,7 +811,7 @@ func (m *DateSyncModule) standardUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Date Sync",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(err, context)
@@ -855,7 +855,7 @@ func (m *DateSyncModule) customUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
@@ -870,7 +870,7 @@ func (m *DateSyncModule) customUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Backup",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(err, context)
@@ -893,7 +893,7 @@ func (m *DateSyncModule) customUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
@@ -924,7 +924,7 @@ func (m *DateSyncModule) customUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Date Parse",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.invaliddate")), context)
@@ -941,7 +941,7 @@ func (m *DateSyncModule) customUpdate() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Custom Date Sync",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(err, context)

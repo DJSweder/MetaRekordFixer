@@ -134,7 +134,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
@@ -147,7 +147,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
@@ -161,7 +161,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Access",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
@@ -910,7 +910,7 @@ func (m *HotCueSyncModule) Start() error {
 			m.CloseProgressDialog()
 			// Create error context with module name and operation
 			context := common.NewErrorContext(m.GetConfigName(), "Database Backup")
-			context.Severity = common.ErrorWarning
+			context.Severity = common.SeverityWarning
 			m.ErrorHandler.ShowStandardError(err, &context)
 			return
 		}

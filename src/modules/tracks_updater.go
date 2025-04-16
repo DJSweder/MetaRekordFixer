@@ -100,7 +100,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Validation",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
@@ -113,7 +113,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Connection",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
@@ -127,7 +127,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Access",
-			Severity:    common.ErrorWarning,
+			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
@@ -362,7 +362,7 @@ func (m *TracksUpdater) Start() {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Update Process",
-					Severity:    common.ErrorCritical,
+					Severity:    common.SeverityCritical,
 					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)

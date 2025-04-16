@@ -89,7 +89,7 @@ func NewRekordboxTools() *RekordboxTools {
 	var dbManager *common.DBManager
 
 	// Initialize error handler with new logger
-	errorHandler := common.NewErrorHandler(logger)
+	errorHandler := common.NewErrorHandler(logger, mainWindow)
 
 	return &RekordboxTools{
 		app:          fyneApp,
@@ -386,7 +386,7 @@ func main() {
 	var dbManager *common.DBManager
 
 	// Initialize error handler with new logger
-	errorHandler := common.NewErrorHandler(logger)
+	errorHandler := common.NewErrorHandler(logger, mainWindow)
 	errorHandler.SetWindow(mainWindow)
 
 	// Initialize language

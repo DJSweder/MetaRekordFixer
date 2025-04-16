@@ -191,7 +191,7 @@ func (m *MetadataSyncModule) initializeUI() {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Metadata Sync",
-					Severity:    common.ErrorWarning,
+					Severity:    common.SeverityWarning,
 					Recoverable: true,
 				}
 				m.ErrorHandler.ShowStandardError(err, context)
@@ -255,7 +255,7 @@ func (m *MetadataSyncModule) Start() error {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Metadata Sync",
-					Severity:    common.ErrorCritical,
+					Severity:    common.SeverityCritical,
 					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
@@ -272,7 +272,7 @@ func (m *MetadataSyncModule) Start() error {
 			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), &common.ErrorContext{
 				Module:      m.GetConfigName(),
 				Operation:   "Database Backup",
-				Severity:    common.ErrorCritical,
+				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			})
 			return
@@ -293,7 +293,7 @@ func (m *MetadataSyncModule) Start() error {
 			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbconn"), err), &common.ErrorContext{
 				Module:      m.GetConfigName(),
 				Operation:   "Database Connection",
-				Severity:    common.ErrorCritical,
+				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			})
 			return
@@ -338,7 +338,7 @@ func (m *MetadataSyncModule) Start() error {
 			m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
 				Module:      m.GetConfigName(),
 				Operation:   "Database Query",
-				Severity:    common.ErrorWarning,
+				Severity:    common.SeverityWarning,
 				Recoverable: true,
 			})
 			return
@@ -369,7 +369,7 @@ func (m *MetadataSyncModule) Start() error {
 				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Read Database Records",
-					Severity:    common.ErrorWarning,
+					Severity:    common.SeverityWarning,
 					Recoverable: true,
 				})
 				return
@@ -383,7 +383,7 @@ func (m *MetadataSyncModule) Start() error {
 		if totalDbFiles == 0 {
 			// Add error message to status
 			m.AddErrorMessage(locales.Translate("common.err.noentryfound"))
-			
+
 			// Update progress and complete dialog
 			m.UpdateProgressStatus(1.0, locales.Translate("common.err.noentryfound"))
 			m.CompleteProgressDialog()
@@ -437,7 +437,7 @@ func (m *MetadataSyncModule) Start() error {
 				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Update FLAC Metadata",
-					Severity:    common.ErrorWarning,
+					Severity:    common.SeverityWarning,
 					Recoverable: true,
 				})
 				return

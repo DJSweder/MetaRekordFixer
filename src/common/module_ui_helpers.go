@@ -6,9 +6,11 @@ import (
 	"MetaRekordFixer/locales"
 	"fmt"
 	"image/color"
+	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -202,10 +204,9 @@ func ShowTextInputDialog(title, message, defaultValue string, onSubmit func(stri
 		container.NewHBox(layout.NewSpacer(), cancelBtn, submitBtn),
 	)
 
-	// Create dialog
+	// Create and show dialog
 	d := dialog.NewCustom(title, "", content, window)
-	cancelBtn.OnTapped = func() { d.Hide() }
-
+	d.Show()
 	return d
 }
 
@@ -327,7 +328,7 @@ type ErrorDialogDetails struct {
 	Module      string
 	Operation   string
 	Error       error
-	Severity    ErrorSeverity
+	Severity    Severity
 	Recoverable bool
 	Timestamp   string
 	StackTrace  string
@@ -339,11 +340,11 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 	var header string
 	if context != nil {
 		switch context.Severity {
-		case ErrorWarning:
+		case SeverityWarning:
 			header = locales.Translate("common.dialog.warningheader")
-		case ErrorCritical:
+		case SeverityCritical:
 			header = locales.Translate("common.dialog.criticalheader")
-		case ErrorFatal:
+		case SeverityError:
 			header = locales.Translate("common.dialog.fatalerror")
 		default:
 			header = locales.Translate("common.dialog.errorheader")
@@ -352,35 +353,53 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 		header = locales.Translate("common.dialog.errorheader")
 	}
 
-	// Create error message label
-	messageLabel := widget.NewLabel(err.Error())
+	// Only use localized error message in dialog, without technical details
+	var errorMsg string
+	if err != nil {
+		// Pokud je chyba ve formátu "convert.err.nosourcefiles: %v", extrahujeme jen prvních část
+		errParts := strings.SplitN(err.Error(), ":", 2)
+		errKey := strings.TrimSpace(errParts[0])
+		errorMsg = locales.Translate(errKey)
+	} else {
+		errorMsg = locales.Translate("common.dialog.unknownerror")
+	}
+
+	// Message label with word wrap
+	messageLabel := widget.NewLabel(errorMsg)
 	messageLabel.Wrapping = fyne.TextWrapWord
 
-	// Create buttons container
+	// Log info button - right aligned
 	openLogsBtn := widget.NewButtonWithIcon(
 		locales.Translate("common.button.openlogs"),
 		theme.FolderOpenIcon(),
 		func() {
-			logDir := filepath.Dir(GetLogFilePath())
-			cmd := exec.Command("explorer", logDir)
-			err := cmd.Run()
-			if err != nil {
-				dialog.ShowError(fmt.Errorf("Failed to open log directory: %v", err), window)
-			}
+			// Open log viewer window
+			ShowLogViewerWindow(window)
 		},
 	)
 
-	okBtn := widget.NewButtonWithIcon(locales.Translate("common.button.ok"), theme.ConfirmIcon(), nil)
-	buttons := container.NewHBox(layout.NewSpacer(), openLogsBtn, okBtn)
+	// OK button with high importance
+	var dlg *dialog.CustomDialog
+	okBtn := widget.NewButton(
+		locales.Translate("common.button.ok"),
+		func() {
+			dlg.Hide()
+		},
+	)
+	okBtn.Importance = widget.HighImportance
 
-	// Create content container
+	// Create content with properly aligned buttons
 	content := container.NewVBox(
 		messageLabel,
-		buttons,
+		container.NewHBox(layout.NewSpacer(), openLogsBtn),
+		container.NewHBox(layout.NewSpacer(), okBtn, layout.NewSpacer()),
 	)
 
-	// Create and return dialog
-	return dialog.NewCustom(header, "", content, window)
+	// Create and show dialog without default buttons
+	dlg = dialog.NewCustomWithoutButtons(header, content, window)
+	dlg.Resize(fyne.NewSize(400, 200))
+	dlg.Show()
+	return dlg
 }
 
 // CreatePlaylistSelect creates a select widget for playlist selection.
@@ -459,8 +478,112 @@ func GetLogFilePath() string {
 	}
 
 	// Construct the path to the log file
-	logDir := filepath.Join(appDataDir, "MetaRekordFixer", "logs")
-	logFile := filepath.Join(logDir, "app.log")
+	logDir := filepath.Join(appDataDir, "MetaRekordFixer", "log")
+	logFile := filepath.Join(logDir, "metarekordfixer.log")
 
 	return logFile
+}
+
+// ShowLogViewerWindow creates and displays a window with the log file content.
+// The log content is displayed in a scrollable text area with monospace font.
+// The window includes a refresh button to reload the log content.
+func ShowLogViewerWindow(parent fyne.Window) {
+	// Get log file path
+	logPath := GetLogFilePath()
+
+	// Create text widget for log content
+	logText := widget.NewEntry()
+	logText.MultiLine = true
+	logText.TextStyle = fyne.TextStyle{Monospace: true}
+	logText.Wrapping = fyne.TextWrapBreak
+
+	// Make the text read-only
+	logText.Disable()
+
+	// Create scroll container for the text
+	var scrollContainerRef *container.Scroll
+	scrollContainer := container.NewScroll(logText)
+	scrollContainerRef = scrollContainer
+
+	// Create window
+	logWindow := fyne.CurrentApp().NewWindow(locales.Translate("common.title.logviewer"))
+
+	// Create refresh button
+	refreshBtn := widget.NewButtonWithIcon(
+		locales.Translate("common.button.refresh"),
+		theme.ViewRefreshIcon(),
+		func() {
+			loadLogContent(logPath, logText, scrollContainerRef)
+		},
+	)
+
+	// Create close button
+	closeBtn := widget.NewButtonWithIcon(
+		locales.Translate("common.button.close"),
+		theme.CancelIcon(),
+		func() {
+			// Close the window
+			logWindow.Close()
+		},
+	)
+
+	// Create button container
+	buttonContainer := container.NewHBox(
+		layout.NewSpacer(),
+		refreshBtn,
+		closeBtn,
+	)
+
+	// Create main content container
+	content := container.NewBorder(
+		nil,
+		buttonContainer,
+		nil,
+		nil,
+		scrollContainer,
+	)
+
+	// Set content and configure window
+	logWindow.SetContent(content)
+	logWindow.Resize(fyne.NewSize(800, 600))
+	logWindow.CenterOnScreen()
+
+	// Load log content
+	loadLogContent(logPath, logText, scrollContainerRef)
+
+	// Show window
+	logWindow.Show()
+}
+
+// loadLogContent loads the content of the log file into the text widget
+// and scrolls to the end of the content.
+func loadLogContent(logPath string, logText *widget.Entry, scrollContainer *container.Scroll) {
+	// Read log file content
+	content, err := ioutil.ReadFile(logPath)
+	if err != nil {
+		logText.SetText(fmt.Sprintf(locales.Translate("common.err.readlog"), err))
+		return
+	}
+
+	// Set text content
+	logText.SetText(string(content))
+
+	// Scroll to end (last line)
+	lineCount := strings.Count(string(content), "\n")
+	if lineCount > 0 {
+		// Set cursor to last line
+		logText.CursorRow = lineCount
+
+		// Ensure UI updates
+		logText.Refresh()
+
+		// Use a timer to ensure scrolling happens after the content is rendered
+		go func() {
+			// Wait a short time for the UI to update
+			time.Sleep(100 * time.Millisecond)
+
+			// Scroll to bottom
+			scrollContainer.ScrollToBottom()
+		}()
+	}
 }

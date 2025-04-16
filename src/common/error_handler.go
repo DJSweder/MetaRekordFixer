@@ -25,7 +25,7 @@ type ErrorContext struct {
 	Module      string
 	Operation   string
 	Error       error
-	Severity    ErrorSeverity
+	Severity    Severity
 	Recoverable bool
 	Timestamp   time.Time
 	StackTrace  string
@@ -36,7 +36,7 @@ func NewErrorContext(module, operation string) ErrorContext {
 	return ErrorContext{
 		Module:      module,
 		Operation:   operation,
-		Severity:    ErrorInfo,
+		Severity:    SeverityInfo,
 		Recoverable: true,
 		Timestamp:   time.Now(),
 	}
@@ -49,7 +49,7 @@ type ErrorHandler struct {
 }
 
 // NewErrorHandler creates a new error handler instance
-func NewErrorHandler(logger *Logger) *ErrorHandler {
+func NewErrorHandler(logger *Logger, window fyne.Window) *ErrorHandler {
 	if logger == nil {
 		// This should never happen in production
 		os.Exit(1)
@@ -57,6 +57,7 @@ func NewErrorHandler(logger *Logger) *ErrorHandler {
 
 	return &ErrorHandler{
 		logger: logger,
+		window: window,
 	}
 }
 
