@@ -353,6 +353,9 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 	// Normalize paths
 	sourcePath = common.NormalizePath(sourcePath)
 
+	// Get the last folder name from the path
+	lastFolderName := filepath.Base(sourcePath)
+
 	// Prepare a slice to hold MP3 file information
 	var mp3Files []struct {
 		FileName    string
@@ -374,8 +377,8 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 			c1.Subtitle
 		FROM djmdContent c1
 		WHERE c1.FileNameL LIKE '%.mp3'
-		AND c1.FolderPath LIKE ? || '%'
-	`, common.ToDbPath(sourcePath, true))
+		AND c1.FolderPath LIKE '%/' || ? || '/%' OR c1.FolderPath LIKE '%/' || ? || ''
+	`, lastFolderName, lastFolderName)
 
 	if err != nil {
 		m.CloseProgressDialog()
