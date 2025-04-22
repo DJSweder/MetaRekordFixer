@@ -640,9 +640,10 @@ func (m *MusicConverterModule) startConversion() {
 	// Validate source folder exists
 	if _, err := os.Stat(sourceFolder); os.IsNotExist(err) {
 		context := &common.ErrorContext{
-			Module:    m.GetName(),
-			Operation: "startConversion",
-			Severity:  common.SeverityCritical,
+			Module:      m.GetName(),
+			Operation:   "startConversion",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nosource")), context)
 		return
@@ -682,9 +683,10 @@ func (m *MusicConverterModule) startConversion() {
 			if err != nil {
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				context := &common.ErrorContext{
-					Module:    m.GetName(),
-					Operation: "startConversion",
-					Severity:  common.SeverityCritical,
+					Module:      m.GetName(),
+					Operation:   "startConversion",
+					Severity:    common.SeverityCritical,
+					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.createfolder")), context)
 				return
@@ -696,9 +698,10 @@ func (m *MusicConverterModule) startConversion() {
 		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
 			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			context := &common.ErrorContext{
-				Module:    m.GetName(),
-				Operation: "startConversion",
-				Severity:  common.SeverityCritical,
+				Module:      m.GetName(),
+				Operation:   "startConversion",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
 			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nofolder")), context)
 			return
@@ -711,9 +714,10 @@ func (m *MusicConverterModule) startConversion() {
 		// Permission denied
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		context := &common.ErrorContext{
-			Module:    m.GetName(),
-			Operation: "startConversion",
-			Severity:  common.SeverityCritical,
+			Module:      m.GetName(),
+			Operation:   "startConversion",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nowriteaccess")), context)
 		return
@@ -744,9 +748,10 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 
 		context := &common.ErrorContext{
-			Module:    m.GetName(),
-			Operation: "convertFiles",
-			Severity:  common.SeverityCritical,
+			Module:      m.GetName(),
+			Operation:   "convertFiles",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nosourcefiles")), context)
 		return
@@ -893,9 +898,10 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 			} else {
 				// Handle regular conversion error
 				context := &common.ErrorContext{
-					Module:    m.GetName(),
-					Operation: "convertFiles",
-					Severity:  common.SeverityCritical,
+					Module:      m.GetName(),
+					Operation:   "convertFiles",
+					Severity:    common.SeverityCritical,
+					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.duringconv")), context)
 				failedFiles = append(failedFiles, file)

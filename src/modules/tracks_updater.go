@@ -3,6 +3,7 @@ package modules
 import (
 	"MetaRekordFixer/common"
 	"MetaRekordFixer/locales"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -103,7 +104,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -116,7 +117,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -130,7 +131,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.playlistload")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.playlistload")), context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}

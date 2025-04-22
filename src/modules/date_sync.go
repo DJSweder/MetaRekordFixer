@@ -3,6 +3,7 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -676,7 +677,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 // setCustomDates sets custom dates for tracks in selected folders
 func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
 	if len(customDateFoldersEntry) == 0 {
-		return 0, fmt.Errorf(locales.Translate("datesync.err.nofolders"))
+		return 0, errors.New(locales.Translate("datesync.err.nofolders"))
 	}
 
 	// Build WHERE clause for selected folders
@@ -751,7 +752,7 @@ func (m *DateSyncModule) standardUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
 		return
 	}
 
@@ -789,7 +790,7 @@ func (m *DateSyncModule) standardUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
 		return
 	}
 	defer m.dbMgr.Finalize()
@@ -858,7 +859,7 @@ func (m *DateSyncModule) customUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nodbpath")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
 		return
 	}
 
@@ -896,7 +897,7 @@ func (m *DateSyncModule) customUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
 		return
 	}
 	defer m.dbMgr.Finalize()
@@ -927,7 +928,7 @@ func (m *DateSyncModule) customUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.invaliddate")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.invaliddate")), context)
 		return
 	}
 

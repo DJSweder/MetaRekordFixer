@@ -44,8 +44,8 @@ func NewErrorContext(module, operation string) ErrorContext {
 
 // ErrorHandler handles application errors and logging
 type ErrorHandler struct {
-	logger    *Logger
-	window    fyne.Window
+	logger *Logger
+	window fyne.Window
 }
 
 // NewErrorHandler creates a new error handler instance
@@ -73,32 +73,32 @@ func (h *ErrorHandler) GetLogger() *Logger {
 
 // ShowError displays an error dialog and logs the error
 func (h *ErrorHandler) ShowError(err error) {
-    if err == nil {
-        return
-    }
+	if err == nil {
+		return
+	}
 
-    // Log error without context
-    h.logger.Error("%s", err.Error())
+	// Log error without context
+	h.logger.Error("%s", err.Error())
 
-    if h.window != nil {
-        context := NewErrorContext("", "")
-        context.Error = err
-        ShowStandardError(h.window, err, &context)
-    }
+	if h.window != nil {
+		context := NewErrorContext("", "")
+		context.Error = err
+		ShowStandardError(h.window, err, &context)
+	}
 }
 
 // ShowErrorWithContext displays an error dialog with context and logs the error
 func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
-    if context.Error == nil {
-        return
-    }
+	if context.Error == nil {
+		return
+	}
 
-    // Log error with context
-    h.logger.Error("Module: %s, Operation: %s - %s", context.Module, context.Operation, context.Error.Error())
+	// Log error with context
+	h.logger.Error("Module: %s, Operation: %s - %s", context.Module, context.Operation, context.Error.Error())
 
-    if h.window != nil {
-        ShowStandardError(h.window, context.Error, &context)
-    }
+	if h.window != nil {
+		ShowStandardError(h.window, context.Error, &context)
+	}
 }
 
 // FormatError creates a standardized error message
@@ -129,9 +129,4 @@ func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {
 	if h.window != nil {
 		ShowStandardError(h.window, err, context)
 	}
-}
-
-// Deprecated: Use ShowStandardError instead
-func (h *ErrorHandler) showErrorDialog(context ErrorContext) {
-	ShowStandardError(h.window, context.Error, &context)
 }

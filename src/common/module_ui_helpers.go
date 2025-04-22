@@ -507,7 +507,7 @@ func ShowLogViewerWindow(parent fyne.Window) {
 	scrollContainerRef = scrollContainer
 
 	// Create window
-	logWindow := fyne.CurrentApp().NewWindow(locales.Translate("common.title.logviewer"))
+	logWindow := fyne.CurrentApp().NewWindow(locales.Translate("common.logviewer.header"))
 
 	// Create refresh button
 	refreshBtn := widget.NewButtonWithIcon(

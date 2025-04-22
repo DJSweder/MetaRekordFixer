@@ -2,7 +2,9 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -186,46 +188,15 @@ func (m *MetadataSyncModule) initializeUI() {
 
 	// Initialize sync button
 	m.submitBtn = common.CreateSubmitButton(locales.Translate("metsync.button.sync"), func() {
-		go func() {
-			if err := m.Start(); err != nil {
-				context := &common.ErrorContext{
-					Module:      m.GetConfigName(),
-					Operation:   "Metadata Sync",
-					Severity:    common.SeverityWarning,
-					Recoverable: true,
-				}
-				m.ErrorHandler.ShowStandardError(err, context)
-			} else {
-				common.UpdateButtonToCompleted(m.submitBtn)
-			}
-		}()
+		m.ClearStatusMessages()
+		go m.Start()
 	})
-}
-
-// GetStatusMessagesContainer returns the status messages container.
-func (m *MetadataSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-// AddInfoMessage adds an information message to the status messages container.
-func (m *MetadataSyncModule) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-// AddErrorMessage adds an error message to the status messages container.
-func (m *MetadataSyncModule) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-// ClearStatusMessages clears all status messages.
-func (m *MetadataSyncModule) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
 }
 
 // Start initiates the metadata synchronization process.
 // It validates the input, clears previous status messages,
 // and executes the synchronization.
-func (m *MetadataSyncModule) Start() error {
+func (m *MetadataSyncModule) Start() {
 	// Disable the button during processing
 	m.submitBtn.Disable()
 	defer func() {
@@ -236,13 +207,70 @@ func (m *MetadataSyncModule) Start() error {
 	// Save configuration before starting
 	m.SaveConfig()
 
-	// Clear previous status messages
-	m.ClearStatusMessages()
-
-	// Validate source folder
+	// Validate filled source folder entryField
 	if m.sourceFolderEntry.Text == "" {
-		m.AddErrorMessage(locales.Translate("metsync.err.nosource"))
-		return fmt.Errorf("source folder not selected")
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "StartSync",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("metsync.err.nofolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	// Validate source folder exists
+	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "StartSync",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	// Validate source folder contains MP3 files
+	mp3Files, err := m.findMP3Files(sourcePath)
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Find MP3 Files",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	if len(mp3Files) == 0 {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Validate MP3 Files Exist",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nofiles")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	// Validate database path is set
+	if m.dbMgr.GetDatabasePath() == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Validate Database Path",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
 	}
 
 	// Show progress dialog with cancel support
@@ -252,31 +280,35 @@ func (m *MetadataSyncModule) Start() error {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				m.CloseProgressDialog()
 				context := &common.ErrorContext{
-					Module:      m.GetConfigName(),
+					Module:      m.GetName(),
 					Operation:   "Metadata Sync",
 					Severity:    common.SeverityCritical,
 					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
+				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			}
 		}()
 
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
-
 		// Create database backup
-		m.UpdateProgressStatus(0.1, fmt.Sprintf(locales.Translate("common.db.backupcreate")))
+		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 		if err := m.dbMgr.BackupDatabase(); err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), &common.ErrorContext{
-				Module:      m.GetConfigName(),
+			context := &common.ErrorContext{
+				Module:      m.GetName(),
 				Operation:   "Database Backup",
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
-			})
+			}
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
+
+		// Add initial status message
+		m.AddInfoMessage(locales.Translate("common.status.start"))
 		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 		// Check if cancelled
@@ -287,15 +319,17 @@ func (m *MetadataSyncModule) Start() error {
 		}
 
 		// Connect to database
-		m.UpdateProgressStatus(0.2, fmt.Sprintf(locales.Translate("common.db.conn")))
+		m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
 		if err := m.dbMgr.Connect(); err != nil {
 			m.CloseProgressDialog()
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbconn"), err), &common.ErrorContext{
-				Module:      m.GetConfigName(),
+			context := &common.ErrorContext{
+				Module:      m.GetName(),
 				Operation:   "Database Connection",
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
-			})
+			}
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
 		defer m.dbMgr.Finalize()
@@ -307,11 +341,59 @@ func (m *MetadataSyncModule) Start() error {
 			return
 		}
 
-		// Normalize paths
-		sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
+		// Process metadata synchronization
+		m.processMetadataSync(sourcePath)
+	}()
+}
 
-		// Prepare a slice to hold MP3 file information
-		var mp3Files []struct {
+// processMetadataSync handles the actual metadata synchronization process.
+// It reads MP3 files from the database, updates corresponding FLAC files,
+// and manages the progress dialog.
+func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
+	// Normalize paths
+	sourcePath = common.NormalizePath(sourcePath)
+
+	// Prepare a slice to hold MP3 file information
+	var mp3Files []struct {
+		FileName    string
+		AlbumID     common.NullString
+		ArtistID    common.NullString
+		OrgArtistID common.NullString
+		ReleaseDate common.NullString
+		Subtitle    common.NullString
+	}
+
+	// Query to get MP3 files from database
+	rows, err := m.dbMgr.Query(`
+		SELECT 
+			c1.FileNameL,
+			c1.AlbumID,
+			c1.ArtistID,
+			c1.OrgArtistID,
+			c1.ReleaseDate,
+			c1.Subtitle
+		FROM djmdContent c1
+		WHERE c1.FileNameL LIKE '%.mp3'
+		AND c1.FolderPath LIKE ? || '%'
+	`, common.ToDbPath(sourcePath, true))
+
+	if err != nil {
+		m.CloseProgressDialog()
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Database Query",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+	defer rows.Close()
+
+	// Read all MP3 records from database
+	for rows.Next() {
+		var mp3File struct {
 			FileName    string
 			AlbumID     common.NullString
 			ArtistID    common.NullString
@@ -320,141 +402,124 @@ func (m *MetadataSyncModule) Start() error {
 			Subtitle    common.NullString
 		}
 
-		// Query to get MP3 files from database
-		rows, err := m.dbMgr.Query(`
-			SELECT 
-				c1.FileNameL,
-				c1.AlbumID,
-				c1.ArtistID,
-				c1.OrgArtistID,
-				c1.ReleaseDate,
-				c1.Subtitle
-			FROM djmdContent c1
-			WHERE c1.FileNameL LIKE '%.mp3'
-			AND c1.FolderPath LIKE ? || '%'
-		`, common.ToDbPath(sourcePath, true))
+		err := rows.Scan(
+			&mp3File.FileName,
+			&mp3File.AlbumID,
+			&mp3File.ArtistID,
+			&mp3File.OrgArtistID,
+			&mp3File.ReleaseDate,
+			&mp3File.Subtitle,
+		)
 
 		if err != nil {
-			m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
-				Module:      m.GetConfigName(),
-				Operation:   "Database Query",
-				Severity:    common.SeverityWarning,
-				Recoverable: true,
-			})
+			m.CloseProgressDialog()
+			context := &common.ErrorContext{
+				Module:      m.GetName(),
+				Operation:   "Read Database Records",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
+			}
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
-		defer rows.Close()
+		mp3Files = append(mp3Files, mp3File)
+	}
 
-		// Read all MP3 records from database
-		for rows.Next() {
-			var mp3File struct {
-				FileName    string
-				AlbumID     common.NullString
-				ArtistID    common.NullString
-				OrgArtistID common.NullString
-				ReleaseDate common.NullString
-				Subtitle    common.NullString
-			}
+	// Check if we found any MP3 files in the database
+	totalDbFiles := len(mp3Files)
+	if totalDbFiles == 0 {
+		// Add error message to status
+		m.AddErrorMessage(locales.Translate("common.err.noentryfound"))
 
-			err := rows.Scan(
-				&mp3File.FileName,
-				&mp3File.AlbumID,
-				&mp3File.ArtistID,
-				&mp3File.OrgArtistID,
-				&mp3File.ReleaseDate,
-				&mp3File.Subtitle,
-			)
+		// Update progress and complete dialog
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.noentryfound"))
+		m.CompleteProgressDialog()
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
 
-			if err != nil {
-				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
-					Module:      m.GetConfigName(),
-					Operation:   "Read Database Records",
-					Severity:    common.SeverityWarning,
-					Recoverable: true,
-				})
-				return
-			}
+	// Add status message about number of files found
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
 
-			mp3Files = append(mp3Files, mp3File)
-		}
+	// Process each MP3 file and update corresponding FLAC files
+	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
 
-		// Check if we found any MP3 files in the database
-		totalDbFiles := len(mp3Files)
-		if totalDbFiles == 0 {
-			// Add error message to status
-			m.AddErrorMessage(locales.Translate("common.err.noentryfound"))
+	// Add status message about starting the update process
+	m.AddInfoMessage(locales.Translate("common.status.updating"))
 
-			// Update progress and complete dialog
-			m.UpdateProgressStatus(1.0, locales.Translate("common.err.noentryfound"))
-			m.CompleteProgressDialog()
+	for i, mp3File := range mp3Files {
+		// Update progress
+		progress := 0.3 + (float64(i+1) / float64(totalDbFiles) * 0.7)
+		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
+
+		// Check if cancelled
+		if m.IsCancelled() {
+			m.HandleProcessCancellation("common.status.stopped", i, totalDbFiles)
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
-		// Add status message about number of files found
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
+		// Generate FLAC filename from MP3 filename
+		flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
 
-		// Process each MP3 file and update corresponding FLAC files
-		m.UpdateProgressStatus(0.3, fmt.Sprintf(locales.Translate("common.status.updating")))
+		// Update the FLAC file with the metadata from the MP3 file
+		err = m.dbMgr.Execute(`
+				UPDATE djmdContent
+				SET AlbumID = CAST(? AS INTEGER),
+					ArtistID = CAST(? AS INTEGER),
+					OrgArtistID = CAST(? AS INTEGER),
+					ReleaseDate = ?,
+					Subtitle = ?
+				WHERE FileNameL = ?
+			`,
+			mp3File.AlbumID.ValueOrNil(),
+			mp3File.ArtistID.ValueOrNil(),
+			mp3File.OrgArtistID.ValueOrNil(),
+			mp3File.ReleaseDate.ValueOrNil(),
+			mp3File.Subtitle.ValueOrNil(),
+			flacFileName,
+		)
 
-		// Add status message about starting the update process
-		m.AddInfoMessage(locales.Translate("common.status.updating"))
-
-		for i, mp3File := range mp3Files {
-			// Update progress
-			progress := 0.3 + (float64(i+1) / float64(totalDbFiles) * 0.7)
-			m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
-
-			// Check if cancelled
-			if m.IsCancelled() {
-				m.HandleProcessCancellation("common.status.stopped", i, totalDbFiles)
-				common.UpdateButtonToCompleted(m.submitBtn)
-				return
+		if err != nil {
+			m.CloseProgressDialog()
+			context := &common.ErrorContext{
+				Module:      m.GetName(),
+				Operation:   "Update FLAC Metadata",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
-
-			// Generate FLAC filename from MP3 filename
-			flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
-
-			// Update the FLAC file with the metadata from the MP3 file
-			err = m.dbMgr.Execute(`
-					UPDATE djmdContent
-					SET AlbumID = CAST(? AS INTEGER),
-						ArtistID = CAST(? AS INTEGER),
-						OrgArtistID = CAST(? AS INTEGER),
-						ReleaseDate = ?,
-						Subtitle = ?
-					WHERE FileNameL = ?
-				`,
-				mp3File.AlbumID.ValueOrNil(),
-				mp3File.ArtistID.ValueOrNil(),
-				mp3File.OrgArtistID.ValueOrNil(),
-				mp3File.ReleaseDate.ValueOrNil(),
-				mp3File.Subtitle.ValueOrNil(),
-				flacFileName,
-			)
-
-			if err != nil {
-				m.ErrorHandler.ShowStandardError(err, &common.ErrorContext{
-					Module:      m.GetConfigName(),
-					Operation:   "Update FLAC Metadata",
-					Severity:    common.SeverityWarning,
-					Recoverable: true,
-				})
-				return
-			}
-
-			// Small delay to prevent database overload
-			time.Sleep(10 * time.Millisecond)
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+			return
 		}
 
-		// Update progress to completion
-		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
+		// Small delay to prevent database overload
+		time.Sleep(10 * time.Millisecond)
+	}
 
-		// Mark the progress dialog as completed and update button
-		m.CompleteProgressDialog()
-		common.UpdateButtonToCompleted(m.submitBtn)
-	}()
+	// Update progress to completion
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
 
-	return nil
+	// Mark the progress dialog as completed and update button
+	m.CompleteProgressDialog()
+	common.UpdateButtonToCompleted(m.submitBtn)
+}
+
+func (m *MetadataSyncModule) findMP3Files(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(info.Name(), ".mp3") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
 }
