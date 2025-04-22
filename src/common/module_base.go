@@ -197,7 +197,6 @@ func (m *ModuleBase) CloseProgressDialog() {
 
 // CompleteProgressDialog marks the progress dialog as completed and changes the stop button to OK
 func (m *ModuleBase) CompleteProgressDialog() {
-	fmt.Printf("DEBUG: ModuleBase.CompleteProgressDialog() called, dialog exists=%v\n", m.ProgressDialog != nil)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
