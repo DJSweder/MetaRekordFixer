@@ -141,18 +141,28 @@ func (m *ModuleBase) SaveConfig() ModuleConfig {
 	return NewModuleConfig()
 }
 
-// ShowProgressDialog displays a progress dialog with stop button
-func (m *ModuleBase) ShowProgressDialog(title string) {
+// ShowProgressDialog displays a progress dialog with stop button and optional cancel callback
+func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 	// Reset cancellation flag
 	m.mutex.Lock()
 	m.isCancelled = false
 	m.mutex.Unlock()
 
 	// Create cancel handler function
-	cancelHandler := func() {
-		m.mutex.Lock()
-		m.isCancelled = true
-		m.mutex.Unlock()
+	var cancelHandler func()
+	if len(onCancel) > 0 && onCancel[0] != nil {
+		cancelHandler = func() {
+			m.mutex.Lock()
+			m.isCancelled = true
+			m.mutex.Unlock()
+			onCancel[0]()
+		}
+	} else {
+		cancelHandler = func() {
+			m.mutex.Lock()
+			m.isCancelled = true
+			m.mutex.Unlock()
+		}
 	}
 
 	// Create and show progress dialog
@@ -187,6 +197,7 @@ func (m *ModuleBase) CloseProgressDialog() {
 
 // CompleteProgressDialog marks the progress dialog as completed and changes the stop button to OK
 func (m *ModuleBase) CompleteProgressDialog() {
+	fmt.Printf("DEBUG: ModuleBase.CompleteProgressDialog() called, dialog exists=%v\n", m.ProgressDialog != nil)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

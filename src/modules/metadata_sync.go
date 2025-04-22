@@ -281,7 +281,7 @@ func (m *MetadataSyncModule) Start() error {
 
 		// Check if cancelled
 		if m.IsCancelled() {
-			m.HandleProcessCancellation("metsync.status.stopped", 0, 0)
+			m.HandleProcessCancellation("common.status.stopped", 0, 0)
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
@@ -302,7 +302,7 @@ func (m *MetadataSyncModule) Start() error {
 
 		// Check if cancelled
 		if m.IsCancelled() {
-			m.HandleProcessCancellation("metsync.status.stopped", 0, 0)
+			m.HandleProcessCancellation("common.status.stopped", 0, 0)
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}

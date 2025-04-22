@@ -3,6 +3,8 @@
 package modules
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -61,8 +63,14 @@ type MusicConverterModule struct {
 	// Current state
 	currentTargetFormat string
 	isConverting        bool
-	isCancelled         bool
 	metadataMap         *MetadataMap
+
+	// Current ffmpeg process
+	currentProcess *exec.Cmd
+
+	// Cancel context and function for stopping ffmpeg
+	cancelFunc context.CancelFunc
+	ctx        context.Context
 }
 
 // NewMusicConverterModule creates a new instance of MusicConverterModule
@@ -70,7 +78,6 @@ func NewMusicConverterModule(window fyne.Window, configMgr *common.ConfigManager
 	m := &MusicConverterModule{
 		ModuleBase:   common.NewModuleBase(window, configMgr, errorHandler),
 		isConverting: false,
-		isCancelled:  false,
 	}
 
 	// Initialize UI components without triggering callbacks
@@ -206,6 +213,166 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 func (m *MusicConverterModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+}
+
+// LoadConfig loads module configuration
+func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
+	m.IsLoadingConfig = true
+	defer func() { m.IsLoadingConfig = false }()
+
+	// Load source and target folder paths
+	if m.sourceFolderEntry != nil {
+		if sourceFolder := cfg.Get("source_folder", ""); sourceFolder != "" {
+			m.sourceFolderEntry.SetText(sourceFolder)
+		}
+	}
+
+	if m.targetFolderEntry != nil {
+		if targetFolder := cfg.Get("target_folder", ""); targetFolder != "" {
+			m.targetFolderEntry.SetText(targetFolder)
+		}
+	}
+
+	// Load format selections
+	if m.sourceFormatSelect != nil {
+		if sourceFormat := cfg.Get("source_format", ""); sourceFormat != "" {
+			m.sourceFormatSelect.SetSelected(sourceFormat)
+		} else {
+			m.sourceFormatSelect.SetSelected(locales.Translate("convert.srcformats.all"))
+		}
+	}
+
+	if m.targetFormatSelect != nil {
+		if targetFormat := cfg.Get("target_format", ""); targetFormat != "" {
+			m.targetFormatSelect.SetSelected(targetFormat)
+			// Aktualizujeme panel s parametry podle vybranu00e9ho formu00e1tu
+			m.updateFormatSettings(targetFormat)
+		} else {
+			m.targetFormatSelect.SetSelected("MP3")
+			// Aktualizujeme panel s parametry pro MP3
+			m.updateFormatSettings("MP3")
+		}
+	}
+
+	// Load checkboxes
+	if m.rewriteExistingCheckbox != nil {
+		m.rewriteExistingCheckbox.SetChecked(cfg.GetBool("rewrite_existing", false))
+	}
+	if m.makeTargetFolderCheckbox != nil {
+		m.makeTargetFolderCheckbox.SetChecked(cfg.GetBool("make_target_folder", false))
+	}
+
+	// Load format-specific settings
+	// MP3
+	if m.MP3BitrateSelect != nil {
+		if mp3Bitrate := cfg.Get("mp3_bitrate", ""); mp3Bitrate != "" {
+			m.MP3BitrateSelect.SetSelected(mp3Bitrate)
+		}
+	}
+
+	if m.MP3SampleRateSelect != nil {
+		if mp3SampleRate := cfg.Get("mp3_samplerate", ""); mp3SampleRate != "" {
+			m.MP3SampleRateSelect.SetSelected(mp3SampleRate)
+		}
+	}
+
+	// FLAC
+	if m.FLACCompressionSelect != nil {
+		if flacCompression := cfg.Get("flac_compression", ""); flacCompression != "" {
+			m.FLACCompressionSelect.SetSelected(flacCompression)
+		}
+	}
+
+	if m.FLACSampleRateSelect != nil {
+		if flacSampleRate := cfg.Get("flac_samplerate", ""); flacSampleRate != "" {
+			m.FLACSampleRateSelect.SetSelected(flacSampleRate)
+		}
+	}
+
+	if m.FLACBitDepthSelect != nil {
+		if flacBitDepth := cfg.Get("flac_bitdepth", ""); flacBitDepth != "" {
+			m.FLACBitDepthSelect.SetSelected(flacBitDepth)
+		}
+	}
+
+	// WAV
+	if m.WAVSampleRateSelect != nil {
+		if wavSampleRate := cfg.Get("wav_samplerate", ""); wavSampleRate != "" {
+			m.WAVSampleRateSelect.SetSelected(wavSampleRate)
+		}
+	}
+	if m.WAVBitDepthSelect != nil {
+		if wavBitDepth := cfg.Get("wav_bitdepth", ""); wavBitDepth != "" {
+			m.WAVBitDepthSelect.SetSelected(wavBitDepth)
+		}
+	}
+
+	// Ensure metadata map is loaded
+	m.metadataMap, _ = m.loadMetadataMap()
+}
+
+// SaveConfig saves the current module configuration
+func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
+	cfg := common.ModuleConfig{Extra: make(map[string]string)}
+
+	// Save source and target folder paths
+	if m.sourceFolderEntry != nil {
+		cfg.Set("source_folder", m.sourceFolderEntry.Text)
+	}
+	if m.targetFolderEntry != nil {
+		cfg.Set("target_folder", m.targetFolderEntry.Text)
+	}
+
+	// Save format selections
+	if m.sourceFormatSelect != nil {
+		cfg.Set("source_format", m.sourceFormatSelect.Selected)
+	}
+	if m.targetFormatSelect != nil {
+		cfg.Set("target_format", m.targetFormatSelect.Selected)
+	}
+
+	// Save checkboxes
+	if m.rewriteExistingCheckbox != nil {
+		cfg.SetBool("rewrite_existing", m.rewriteExistingCheckbox.Checked)
+	}
+	if m.makeTargetFolderCheckbox != nil {
+		cfg.SetBool("make_target_folder", m.makeTargetFolderCheckbox.Checked)
+	}
+
+	// Save format-specific settings
+	// MP3
+	if m.MP3BitrateSelect != nil {
+		cfg.Set("mp3_bitrate", m.MP3BitrateSelect.Selected)
+	}
+
+	if m.MP3SampleRateSelect != nil {
+		cfg.Set("mp3_samplerate", m.MP3SampleRateSelect.Selected)
+	}
+
+	// FLAC
+	if m.FLACCompressionSelect != nil {
+		cfg.Set("flac_compression", m.FLACCompressionSelect.Selected)
+	}
+
+	if m.FLACSampleRateSelect != nil {
+		cfg.Set("flac_samplerate", m.FLACSampleRateSelect.Selected)
+	}
+
+	if m.FLACBitDepthSelect != nil {
+		cfg.Set("flac_bitdepth", m.FLACBitDepthSelect.Selected)
+	}
+
+	// WAV
+	if m.WAVSampleRateSelect != nil {
+		cfg.Set("wav_samplerate", m.WAVSampleRateSelect.Selected)
+	}
+	if m.WAVBitDepthSelect != nil {
+		cfg.Set("wav_bitdepth", m.WAVBitDepthSelect.Selected)
+	}
+
+	// Store to config manager
+	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	return cfg
 }
 
 // initializeUI sets up the user interface components
@@ -373,18 +540,13 @@ func (m *MusicConverterModule) initializeUI() {
 }
 
 // onSourceFormatChanged handles changes in source format selection
-func (m *MusicConverterModule) onSourceFormatChanged(format string) {
-	// Debug log
-	m.debugLog("Source format changed to: '%s'", format)
-
+func (m *MusicConverterModule) onSourceFormatChanged(_ string) {
 	// Save configuration
 	m.SaveConfig()
 }
 
 // onTargetFormatChanged handles changes in target format selection
 func (m *MusicConverterModule) onTargetFormatChanged(format string) {
-	// Debug log
-	m.debugLog("Target format changed to: '%s'", format)
 
 	// Update format settings container
 	m.updateFormatSettings(format)
@@ -397,7 +559,7 @@ func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 func (m *MusicConverterModule) updateFormatSettings(format string) {
 	// Safety check - if containers are not initialized yet, return
 	if m.formatSettingsContainer == nil {
-		m.debugLog("WARNING: Format settings container is nil")
+
 		return
 	}
 
@@ -405,224 +567,50 @@ func (m *MusicConverterModule) updateFormatSettings(format string) {
 	m.formatSettingsContainer.Objects = []fyne.CanvasObject{}
 	m.currentTargetFormat = format
 
-	// Debug log
-	m.debugLog("Updating format settings for: '%s'", format)
-
 	// Exact string comparison for format types
 	switch format {
 	case "MP3":
 		if m.MP3SettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.MP3SettingsContainer)
-			m.debugLog("Adding MP3 settings container")
+
 		} else {
-			m.debugLog("WARNING: MP3 settings container is nil")
+
 		}
 	case "FLAC":
 		if m.FLACSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.FLACSettingsContainer)
-			m.debugLog("Adding FLAC settings container")
+
 		} else {
-			m.debugLog("WARNING: FLAC settings container is nil")
+
 		}
 	case "WAV":
 		if m.WAVSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.WAVSettingsContainer)
-			m.debugLog("Adding WAV settings container")
+
 		} else {
-			m.debugLog("WARNING: WAV settings container is nil")
+
 		}
 	default:
 		// No format selected or unsupported format
 		m.formatSettingsContainer.Add(widget.NewLabel(locales.Translate("convert.formatsel.default")))
-		m.debugLog("Using default settings container")
+
 	}
 
 	// Force refresh of the container
 	m.formatSettingsContainer.Refresh()
 }
 
-// LoadConfig loads module configuration
-func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
-	m.IsLoadingConfig = true
-	defer func() { m.IsLoadingConfig = false }()
-
-	// Load source and target folder paths
-	if m.sourceFolderEntry != nil {
-		if sourceFolder := cfg.Get("source_folder", ""); sourceFolder != "" {
-			m.sourceFolderEntry.SetText(sourceFolder)
-		}
-	}
-
-	if m.targetFolderEntry != nil {
-		if targetFolder := cfg.Get("target_folder", ""); targetFolder != "" {
-			m.targetFolderEntry.SetText(targetFolder)
-		}
-	}
-
-	// Load format selections
-	if m.sourceFormatSelect != nil {
-		if sourceFormat := cfg.Get("source_format", ""); sourceFormat != "" {
-			m.sourceFormatSelect.SetSelected(sourceFormat)
-		} else {
-			m.sourceFormatSelect.SetSelected(locales.Translate("convert.srcformats.all"))
-		}
-	}
-
-	if m.targetFormatSelect != nil {
-		if targetFormat := cfg.Get("target_format", ""); targetFormat != "" {
-			m.targetFormatSelect.SetSelected(targetFormat)
-			// Aktualizujeme panel s parametry podle vybranu00e9ho formu00e1tu
-			m.updateFormatSettings(targetFormat)
-		} else {
-			m.targetFormatSelect.SetSelected("MP3")
-			// Aktualizujeme panel s parametry pro MP3
-			m.updateFormatSettings("MP3")
-		}
-	}
-
-	// Load checkboxes
-	if m.rewriteExistingCheckbox != nil {
-		m.rewriteExistingCheckbox.SetChecked(cfg.GetBool("rewrite_existing", false))
-	}
-	if m.makeTargetFolderCheckbox != nil {
-		m.makeTargetFolderCheckbox.SetChecked(cfg.GetBool("make_target_folder", false))
-	}
-
-	// Load format-specific settings
-	// MP3
-	if m.MP3BitrateSelect != nil {
-		if mp3Bitrate := cfg.Get("mp3_bitrate", ""); mp3Bitrate != "" {
-			m.MP3BitrateSelect.SetSelected(mp3Bitrate)
-		}
-	}
-
-	if m.MP3SampleRateSelect != nil {
-		if mp3SampleRate := cfg.Get("mp3_samplerate", ""); mp3SampleRate != "" {
-			m.MP3SampleRateSelect.SetSelected(mp3SampleRate)
-		}
-	}
-
-	// FLAC
-	if m.FLACCompressionSelect != nil {
-		if flacCompression := cfg.Get("flac_compression", ""); flacCompression != "" {
-			m.FLACCompressionSelect.SetSelected(flacCompression)
-		}
-	}
-
-	if m.FLACSampleRateSelect != nil {
-		if flacSampleRate := cfg.Get("flac_samplerate", ""); flacSampleRate != "" {
-			m.FLACSampleRateSelect.SetSelected(flacSampleRate)
-		}
-	}
-
-	if m.FLACBitDepthSelect != nil {
-		if flacBitDepth := cfg.Get("flac_bitdepth", ""); flacBitDepth != "" {
-			m.FLACBitDepthSelect.SetSelected(flacBitDepth)
-		}
-	}
-
-	// WAV
-	if m.WAVSampleRateSelect != nil {
-		if wavSampleRate := cfg.Get("wav_samplerate", ""); wavSampleRate != "" {
-			m.WAVSampleRateSelect.SetSelected(wavSampleRate)
-		}
-	}
-	if m.WAVBitDepthSelect != nil {
-		if wavBitDepth := cfg.Get("wav_bitdepth", ""); wavBitDepth != "" {
-			m.WAVBitDepthSelect.SetSelected(wavBitDepth)
-		}
-	}
-
-	// Ensure metadata map is loaded
-	if m.metadataMap == nil {
-		var err error
-		m.metadataMap, err = m.loadMetadataMap()
-		if err != nil {
-			// Log the technical error
-			m.debugLog("Error loading metadata map: %v", err)
-			
-			// Add final error message to status messages
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			
-			// Show localized error without technical details
-			context := &common.ErrorContext{
-				Module:    m.GetName(),
-				Operation: "convertFiles",
-				Severity:  common.SeverityCritical,
-			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("convert.err.nomaploaded")), context)
-			return
-		}
-	}
-}
-
-// SaveConfig saves the current module configuration
-func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
-	cfg := common.ModuleConfig{Extra: make(map[string]string)}
-
-	// Save source and target folder paths
-	if m.sourceFolderEntry != nil {
-		cfg.Set("source_folder", m.sourceFolderEntry.Text)
-	}
-	if m.targetFolderEntry != nil {
-		cfg.Set("target_folder", m.targetFolderEntry.Text)
-	}
-
-	// Save format selections
-	if m.sourceFormatSelect != nil {
-		cfg.Set("source_format", m.sourceFormatSelect.Selected)
-	}
-	if m.targetFormatSelect != nil {
-		cfg.Set("target_format", m.targetFormatSelect.Selected)
-	}
-
-	// Save checkboxes
-	if m.rewriteExistingCheckbox != nil {
-		cfg.SetBool("rewrite_existing", m.rewriteExistingCheckbox.Checked)
-	}
-	if m.makeTargetFolderCheckbox != nil {
-		cfg.SetBool("make_target_folder", m.makeTargetFolderCheckbox.Checked)
-	}
-
-	// Save format-specific settings
-	// MP3
-	if m.MP3BitrateSelect != nil {
-		cfg.Set("mp3_bitrate", m.MP3BitrateSelect.Selected)
-	}
-
-	if m.MP3SampleRateSelect != nil {
-		cfg.Set("mp3_samplerate", m.MP3SampleRateSelect.Selected)
-	}
-
-	// FLAC
-	if m.FLACCompressionSelect != nil {
-		cfg.Set("flac_compression", m.FLACCompressionSelect.Selected)
-	}
-
-	if m.FLACSampleRateSelect != nil {
-		cfg.Set("flac_samplerate", m.FLACSampleRateSelect.Selected)
-	}
-
-	if m.FLACBitDepthSelect != nil {
-		cfg.Set("flac_bitdepth", m.FLACBitDepthSelect.Selected)
-	}
-
-	// WAV
-	if m.WAVSampleRateSelect != nil {
-		cfg.Set("wav_samplerate", m.WAVSampleRateSelect.Selected)
-	}
-	if m.WAVBitDepthSelect != nil {
-		cfg.Set("wav_bitdepth", m.WAVBitDepthSelect.Selected)
-	}
-
-	// Store to config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	return cfg
-}
-
 // IsCancelled returns whether the current operation has been cancelled
 func (m *MusicConverterModule) IsCancelled() bool {
-	return m.isCancelled
+	isCancelled := m.ModuleBase.IsCancelled()
+	if m.currentProcess != nil && isCancelled {
+		// Kill the ffmpeg process if it's running
+		if err := m.currentProcess.Process.Kill(); err != nil {
+			m.AddErrorMessage(fmt.Sprintf(locales.Translate("convert.err.killprocess"), err))
+		} else {
+		}
+	}
+	return isCancelled
 }
 
 // startConversion begins the conversion process
@@ -632,7 +620,6 @@ func (m *MusicConverterModule) startConversion() {
 		return
 	}
 	m.isConverting = true
-	m.isCancelled = false
 	defer func() { m.isConverting = false }()
 
 	// Disable the button during processing and set icon after completion
@@ -645,77 +632,139 @@ func (m *MusicConverterModule) startConversion() {
 	// Clear previous status messages
 	m.ClearStatusMessages()
 
+	// Validate inputs
+	sourceFolder := m.sourceFolderEntry.Text
+	targetFolder := m.targetFolderEntry.Text
+	targetFormat := m.targetFormatSelect.Selected
+
+	// Validate source folder exists
+	if _, err := os.Stat(sourceFolder); os.IsNotExist(err) {
+		context := &common.ErrorContext{
+			Module:    m.GetName(),
+			Operation: "startConversion",
+			Severity:  common.SeverityCritical,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nosource")), context)
+		return
+	}
+
+	// Get format-specific settings
+	formatSettings := make(map[string]string)
+
+	switch targetFormat {
+	case "MP3":
+		// MP3 settings
+		bitrate := m.MP3BitrateSelect.Selected
+		sampleRateSetting := m.MP3SampleRateSelect.Selected
+		formatSettings["bitrate"] = bitrate
+		formatSettings["sample_rate"] = sampleRateSetting
+	case "FLAC":
+		// FLAC settings
+		compression := m.FLACCompressionSelect.Selected
+		sampleRate := m.FLACSampleRateSelect.Selected
+		bitDepth := m.FLACBitDepthSelect.Selected
+		formatSettings["compression"] = compression
+		formatSettings["sample_rate"] = sampleRate
+		formatSettings["bit_depth"] = bitDepth
+	case "WAV":
+		// WAV settings
+		sampleRate := m.WAVSampleRateSelect.Selected
+		bitDepth := m.WAVBitDepthSelect.Selected
+		formatSettings["sample_rate"] = sampleRate
+		formatSettings["bit_depth"] = bitDepth
+	}
+
+	// Check if target folder exists, create if needed and option is selected
+	if m.makeTargetFolderCheckbox.Checked {
+		// Create target folder if it doesn't exist
+		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
+			err := os.MkdirAll(targetFolder, 0755)
+			if err != nil {
+				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+				context := &common.ErrorContext{
+					Module:    m.GetName(),
+					Operation: "startConversion",
+					Severity:  common.SeverityCritical,
+				}
+				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.createfolder")), context)
+				return
+			}
+			m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.foldercreated"), targetFolder))
+		}
+	} else {
+		// Check if target folder exists
+		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+			context := &common.ErrorContext{
+				Module:    m.GetName(),
+				Operation: "startConversion",
+				Severity:  common.SeverityCritical,
+			}
+			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nofolder")), context)
+			return
+		}
+	}
+	// Try to make test file for write permission check
+	testFile := filepath.Join(targetFolder, ".write_test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		// Permission denied
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		context := &common.ErrorContext{
+			Module:    m.GetName(),
+			Operation: "startConversion",
+			Severity:  common.SeverityCritical,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nowriteaccess")), context)
+		return
+	}
+	// Clean up test file
+	f.Close()
+	os.Remove(testFile)
+
 	// Add initial status message
-	m.AddInfoMessage(locales.Translate("common.status.start"))
+	m.AddInfoMessage(locales.Translate("convert.status.starting"))
 
 	// Log conversion parameters
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.source"), m.sourceFolderEntry.Text))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.target"), m.targetFolderEntry.Text))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.format"), m.targetFormatSelect.Selected))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.source"), sourceFolder))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.target"), targetFolder))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.format"), targetFormat))
 
 	// Perform the actual conversion
-	go m.convertFiles(m.sourceFolderEntry.Text, m.targetFolderEntry.Text, m.targetFormatSelect.Selected, map[string]string{})
+	go m.convertFiles(sourceFolder, targetFolder, targetFormat, formatSettings)
 }
 
 // convertFiles performs the actual conversion of audio files using ffmpeg
 func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
-	// Ensure metadata map is loaded
-	if m.metadataMap == nil {
-		var err error
-		m.metadataMap, err = m.loadMetadataMap()
-		if err != nil {
-			// Log the technical error
-			m.debugLog("Error loading metadata map: %v", err)
-			
-			// Add final error message to status messages
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			
-			// Show localized error without technical details
-			context := &common.ErrorContext{
-				Module:    m.GetName(),
-				Operation: "convertFiles",
-				Severity:  common.SeverityCritical,
-			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("convert.err.nomaploaded")), context)
-			return
-		}
-	}
-
 	// Find all audio files in the source folder
-	files, err := m.findAudioFiles(sourceFolder, m.sourceFormatSelect.Selected)
-	if err != nil {
-		// Log the technical error
-		m.debugLog("Error finding audio files: %v", err)
-		
-		// Add final error message to status messages
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		
-		// Show localized error without technical details
-		context := &common.ErrorContext{
-			Module:    m.GetName(),
-			Operation: "convertFiles",
-			Severity:  common.SeverityCritical,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("convert.err.nosourcefiles")), context)
-		return
-	}
+	files, _ := m.findAudioFiles(sourceFolder, m.sourceFormatSelect.Selected)
 
 	if len(files) == 0 {
 		// Add final error message to status messages
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		
+
 		context := &common.ErrorContext{
 			Module:    m.GetName(),
 			Operation: "convertFiles",
 			Severity:  common.SeverityCritical,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("convert.err.nosourcefiles")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nosourcefiles")), context)
 		return
 	}
 
-	// Show progress dialog only after all validations pass
-	m.ShowProgressDialog(locales.Translate("convert.dialog.header"))
+	// Create cancelable context for ffmpeg
+	ctx, cancel := context.WithCancel(context.Background())
+	m.ctx = ctx
+	m.cancelFunc = cancel
+	m.ShowProgressDialog(
+		locales.Translate("convert.dialog.header"),
+		func() {
+			cancel()
+			m.HandleProcessCancellation("convert.dialog.stop")
+		},
+	)
 
+	// Show progress dialog only after all validations pass
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), len(files)))
 
 	// Track conversion statistics
@@ -727,7 +776,8 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	for i, file := range files {
 		// Check if cancelled
 		if m.IsCancelled() {
-			m.AddInfoMessage(locales.Translate("convert.dialog.stop"))
+			m.HandleProcessCancellation("convert.dialog.stop", successCount, len(files))
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
@@ -737,12 +787,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		m.UpdateProgressStatus(progress, statusText)
 
 		// Get relative path from source folder
-		relPath, err := filepath.Rel(sourceFolder, file)
-		if err != nil {
-			m.AddWarningMessage(fmt.Sprintf("Error getting relative path for %s: %v", file, err))
-			failedFiles = append(failedFiles, file)
-			continue
-		}
+		relPath, _ := filepath.Rel(sourceFolder, file)
 
 		// Determine target path
 		targetPath := targetFolder
@@ -753,6 +798,12 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 
 			// Ensure target directory exists
 			if err := os.MkdirAll(targetPath, 0755); err != nil {
+				context := &common.ErrorContext{
+					Module:    m.GetName(),
+					Operation: "createTargetFolder",
+					Severity:  common.SeverityWarning,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
 				m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.createfolder"), err))
 				failedFiles = append(failedFiles, file)
 				continue
@@ -763,14 +814,20 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		relDir := filepath.Dir(relPath)
 		if relDir != "." {
 			targetPath = filepath.Join(targetPath, relDir)
+
 			// Create subdirectories in target
 			if err := os.MkdirAll(targetPath, 0755); err != nil {
-				m.AddWarningMessage(fmt.Sprintf("Error creating directory %s: %v", targetPath, err))
+				context := &common.ErrorContext{
+					Module:    m.GetName(),
+					Operation: "createSubdirectories",
+					Severity:  common.SeverityWarning,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
+				m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.createfolder"), err))
 				failedFiles = append(failedFiles, file)
 				continue
 			}
 		}
-
 		// Get filename without extension
 		fileBase := filepath.Base(file)
 		fileNameWithoutExt := strings.TrimSuffix(fileBase, filepath.Ext(fileBase))
@@ -785,10 +842,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		case "WAV":
 			targetExt = ".wav"
 		default:
-			// No format selected or unsupported format
-			m.AddWarningMessage(fmt.Sprintf("Unsupported target format: %s", targetFormat))
-			failedFiles = append(failedFiles, file)
-			continue
+			targetExt = ".mp3" // Fallback to MP3 as default
 		}
 
 		// Full target file path
@@ -796,7 +850,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 
 		// Check if target file exists and if we should skip it
 		if _, err := os.Stat(targetFile); err == nil && !m.rewriteExistingCheckbox.Checked {
-			m.debugLog(fmt.Sprintf("Skipping existing file: %s", filepath.Base(targetFile)))
+			m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.skipping"), filepath.Base(targetFile)))
 			skippedCount++
 			continue
 		}
@@ -804,40 +858,52 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		// Extract metadata from source file using ffprobe
 		metadata, err := m.extractMetadata(file)
 		if err != nil {
-			m.debugLog(fmt.Sprintf(locales.Translate("convert.err.readmeta"), err))
+			context := &common.ErrorContext{
+				Module:    m.GetName(),
+				Operation: "extractMetadata",
+				Severity:  common.SeverityWarning,
+			}
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.readmeta"), err))
 			failedFiles = append(failedFiles, file)
 			continue
-		}
-
-		// Add debug info for metadata
-		m.debugLog("Input #0, %s, from '%s':", filepath.Ext(file)[1:], file)
-		m.debugLog("Metadata:")
-		for key, value := range metadata {
-			m.debugLog("  %s\t: %s", key, value)
 		}
 
 		// Convert file with ffmpeg
 		bitDepth, sampleRate, err := m.getAudioProperties(file)
 		if err != nil {
-			m.debugLog(fmt.Sprintf(locales.Translate("convert.err.readprops"), err))
+			context := &common.ErrorContext{
+				Module:    m.GetName(),
+				Operation: "getAudioProperties",
+				Severity:  common.SeverityWarning,
+			}
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.readprops"), err))
 			failedFiles = append(failedFiles, file)
 			continue
 		}
 
 		err = m.convertFile(file, targetFile, targetFormat, formatSettings, metadata, bitDepth, sampleRate, m.metadataMap)
 		if err != nil {
-			context := &common.ErrorContext{
-				Module:    m.GetName(),
-				Operation: "convertFiles",
-				Severity:  common.SeverityCritical,
+			// Check if the error is due to cancellation
+			if m.IsCancelled() {
+				m.HandleProcessCancellation("convert.dialog.stop", successCount, len(files))
+				common.UpdateButtonToCompleted(m.submitBtn)
+				return
+			} else {
+				// Handle regular conversion error
+				context := &common.ErrorContext{
+					Module:    m.GetName(),
+					Operation: "convertFiles",
+					Severity:  common.SeverityCritical,
+				}
+				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.duringconv")), context)
+				failedFiles = append(failedFiles, file)
+				continue
 			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("convert.err.duringconv")), context)
-			failedFiles = append(failedFiles, file)
-			continue
 		}
 
 		successCount++
-		m.debugLog(fmt.Sprintf(locales.Translate("convert.status.success"), filepath.Base(file)))
 	}
 
 	// Complete the process
@@ -853,12 +919,12 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	if len(failedFiles) > 0 {
 		m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.status.failed"), len(failedFiles)))
 		for _, file := range failedFiles {
-			m.debugLog("  - %s", filepath.Base(file))
+			m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.faileditems"), filepath.Base(file)))
 		}
 	}
-
 	// Mark progress dialog as completed
 	m.CompleteProgressDialog()
+	common.UpdateButtonToCompleted(m.submitBtn)
 }
 
 // convertFile converts a single audio file using ffmpeg
@@ -1090,23 +1156,33 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	// Add output file path
 	args = append(args, targetPath)
 
-	// Log the full command for debugging
-	cmdStr := "tools/ffmpeg.exe "
-	for _, arg := range args {
-		cmdStr += fmt.Sprintf("%s ", arg)
+	// Create ffmpeg command
+	cmd := exec.CommandContext(m.ctx, "tools/ffmpeg.exe", args...)
+	m.currentProcess = cmd
+
+	// Run the command and wait for it to finish
+	err := cmd.Run()
+
+	// Clear process reference
+	m.currentProcess = nil
+
+	// Check if process was cancelled
+	if m.IsCancelled() {
+		// Remove partial output
+		os.Remove(targetPath)
+
+		// Log the cancellation
+		m.Logger.Info("Module: %s, Operation: %s - %s", m.GetName(), "convertFile", locales.Translate("common.log.cancelled"))
+
+		return errors.New(locales.Translate("common.log.cancelled"))
 	}
-	m.debugLog("DEBUG: Executing command: %s", cmdStr)
 
-	// Execute ffmpeg directly
-	cmd := exec.Command("tools/ffmpeg.exe", args...)
+	// Check for other errors
+	if err != nil {
+		// Log the ffmpeg error
+		m.Logger.Error("Module: %s, Operation: %s - %s", m.GetName(), "convertFile", fmt.Sprintf(locales.Translate("convert.err.ffmpeg"), err))
 
-	// Capture stderr for error reporting
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	// Run the command
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%v: %s", err, stderr.String())
+		return fmt.Errorf(locales.Translate("convert.err.ffmpeg"), err)
 	}
 
 	return nil
@@ -1124,21 +1200,14 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 	// Load the CSV content from the embedded file
 	csvContent := assets.ResourceMetadataMapCSV.Content()
 
-	// Debug output
-	m.debugLog("DEBUG: Loading metadata map CSV, size: %d bytes", len(csvContent))
-
 	// Create a new CSV reader from the content
 	reader := csv.NewReader(bytes.NewReader(csvContent))
 
 	// Read the header row
 	header, err := reader.Read()
 	if err != nil {
-		m.debugLog("DEBUG: Error reading CSV header: %v", err)
-		return nil, fmt.Errorf(locales.Translate("convert.err.readmap"))
+		return nil, errors.New(locales.Translate("convert.err.readmap"))
 	}
-
-	// Debug output
-	m.debugLog("DEBUG: CSV header: %v", header)
 
 	// Initialize maps
 	result := &MetadataMap{
@@ -1162,11 +1231,8 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 		}
 	}
 
-	// Debug output
-	m.debugLog("DEBUG: Column indices - MP3: %d, FLAC: %d, WAV: %d", mpIndex, flacIndex, wavIndex)
-
 	if mpIndex == -1 || flacIndex == -1 || wavIndex == -1 {
-		return nil, fmt.Errorf(locales.Translate("convert.err.missingcolumns"))
+		return nil, errors.New(locales.Translate("convert.err.missingcolumns"))
 	}
 
 	// Read and process each row
@@ -1176,8 +1242,7 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 			break
 		}
 		if err != nil {
-			m.debugLog("DEBUG: Error reading CSV row: %v", err)
-			return nil, fmt.Errorf(locales.Translate("convert.err.readmaprow"))
+			return nil, errors.New(locales.Translate("convert.err.readmaprow"))
 		}
 
 		// Skip empty rows
@@ -1192,10 +1257,6 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 		result.InternalToWAV[internalName] = record[wavIndex]
 	}
 
-	// Debug output
-	m.debugLog("DEBUG: Loaded metadata mappings - MP3: %d, FLAC: %d, WAV: %d",
-		len(result.InternalToMP3), len(result.InternalToFLAC), len(result.InternalToWAV))
-
 	return result, nil
 }
 
@@ -1204,11 +1265,8 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 func (m *MusicConverterModule) findAudioFiles(dir string, sourceFormat string) ([]string, error) {
 	var files []string
 
-	m.debugLog("Finding audio files in '%s', filter: '%s'", dir, sourceFormat)
-
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			m.debugLog("Error accessing path %s: %v", path, err)
 			return fmt.Errorf(locales.Translate("convert.err.accesspath"), path)
 		}
 
@@ -1248,11 +1306,8 @@ func (m *MusicConverterModule) findAudioFiles(dir string, sourceFormat string) (
 	})
 
 	if err != nil {
-		m.debugLog("Error walking directory %s: %v", dir, err)
 		return nil, fmt.Errorf(locales.Translate("convert.err.scandir"), dir)
 	}
-
-	m.debugLog("Found %d audio files matching format '%s'", len(files), sourceFormat)
 
 	return files, nil
 }
@@ -1261,13 +1316,10 @@ func (m *MusicConverterModule) findAudioFiles(dir string, sourceFormat string) (
 func (m *MusicConverterModule) extractMetadata(filePath string) (map[string]string, error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_format", filePath)
 
-	m.debugLog("Executing ffprobe: tools/ffprobe.exe -v quiet -print_format json -show_format \"%s\"", filePath)
-
 	// Get command output
 	output, err := cmd.Output()
 	if err != nil {
-		m.debugLog("ffprobe error: %v", err)
-		return nil, fmt.Errorf(locales.Translate("convert.err.readmeta"))
+		return nil, fmt.Errorf(locales.Translate("convert.err.readmeta")+": %s - %v", filepath.Base(filePath), err)
 	}
 
 	// Parse JSON output
@@ -1278,13 +1330,7 @@ func (m *MusicConverterModule) extractMetadata(filePath string) (map[string]stri
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		m.debugLog("JSON parse error: %v", err)
-		return nil, fmt.Errorf(locales.Translate("convert.err.parsemeta"))
-	}
-
-	m.debugLog("Extracted metadata:")
-	for k, v := range result.Format.Tags {
-		m.debugLog("  %s: %s", k, v)
+		return nil, errors.New(locales.Translate("convert.err.parsemeta"))
 	}
 
 	return result.Format.Tags, nil
@@ -1294,13 +1340,10 @@ func (m *MusicConverterModule) extractMetadata(filePath string) (map[string]stri
 func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth string, sampleRate string, err error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_streams", filePath)
 
-	m.debugLog("Executing ffprobe for audio properties: tools/ffprobe.exe -v quiet -print_format json -show_streams \"%s\"", filePath)
-
 	// Get command output
 	output, err := cmd.Output()
 	if err != nil {
-		m.debugLog("ffprobe error when getting audio properties: %v", err)
-		return bitDepth, sampleRate, fmt.Errorf(locales.Translate("convert.err.readprops"))
+		return "", "", fmt.Errorf(locales.Translate("convert.err.readprops")+": %s - %v", filepath.Base(filePath), err)
 	}
 
 	// Parse JSON output
@@ -1315,8 +1358,7 @@ func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth str
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		m.debugLog("JSON parse error for audio properties: %v", err)
-		return bitDepth, sampleRate, fmt.Errorf(locales.Translate("convert.err.parseprops"))
+		return "", "", errors.New(locales.Translate("convert.err.parseprops"))
 	}
 
 	// Find the audio stream
@@ -1346,13 +1388,11 @@ func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth str
 				}
 			}
 
-			m.debugLog("Detected audio properties - Bit Depth: %s, Sample Rate: %s", bitDepth, sampleRate)
 			return bitDepth, sampleRate, nil
 		}
 	}
 
-	m.debugLog("No audio stream found in the file")
-	return bitDepth, sampleRate, fmt.Errorf(locales.Translate("convert.err.noaudio"))
+	return bitDepth, sampleRate, errors.New(locales.Translate("convert.err.noaudio"))
 }
 
 // SetDefaultConfig sets the default configuration values for the module
@@ -1387,9 +1427,4 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	cfg.Set("wav_bitdepth", locales.Translate("convert.configpar.copypar"))
 
 	return cfg
-}
-
-// debugLog prints debug messages using the module's logger
-func (m *MusicConverterModule) debugLog(format string, args ...interface{}) {
-	m.Logger.Debug(format, args...)
 }

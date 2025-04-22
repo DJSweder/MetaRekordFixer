@@ -95,6 +95,7 @@ func (pd *ProgressDialog) MarkCompleted() {
 	pd.isCompleted = true
 	pd.stopButton.SetText(locales.Translate("common.button.ok"))
 	pd.stopButton.SetIcon(theme.ConfirmIcon())
+
 }
 
 // ShowError displays an error message and hides the progress dialog
