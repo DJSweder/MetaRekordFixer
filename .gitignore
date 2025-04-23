@@ -1,11 +1,8 @@
-console.txt
 .vs/
 .vscode/
-.gitignore
 .winres/
 .dccache
 .deepsource.toml
 dist/
-src/linter.bat
 .windsurfrules
 *.bat
