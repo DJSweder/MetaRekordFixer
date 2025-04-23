@@ -1,9 +1,0 @@
-.vs/
-.vscode/
-.winres/
-.dccache
-.deepsource.toml
-dist/
-.windsurfrules
-*.bat
-.gitattributes
