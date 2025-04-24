@@ -67,6 +67,7 @@
     "common.err.nofiles": "",
     "common.err.nofolder": "",
     "common.err.nosrcfolder": "",
+    "common.err.nosrcfolderpath": "",
     "common.err.playlistload": "Fehler beim Laden der Wiedergabeliste: %v",
     "common.err.statusfinal": "",
     "common.log.cancelled": "",
