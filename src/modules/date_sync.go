@@ -406,26 +406,6 @@ func (m *DateSyncModule) initializeUI() {
 	m.addCustomDateFolderEntry()
 }
 
-// GetStatusMessagesContainer returns the status messages container for this module
-func (m *DateSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-// AddInfoMessage adds an informational message to the status container
-func (m *DateSyncModule) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-// AddErrorMessage adds an error message to the status container
-func (m *DateSyncModule) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-// ClearStatusMessages clears all status messages
-func (m *DateSyncModule) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
-}
-
 // addCustomDateFolderEntry adds a new entry for custom date folder selection
 func (m *DateSyncModule) addCustomDateFolderEntry() {
 	if len(m.customDateFoldersEntry) >= 6 {
