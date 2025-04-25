@@ -48,7 +48,7 @@ func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, 
 	}
 
 	// Set database requirements
-	m.SetDatabaseRequirements(true, false)
+	// m.SetDatabaseRequirements(true, false)
 
 	// Initialize UI components first
 	m.initializeUI()
