@@ -117,7 +117,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -247,26 +247,6 @@ func (m *TracksUpdater) initializeUI() {
 	)
 }
 
-// GetStatusMessagesContainer returns the status messages container.
-func (m *TracksUpdater) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-// AddInfoMessage adds an information message to the status messages container.
-func (m *TracksUpdater) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-// AddErrorMessage adds an error message to the status messages container.
-func (m *TracksUpdater) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-// ClearStatusMessages clears all status messages.
-func (m *TracksUpdater) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
-}
-
 // getFileType is used to translate the file type according to its extension into an identifier that is stored in updated records in djmdContent in the database
 func getFileType(ext string) int {
 	switch strings.ToLower(ext) {
@@ -330,225 +310,305 @@ func (m *TracksUpdater) loadPlaylists() error {
 }
 
 func (m *TracksUpdater) Start() {
-	// Save the configuration before starting the process so that the most recent playlist and folder path are used.
+	// Save the configuration before starting the process
 	m.SaveConfig()
 
-	// Clear any previous status messages.
+	// Clear any previous status messages
 	m.ClearStatusMessages()
 
-	// Get the selected playlist.
+	// Validate playlist selection
 	if m.playlistSelect.Selected == "" {
-		m.AddErrorMessage(locales.Translate("updater.err.noplaylist"))
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
 		return
 	}
 
-	// Get the folder path.
-	folderEntry := m.folderEntry.Text
-	if folderEntry == "" {
-		m.AddErrorMessage(locales.Translate("updater.err.nofolder"))
+	// Validate folder path
+	if m.folderEntry.Text == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.nofolder")), context)
 		return
 	}
 
-	// Show the progress dialog.
+	// Show the progress dialog
 	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
 
-	// Start processing in a goroutine.
-	go func() {
-		// Track the number of updated files.
-		updateCount := 0
+	// Start processing in a goroutine
+	go m.processUpdate()
+}
 
-		defer func() {
-			// Catch any panics or errors and show an error message.
-			if r := recover(); r != nil {
-				context := &common.ErrorContext{
-					Module:      m.GetConfigName(),
-					Operation:   "Update Process",
-					Severity:    common.SeverityCritical,
-					Recoverable: false,
-				}
-				m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
+func (m *TracksUpdater) processUpdate() {
+	// Track the number of updated files.
+	updateCount := 0
+
+	defer func() {
+		// Catch any panics or errors and show an error message.
+		if r := recover(); r != nil {
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Update Process",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
-		}()
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
-		// Backup the database.
-		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
-		err := m.dbMgr.BackupDatabase()
-		if err != nil {
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
+			m.AddErrorMessage(locales.Translate("common.status.failed"))
 			m.CloseProgressDialog()
-			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.backupdb"), err))
-			return
 		}
+	}()
 
-		// Inform about the successful backup.
-		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
+	// Add initial status message
+	m.AddInfoMessage(locales.Translate("common.status.start"))
 
-		// Check if the operation was cancelled.
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
+	// Backup the database.
+	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.CloseProgressDialog()
+		return
+	}
 
-		// Connect to the database.
-		m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
-		err = m.dbMgr.Connect()
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.connectdb"), err))
-			return
-		}
+	// Inform about the successful backup.
+	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
-		// Get the selected playlist.
-		m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))
-		selectedPlaylist := ""
-		for _, p := range m.playlists {
-			if p.Path == m.playlistSelect.Selected {
-				selectedPlaylist = p.ID
-				break
-			}
-		}
-		if selectedPlaylist == "" {
-			m.CloseProgressDialog()
-			m.ModuleBase.AddErrorMessage(locales.Translate("updater.err.noplaylist"))
-			return
-		}
+	// Check if the operation was cancelled.
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
 
-		// Check if the operation was cancelled.
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
+	// Connect to the database.
+	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
+	if err := m.dbMgr.Connect(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Connection",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.CloseProgressDialog()
+		return
+	}
+	defer m.dbMgr.Finalize()
 
-		// Get the tracks from the playlist.
-		m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettracks"))
-		rows, err := m.dbMgr.Query(`
+	// Get the selected playlist.
+	m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))
+	selectedPlaylist := ""
+	for _, p := range m.playlists {
+		if p.Path == m.playlistSelect.Selected {
+			selectedPlaylist = p.ID
+			break
+		}
+	}
+	if selectedPlaylist == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Playlist Selection",
+			Severity:    common.SeverityWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
+		m.CloseProgressDialog()
+		return
+	}
+
+	// Check if the operation was cancelled.
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Get the tracks from the playlist.
+	m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettracks"))
+	rows, err := m.dbMgr.Query(`
 		SELECT c.ID, c.FileNameL
 		FROM djmdContent c
 		JOIN djmdSongPlaylist sp ON c.ID = sp.ContentID
 		WHERE sp.PlaylistID = ?
 	`, selectedPlaylist)
-		if err != nil {
-			m.CloseProgressDialog()
-			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.dbquery"), err))
-			return
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Get Playlist Tracks",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
-		defer rows.Close()
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbquery"), err), context)
+		m.CloseProgressDialog()
+		return
+	}
+	defer rows.Close()
 
-		// Check if the operation was cancelled.
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("updater.status.stopped", updateCount, len([]int{}))
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
-		}
-
-		var tracks []struct {
+	var tracks []struct {
+		ID       string
+		FileName string
+	}
+	for rows.Next() {
+		var t struct {
 			ID       string
 			FileName string
 		}
-		for rows.Next() {
-			var t struct {
-				ID       string
-				FileName string
+		if err := rows.Scan(&t.ID, &t.FileName); err != nil {
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Database Scan",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
-			if err := rows.Scan(&t.ID, &t.FileName); err != nil {
-				m.CloseProgressDialog()
-				m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("updater.err.dbscan"), err))
-				return
-			}
-			tracks = append(tracks, t)
-		}
-
-		// Report playlist track count
-		m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
-		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("updater.status.stopped", updateCount, len(tracks))
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
-		}
-
-		// Get all files in target folder
-		m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.scanfolder"))
-		files, err := filepath.Glob(filepath.Join(m.folderEntry.Text, "*.*"))
-		if err != nil {
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("updater.err.dbscan"), err), context)
 			m.CloseProgressDialog()
-			m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("updater.err.glob"), err))
 			return
 		}
+		tracks = append(tracks, t)
+	}
 
-		// Inform about number of files in folder
-		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.countinfolder"), len(files)))
+	// Report playlist track count
+	m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
 
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("updater.status.stopped", updateCount, len(tracks))
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
+	// Check if operation was cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Get all files in target folder
+	m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.scanfolder"))
+	files, err := filepath.Glob(filepath.Join(m.folderEntry.Text, "*.*"))
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Scan Folder",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("updater.err.glob"), err), context)
+		m.CloseProgressDialog()
+		return
+	}
+
+	// Inform about number of files in folder
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.countinfolder"), len(files)))
+
+	// Check if operation was cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Process file matching and updates
+	matchingFiles := 0
+	nonMatchingFiles := 0
+	mismatchedFiles := make([]string, 0)
+	updateTracks := make([]struct {
+		TrackID     string
+		NewPath     string
+		NewFileName string
+		NewFileType int
+	}, 0)
+
+	// Match files and prepare updates
+	m.UpdateProgressStatus(0.7, locales.Translate("updater.status.matching"))
+	for _, track := range tracks {
+		baseName := strings.TrimSuffix(track.FileName, filepath.Ext(track.FileName))
+		newFiles, err := filepath.Glob(filepath.Join(m.folderEntry.Text, baseName+".*"))
+		if err != nil || len(newFiles) == 0 {
+			nonMatchingFiles++
+			mismatchedFiles = append(mismatchedFiles, track.FileName)
+			continue
 		}
 
-		// Count matching files and non-matching files
-		m.UpdateProgressStatus(0.7, locales.Translate("updater.status.matching"))
-		matchingFiles := 0
-		nonMatchingFiles := 0
-		mismatchedFiles := make([]string, 0) // Add slice for mismatched filenames
-		updateTracks := make([]struct {
+		newPath := newFiles[0]
+		newExt := strings.ToLower(filepath.Ext(newPath))
+		newFileType := getFileType(newExt)
+		if newFileType == 0 {
+			nonMatchingFiles++
+			mismatchedFiles = append(mismatchedFiles, track.FileName)
+			continue
+		}
+
+		matchingFiles++
+		updateTracks = append(updateTracks, struct {
 			TrackID     string
 			NewPath     string
 			NewFileName string
 			NewFileType int
-		}, 0)
+		}{
+			TrackID:     track.ID,
+			NewPath:     common.ToDbPath(newPath, false),
+			NewFileName: filepath.Base(newPath),
+			NewFileType: newFileType,
+		})
+	}
 
-		for _, track := range tracks {
-			baseName := strings.TrimSuffix(track.FileName, filepath.Ext(track.FileName))
-			newFiles, err := filepath.Glob(filepath.Join(m.folderEntry.Text, baseName+".*"))
-			if err != nil || len(newFiles) == 0 {
-				nonMatchingFiles++
-				mismatchedFiles = append(mismatchedFiles, track.FileName) // Store mismatched filename
-				continue
+	// Report non-matching files
+	if nonMatchingFiles > 0 {
+		m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfilenamescount"), nonMatchingFiles))
+
+		// Display list of non-matching files as warning
+		fileListStr := ""
+		if len(mismatchedFiles) > 5 {
+			fileListStr = fmt.Sprintf("%s %s",
+				strings.Join(mismatchedFiles[:5], ", "),
+				fmt.Sprintf(locales.Translate("updater.tracks.morefiles"), len(mismatchedFiles)-5))
+		} else {
+			fileListStr = strings.Join(mismatchedFiles, ", ")
+		}
+		m.AddWarningMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfileslist"), fileListStr))
+	}
+
+	// Check if operation was cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("updater.status.stopped", updateCount, len(updateTracks))
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Update tracks in database
+	m.UpdateProgressStatus(0.8, locales.Translate("updater.tracks.starting"))
+	for _, updateTrack := range updateTracks {
+		if err := m.dbMgr.Execute(`
+			UPDATE djmdContent
+			SET 
+				FolderPath = ?,
+				FileNameL = ?,
+				FileType = ?
+			WHERE ID = ?
+		`, updateTrack.NewPath, updateTrack.NewFileName, updateTrack.NewFileType, updateTrack.TrackID); err != nil {
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Update Track",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
-
-			newPath := newFiles[0]
-			newExt := strings.ToLower(filepath.Ext(newPath))
-			newFileType := getFileType(newExt)
-			if newFileType == 0 {
-				nonMatchingFiles++
-				mismatchedFiles = append(mismatchedFiles, track.FileName) // Store mismatched filename
-				continue
-			}
-
-			matchingFiles++
-			updateTracks = append(updateTracks, struct {
-				TrackID     string
-				NewPath     string
-				NewFileName string
-				NewFileType int
-			}{
-				TrackID:     track.ID,
-				NewPath:     common.ToDbPath(newPath, false),
-				NewFileName: filepath.Base(newPath),
-				NewFileType: newFileType,
-			})
+			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbupdate"), err), context)
+			m.CloseProgressDialog()
+			return
 		}
 
-		// Inform about non-matching files
-		if nonMatchingFiles > 0 {
-			m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfilenamescount"), nonMatchingFiles))
-
-			// Display list of non-matching files as warning
-			fileListStr := ""
-			if len(mismatchedFiles) > 5 {
-				// Display only first 5 files and information about remaining files
-				fileListStr = strings.Join(mismatchedFiles[:5], ", ")
-				fileListStr += fmt.Sprintf(" %s", fmt.Sprintf(locales.Translate("updater.tracks.morefiles"), len(mismatchedFiles)-5))
-			} else {
-				fileListStr = strings.Join(mismatchedFiles, ", ")
-			}
-			m.ModuleBase.AddWarningMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfileslist"), fileListStr))
-		}
+		updateCount++
+		progress := float64(updateCount) / float64(len(updateTracks))
+		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("updater.status.progress"), updateCount, len(updateTracks)))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -556,45 +616,15 @@ func (m *TracksUpdater) Start() {
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
+	}
 
-		// Process tracks
-		m.UpdateProgressStatus(0.0, locales.Translate("updater.tracks.starting"))
-		for _, updateTrack := range updateTracks {
-			err = m.dbMgr.Execute(`
-		UPDATE djmdContent
-		SET 
-			FolderPath = ?,
-			FileNameL = ?,
-			FileType = ?
-		WHERE ID = ?
-	`, updateTrack.NewPath, updateTrack.NewFileName, updateTrack.NewFileType, updateTrack.TrackID)
+	// Update progress and status
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
 
-			if err != nil {
-				m.CloseProgressDialog()
-				m.ErrorHandler.ShowError(fmt.Errorf(locales.Translate("common.err.dbupdate"), err))
-				return
-			}
+	// Mark the progress dialog as completed
+	m.CompleteProgressDialog()
 
-			updateCount++
-			progress := float64(updateCount) / float64(len(updateTracks))
-			m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("updater.status.progress"), updateCount, len(updateTracks)))
-
-			// Check if operation was cancelled
-			if m.IsCancelled() {
-				m.HandleProcessCancellation("updater.status.stopped", updateCount, len(updateTracks))
-				common.UpdateButtonToCompleted(m.submitBtn)
-				return
-			}
-		}
-
-		// Update progress and status
-		m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
-		m.ModuleBase.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
-
-		// Mark the progress dialog as completed
-		m.CompleteProgressDialog()
-
-		// Update submit button to show completion using standardized function
-		common.UpdateButtonToCompleted(m.submitBtn)
-	}()
+	// Update submit button to show completion
+	common.UpdateButtonToCompleted(m.submitBtn)
 }

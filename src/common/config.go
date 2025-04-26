@@ -14,9 +14,8 @@ import (
 
 // GlobalConfig holds global application settings
 type GlobalConfig struct {
-	DatabasePath string
-	Language     string
-	Logging      bool
+	DatabasePath  string
+	Language      string
 	LoggingConfig ModuleConfig
 }
 
@@ -260,7 +259,6 @@ func CreateConfigFile(configPath string) error {
 		Global: GlobalConfig{
 			DatabasePath: "",
 			Language:     "cs",
-			Logging:      true,
 			LoggingConfig: ModuleConfig{
 				Extra: make(map[string]string),
 			},

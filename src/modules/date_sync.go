@@ -643,7 +643,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 
 	// Check if cancelled
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, totalCount)
+		m.HandleProcessCancellation("common.status.stopped", 0, totalCount)
 		common.UpdateButtonToCompleted(m.standardUpdateBtn)
 		return 0, nil
 	}
@@ -686,7 +686,7 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 
 	// Check if cancelled
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, totalCount)
+		m.HandleProcessCancellation("common.status.stopped", 0, totalCount)
 		common.UpdateButtonToCompleted(m.customDateUpdateBtn)
 		return 0, nil
 	}
@@ -876,7 +876,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 
 	// Check if cancelled after database backup
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, 0)
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
 		common.UpdateButtonToCompleted(m.standardUpdateBtn)
 		return
 	}
@@ -899,7 +899,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 
 	// Check if cancelled after database connection
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, 0)
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
 		common.UpdateButtonToCompleted(m.standardUpdateBtn)
 		return
 	}
@@ -958,7 +958,7 @@ func (m *DateSyncModule) processCustomUpdate() {
 
 	// Check if cancelled after database backup
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, 0)
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
 		common.UpdateButtonToCompleted(m.customDateUpdateBtn)
 		return
 	}
@@ -981,7 +981,7 @@ func (m *DateSyncModule) processCustomUpdate() {
 
 	// Check if cancelled after database connection
 	if m.IsCancelled() {
-		m.ModuleBase.HandleProcessCancellation("common.status.stopped", 0, 0)
+		m.HandleProcessCancellation("common.status.stopped", 0, 0)
 		common.UpdateButtonToCompleted(m.customDateUpdateBtn)
 		return
 	}

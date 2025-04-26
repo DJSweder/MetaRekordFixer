@@ -394,26 +394,6 @@ func (m *HotCueSyncModule) initializeUI() {
 	m.submitBtn.Importance = widget.HighImportance
 }
 
-// GetStatusMessagesContainer returns the status messages container.
-func (m *HotCueSyncModule) GetStatusMessagesContainer() *common.StatusMessagesContainer {
-	return m.ModuleBase.GetStatusMessagesContainer()
-}
-
-// AddInfoMessage adds an information message to the status messages container.
-func (m *HotCueSyncModule) AddInfoMessage(message string) {
-	m.ModuleBase.AddInfoMessage(message)
-}
-
-// AddErrorMessage adds an error message to the status messages container.
-func (m *HotCueSyncModule) AddErrorMessage(message string) {
-	m.ModuleBase.AddErrorMessage(message)
-}
-
-// ClearStatusMessages clears all status messages.
-func (m *HotCueSyncModule) ClearStatusMessages() {
-	m.ModuleBase.ClearStatusMessages()
-}
-
 // copyHotCues copies hot cues from the source track to the target track.
 func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 	fmt.Printf("    Copying hot cues from source ID %s to target ID %s\n", sourceID, targetID)
@@ -843,211 +823,240 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 }
 
 // Start performs the main hot cue synchronization process.
-// It copies hot cues from source tracks to matching target tracks.
 func (m *HotCueSyncModule) Start() error {
-	// Disable the button during processing
-	m.submitBtn.Disable()
-	defer func() {
-		m.submitBtn.Enable()
-	}()
-
-	// Basic validation
-	if (m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "") ||
-		(m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "") {
-		context := common.NewErrorContext(m.GetConfigName(), "Validate Paths")
-		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths")), &context)
-		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.emptypaths"))
+	// Validate inputs
+	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosourcefolder")), context)
+		return nil
 	}
 
-	// Save the configuration before starting the process
-	m.SaveConfig()
+	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityWarning,
+			Recoverable: true,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetfolder")), context)
+		return nil
+	}
 
-	// Show a progress dialog
+	// Show progress dialog
 	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				// In case of panic
-				m.CloseProgressDialog()
-				context := common.NewErrorContext(m.GetConfigName(), "Panic Recovery")
-				m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), &context)
-			}
-		}()
+	// Start processing in goroutine
+	go m.processUpdate()
 
-		// Clear previous status messages
-		m.ClearStatusMessages()
+	return nil
+}
 
-		// Initial progress
-		m.UpdateProgressStatus(0.0, locales.Translate("common.status.start"))
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
-
-		// Get source tracks based on selected source type
-		sourceTracks, err := m.getSourceTracks()
-		if err != nil {
+// processUpdate performs the actual hot cue synchronization process.
+func (m *HotCueSyncModule) processUpdate() {
+	defer func() {
+		if r := recover(); r != nil {
 			m.CloseProgressDialog()
-			context := common.NewErrorContext(m.GetConfigName(), "Get Source Tracks")
-			m.ErrorHandler.ShowStandardError(err, &context)
-			return
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Panic Recovery",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
+			}
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), context)
 		}
+	}()
 
+	// Clear previous status messages
+	m.ClearStatusMessages()
+
+	// Initial progress
+	m.UpdateProgressStatus(0.0, locales.Translate("common.status.start"))
+	m.AddInfoMessage(locales.Translate("common.status.start"))
+
+	// Get source tracks
+	sourceTracks, err := m.getSourceTracks()
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Get Source Tracks",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.CloseProgressDialog()
+		return
+	}
+
+	// Check if operation was cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("hotcuesync.status.stopped", 0, len(sourceTracks))
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Update progress
+	m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
+	m.AddInfoMessage(locales.Translate("common.status.reading"))
+
+	// Create database backup
+	if err := m.dbMgr.BackupDatabase(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Backup",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.CloseProgressDialog()
+		return
+	}
+
+	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
+
+	// Check if operation was cancelled
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("hotcuesync.status.stopped", 0, len(sourceTracks))
+		common.UpdateButtonToCompleted(m.submitBtn)
+		return
+	}
+
+	// Start database transaction
+	if err := m.dbMgr.BeginTransaction(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Begin Transaction",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), context)
+		m.CloseProgressDialog()
+		return
+	}
+
+	// Ensure database connection is properly closed
+	defer func() {
+		if err := m.dbMgr.Finalize(); err != nil {
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Close Database",
+				Severity:    common.SeverityWarning,
+				Recoverable: true,
+			}
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err), context)
+		}
+	}()
+
+	// Track successful and skipped files
+	successCount := 0
+	skippedCount := 0
+
+	// Update progress before processing
+	m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
+	m.AddInfoMessage(locales.Translate("common.status.updating"))
+
+	// Process each source track
+	for i, sourceTrack := range sourceTracks {
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.CloseProgressDialog()
+			m.HandleProcessCancellation("hotcuesync.status.stopped", successCount, len(sourceTracks))
+			m.dbMgr.RollbackTransaction()
+			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
 		// Update progress
-		m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
+		progress := 0.2 + (float64(i+1) / float64(len(sourceTracks)) * 0.8)
+		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), i+1, len(sourceTracks)))
 
-		// Add status message about reading source tracks
-		m.AddInfoMessage(locales.Translate("common.status.reading"))
-
-		// Create a backup of the database
-		err = m.dbMgr.BackupDatabase()
+		// Get target tracks
+		targetTracks, err := m.getTargetTracks(sourceTrack)
 		if err != nil {
-			m.CloseProgressDialog()
-			// Create error context with module name and operation
-			context := common.NewErrorContext(m.GetConfigName(), "Database Backup")
-			context.Severity = common.SeverityWarning
-			m.ErrorHandler.ShowStandardError(err, &context)
-			return
-		}
-
-		// Add status message about successful database backup
-		m.AddInfoMessage(locales.Translate("common.db.backupdone"))
-
-		// Check if operation was cancelled
-		if m.IsCancelled() {
-			m.CloseProgressDialog()
-			return
-		}
-
-		// Start a database transaction
-		err = m.dbMgr.BeginTransaction()
-		if err != nil {
-			m.CloseProgressDialog()
-			context := common.NewErrorContext(m.GetConfigName(), "Begin Transaction")
-			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), &context)
-			return
-		}
-
-		// Ensure database connection is properly closed when done
-		defer func() {
-			if err := m.dbMgr.Finalize(); err != nil {
-				finalizeContext := common.NewErrorContext(m.GetConfigName(), "Close Database")
-				m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err), &finalizeContext)
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Get Target Tracks",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
 			}
-		}()
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.dbMgr.RollbackTransaction()
+			m.CloseProgressDialog()
+			return
+		}
 
-		// Ensure transaction is rolled back on error
-		defer func() {
-			if err != nil {
-				if rollbackErr := m.dbMgr.RollbackTransaction(); rollbackErr != nil {
-					rollbackContext := common.NewErrorContext(m.GetConfigName(), "Rollback Transaction")
-					m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.rollbackerr"), rollbackErr), &rollbackContext)
-				}
-			}
-		}()
+		// Skip if no target tracks found
+		if len(targetTracks) == 0 {
+			skippedCount++
+			continue
+		}
 
-		// Track successful and skipped files
-		successCount := 0
-		skippedCount := 0
-
-		// Update progress before processing
-		m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
-
-		// Add status message about starting the update process
-		m.AddInfoMessage(locales.Translate("common.status.updating"))
-
-		// Process each source track
-		for i, sourceTrack := range sourceTracks {
+		// Process target tracks
+		for _, targetTrack := range targetTracks {
 			// Check if operation was cancelled
 			if m.IsCancelled() {
-				m.CloseProgressDialog()
+				m.HandleProcessCancellation("hotcuesync.status.stopped", successCount, len(sourceTracks))
 				m.dbMgr.RollbackTransaction()
+				common.UpdateButtonToCompleted(m.submitBtn)
 				return
 			}
 
-			// Update progress
-			progress := 0.2 + (float64(i+1) / float64(len(sourceTracks)) * 0.8)
-			m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), i+1, len(sourceTracks)))
-
-			// Get target tracks for this source track
-			targetTracks, err := m.getTargetTracks(sourceTrack)
-			if err != nil {
-				m.CloseProgressDialog()
-				context := common.NewErrorContext(m.GetConfigName(), "Get Target Tracks")
-				m.ErrorHandler.ShowStandardError(err, &context)
+			// Copy hot cues
+			if err := m.copyHotCues(sourceTrack.ID, targetTrack.ID); err != nil {
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Copy Hot Cues",
+					Severity:    common.SeverityCritical,
+					Recoverable: false,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
 				m.dbMgr.RollbackTransaction()
+				m.CloseProgressDialog()
 				return
 			}
 
-			// Skip if no target tracks found
-			if len(targetTracks) == 0 {
-				skippedCount++
-				continue
+			// Copy track metadata
+			if err := m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID); err != nil {
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Copy Track Metadata",
+					Severity:    common.SeverityCritical,
+					Recoverable: false,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
+				m.dbMgr.RollbackTransaction()
+				m.CloseProgressDialog()
+				return
 			}
-
-			// Copy hot cues and metadata to each target track
-			for _, targetTrack := range targetTracks {
-				// Check if operation was cancelled
-				if m.IsCancelled() {
-					m.CloseProgressDialog()
-					m.dbMgr.RollbackTransaction()
-					return
-				}
-
-				// Copy hot cues
-				err = m.copyHotCues(sourceTrack.ID, targetTrack.ID)
-				if err != nil {
-					m.CloseProgressDialog()
-					context := common.NewErrorContext(m.GetConfigName(), "Copy Hot Cues")
-					m.ErrorHandler.ShowStandardError(err, &context)
-					m.dbMgr.RollbackTransaction()
-					return
-				}
-
-				// Copy track metadata
-				err = m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID)
-				if err != nil {
-					m.CloseProgressDialog()
-					context := common.NewErrorContext(m.GetConfigName(), "Copy Track Metadata")
-					m.ErrorHandler.ShowStandardError(err, &context)
-					m.dbMgr.RollbackTransaction()
-					return
-				}
-			}
-			successCount++
-
-			// Small delay to prevent database overload
-			time.Sleep(10 * time.Millisecond)
 		}
+		successCount++
 
-		// Commit the transaction
-		err = m.dbMgr.CommitTransaction()
-		if err != nil {
-			m.CloseProgressDialog()
-			context := common.NewErrorContext(m.GetConfigName(), "Commit Transaction")
-			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), &context)
-			return
+		// Small delay to prevent database overload
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Commit transaction
+	if err := m.dbMgr.CommitTransaction(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Commit Transaction",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), context)
+		m.CloseProgressDialog()
+		return
+	}
 
-		// Create summary message
-		summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), successCount, skippedCount)
+	// Create and show summary message
+	summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), successCount, skippedCount)
+	m.UpdateProgressStatus(1.0, summaryMessage)
+	m.AddInfoMessage(summaryMessage)
 
-		// Update status message
-		m.UpdateProgressStatus(1.0, summaryMessage)
-
-		// Add final status message about completion
-		m.AddInfoMessage(summaryMessage)
-
-		// Mark the progress dialog as completed instead of closing it
-		m.CompleteProgressDialog()
-		common.UpdateButtonToCompleted(m.submitBtn)
-	}()
-
-	return nil
+	// Complete progress dialog and update button
+	m.CompleteProgressDialog()
+	common.UpdateButtonToCompleted(m.submitBtn)
 }

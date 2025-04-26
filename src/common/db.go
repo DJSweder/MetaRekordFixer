@@ -95,7 +95,7 @@ func (m *DBManager) Connect() error {
 	_, err = db.Exec("PRAGMA journal_mode=DELETE")
 	if err != nil {
 		db.Close()
-		return fmt.Errorf("failed to set journal mode: %w", err)
+		return fmt.Errorf(locales.Translate("common.db.pragmaerr"), err)
 	}
 
 	_, err = db.Exec("PRAGMA synchronous=FULL")
