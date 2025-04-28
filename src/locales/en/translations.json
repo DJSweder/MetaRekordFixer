@@ -45,6 +45,7 @@
     "common.err.noentryfound": "No records found to update.",
     "common.err.nofiles": "No files were found in the specified location to update the database.",
     "common.err.nosrcfolder": "Source folder does not exist",
+    "common.err.notargetfolder": "Target folder does not exist.",
     "common.err.nosrcfolderpath": "Source folder '%s' does not exist.",
     "common.err.playlistload": "Failed to load playlist: %v",
     "common.err.statusfinal": "An error occurred, cannot continue.",
@@ -142,7 +143,7 @@
     "hotcuesync.err.nosourcetracks": "No source songs found for processing",
     "hotcuesync.err.nosrcfolder": "Invalid source folder",
     "hotcuesync.err.nosrcplaylist": "No source playlist",
-    "hotcuesync.err.notgtfolder": "Invalid destination folder",
+    "hotcuesync.err.notargetfolder": "Invalid destination folder",
     "hotcuesync.err.notgtplaylist": "No destination playlist selected",
     "hotcuesync.err.notgttracks": "No matching destination tracks found for",
     "hotcuesync.err.panic": "Unexpected application error",
@@ -189,5 +190,7 @@
     "updater.tracks.countinfolder": "Number of files in folder to update: %d",
     "updater.tracks.morefiles": "...and %d more files",
     "updater.tracks.playlistcount": "Number of songs in playlist to update: %d",
-    "updater.tracks.starting": "Library update was started."
+    "updater.tracks.starting": "Library update was started.",
+    "hotcuesync.err.notexistsourcefldr": "",
+    "hotcuesync.err.notexiststargetfldr": ""
 }

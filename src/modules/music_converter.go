@@ -478,12 +478,9 @@ func (m *MusicConverterModule) initializeUI() {
 	m.formatSettingsContainer = container.NewVBox()
 
 	// Submit button
-	m.submitBtn = common.CreateSubmitButton(
-		locales.Translate("convert.button.start"),
-		func() {
-			m.ClearStatusMessages()
-			go m.startConversion()
-		},
+	m.submitBtn = common.CreateSubmitButton(locales.Translate("convert.button.start"), func() {
+		go m.startConversion()
+	},
 	)
 
 	// Set up change handlers for all UI components

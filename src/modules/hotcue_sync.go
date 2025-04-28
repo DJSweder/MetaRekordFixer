@@ -3,6 +3,7 @@ package modules
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -381,26 +382,17 @@ func (m *HotCueSyncModule) initializeUI() {
 
 	// Create a standardized submit button
 	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("hotcuesync.button.start"), func() {
-		// Save configuration before synchronization
-		m.SaveConfig()
-		go func() {
-			err := m.Start()
-			if err != nil {
-				context := common.NewErrorContext(m.GetConfigName(), "Synchronize Hot Cues")
-				m.ErrorHandler.ShowStandardError(err, &context)
-			}
-		}()
-	})
-	m.submitBtn.Importance = widget.HighImportance
+		go m.Start()
+	},
+	)
 }
 
 // copyHotCues copies hot cues from the source track to the target track.
 func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
-	fmt.Printf("    Copying hot cues from source ID %s to target ID %s\n", sourceID, targetID)
 
 	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
 	if err != nil {
-		fmt.Printf("    Error querying hot cues: %v\n", err)
+
 		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
 	}
 
@@ -415,18 +407,13 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Get the Kind value from the hot cue
 		kind, ok := hotCue["Kind"]
 		if !ok {
-			fmt.Printf("    Warning: Hot cue without Kind value found\n")
+
 			continue
 		}
-
-		// List the hot cue details
-		fmt.Printf("    Processing hot cue %d: ID=%v, Kind=%v\n",
-			hotCueCount, hotCue["ID"], kind)
 
 		// Delete existing hot cues with the same Kind value in the target track
 		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, kind)
 		if err != nil {
-			fmt.Printf("    Error deleting existing hot cue: %v\n", err)
 			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.deletecue"), err)
 		}
 
@@ -434,12 +421,10 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		var maxID int64
 		err = m.dbMgr.QueryRow("SELECT COALESCE(MAX(CAST(ID AS INTEGER)), 0) FROM djmdCue").Scan(&maxID)
 		if err != nil {
-			fmt.Printf("    Error getting max ID: %v\n", err)
 			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.maxidcheck"), err)
 		}
 		maxID++
 		newID := fmt.Sprintf("%d", maxID)
-		fmt.Printf("    Generated new ID: %s for hot cue\n", newID)
 
 		// Get current timestamp for created_at
 		currentTime := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
@@ -474,17 +459,8 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Execute the insert
 		err = m.dbMgr.Execute(query, params...)
 		if err != nil {
-			fmt.Printf("    Error inserting hot cue: %v\n", err)
 			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.cueinsert"), err)
 		}
-		fmt.Printf("    Successfully inserted hot cue with ID %s\n", newID)
-	}
-
-	if hotCueCount == 0 {
-		fmt.Printf("    No hot cues found for source track ID %s\n", sourceID)
-	} else {
-		fmt.Printf("    Successfully copied %d hot cues from source ID %s to target ID %s\n",
-			hotCueCount, sourceID, targetID)
 	}
 
 	return nil
@@ -493,7 +469,6 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 // copyTrackMetadata copies specific metadata fields from source track to target track.
 // Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
 func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
-	fmt.Printf("    Copying track metadata from source ID %s to target ID %s\n", sourceID, targetID)
 
 	// Query to get source track metadata
 	query := `
@@ -515,7 +490,6 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 
 	err := row.Scan(&stockDate, &dateCreated, &colorID, &djPlayCount)
 	if err != nil {
-		fmt.Printf("    Error scanning source track metadata: %v\n", err)
 		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadatascan"), err)
 	}
 
@@ -536,19 +510,14 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 		djPlayCount.ValueOrNil(),
 		currentTime, targetID)
 	if err != nil {
-		fmt.Printf("    Error updating target track metadata: %v\n", err)
 		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
 	}
 
-	fmt.Printf("    Successfully copied metadata from source ID %s to target ID %s\n", sourceID, targetID)
 	return nil
 }
 
 // getSourceTracks retrieves source tracks from the database based on the selected source type.
 func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
-	// Debug output at the start of loading source tracks
-	fmt.Printf("Starting to load source tracks...\n")
-	fmt.Printf("Source type: %s\n", m.sourceType.Selected)
 
 	var tracks []common.TrackItem
 	var err error
@@ -559,9 +528,6 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 		if folderPath == "" {
 			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosrcfolder"))
 		}
-
-		// Debug output
-		fmt.Printf("Loading source tracks from folder: %s\n", folderPath)
 
 		tracks, err = m.dbMgr.GetTracksBasedOnFolder(folderPath)
 		if err != nil {
@@ -580,7 +546,7 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 		for _, p := range m.playlists {
 			if p.Path == m.sourcePlaylistSelect.Selected {
 				playlistID = p.ID
-				fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
+
 				break
 			}
 		}
@@ -588,9 +554,6 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 		if playlistID == "" {
 			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
 		}
-
-		// Debug output
-		fmt.Printf("Loading source tracks from playlist ID: %s\n", playlistID)
 
 		tracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
 		if err != nil {
@@ -602,9 +565,6 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 		return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosourcetracks"))
 	}
 
-	// Debug output for list of count of loaded tracks
-	fmt.Printf("Loaded %d source tracks\n", len(tracks))
-
 	return tracks, nil
 }
 
@@ -613,13 +573,10 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 	ID       string
 	FileName string
 }, error) {
-	// Debug output for the target type
-	fmt.Printf("Target type: %s\n", m.targetType.Selected)
 
 	// Extract the file name from the source track's folder path without extension
 	fileName := filepath.Base(sourceTrack.FolderPath)
 	relativePathWithoutExt := strings.TrimSuffix(fileName, filepath.Ext(fileName))
-	fmt.Printf("Source track relative path (without extension): %s\n", relativePathWithoutExt)
 
 	var targetTracks []common.TrackItem
 	var err error
@@ -630,9 +587,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 		if targetFolderPath == "" {
 			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.notgtfolder"))
 		}
-
-		// Debug output for folder path
-		fmt.Printf("Loading target tracks from folder: %s\n", targetFolderPath)
 
 		targetTracks, err = m.dbMgr.GetTracksBasedOnFolder(targetFolderPath)
 		if err != nil {
@@ -651,7 +605,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 		for _, p := range m.playlists {
 			if p.Path == m.targetPlaylistSelect.Selected {
 				playlistID = p.ID
-				fmt.Printf("Found PlaylistID: %s for playlist path: %s\n", playlistID, p.Path)
 				break
 			}
 		}
@@ -659,9 +612,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 		if playlistID == "" {
 			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
 		}
-
-		// Debug output for playlist ID
-		fmt.Printf("Loading target tracks from playlist ID: %s\n", playlistID)
 
 		targetTracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
 		if err != nil {
@@ -675,10 +625,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 		FileName string
 	}
 
-	// Debug output for target tracks
-	fmt.Printf("DEBUG: Finding match for source file: %s\n", relativePathWithoutExt)
-	fmt.Printf("DEBUG: All files found in target:\n")
-
 	// Omit the source track from the destination
 	for _, track := range targetTracks {
 		if track.ID == sourceTrack.ID {
@@ -688,11 +634,10 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 		// Get the relative path of the target file without the extension
 		targetFileName := filepath.Base(track.FolderPath)
 		targetRelativePathWithoutExt := strings.TrimSuffix(targetFileName, filepath.Ext(targetFileName))
-		fmt.Printf("DEBUG: - %s (ID: %s)\n", targetRelativePathWithoutExt, track.ID)
 
 		// Compare relative paths (without extension) using case-sensitive comparison
 		if targetRelativePathWithoutExt == relativePathWithoutExt {
-			fmt.Printf("MATCH FOUND: Source=%s, Target=%s\n", relativePathWithoutExt, targetRelativePathWithoutExt)
+
 			result = append(result, struct {
 				ID       string
 				FileName string
@@ -705,7 +650,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 
 	if len(result) == 0 {
 		// No matching target tracks found
-		fmt.Printf(locales.Translate("hotcuesync.err.notgttracks")+": %s\n", fileName)
 		return []struct {
 			ID       string
 			FileName string
@@ -739,28 +683,33 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	m.sourcePlaylistSelect.Options = options
 	m.targetPlaylistSelect.Options = options
 
-	// Restore previously selected values if they exist in the new options
+	// Prepare selected values for source and target
+	var sourceSelectedValue string
+	var targetSelectedValue string
+
+	// Find source selected value
 	if m.sourcePlaylistID != "" {
-		for i, playlist := range m.playlists {
+		for _, playlist := range m.playlists {
 			if playlist.ID == m.sourcePlaylistID {
-				if i < len(m.sourcePlaylistSelect.Options) {
-					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
-				}
+				sourceSelectedValue = playlist.Path
 				break
 			}
 		}
 	}
 
+	// Find target selected value
 	if m.targetPlaylistID != "" {
-		for i, playlist := range m.playlists {
+		for _, playlist := range m.playlists {
 			if playlist.ID == m.targetPlaylistID {
-				if i < len(m.targetPlaylistSelect.Options) {
-					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
-				}
+				targetSelectedValue = playlist.Path
 				break
 			}
 		}
 	}
+
+	// Set active state for source and target playlist selects
+	common.SetPlaylistSelectState(m.sourcePlaylistSelect, true, sourceSelectedValue)
+	common.SetPlaylistSelectState(m.targetPlaylistSelect, true, targetSelectedValue)
 
 	return nil
 }
@@ -806,6 +755,20 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 		m.sourceFolderField.Show()
 		m.sourcePlaylistSelect.Hide()
 	} else {
+		// Když se přepíná na playlist, zkus znovu načíst playlisty
+		if err := m.dbMgr.Connect(); err == nil {
+			if err := m.loadPlaylists(); err != nil {
+				// Pokud se načtení nezdaří, zobraz chybu, ale nezastavuj proces
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Load Playlists",
+					Severity:    common.SeverityWarning,
+					Recoverable: true,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
+			}
+			m.dbMgr.Finalize()
+		}
 		m.sourceFolderField.Hide()
 		m.sourcePlaylistSelect.Show()
 	}
@@ -817,23 +780,43 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 		m.targetFolderField.Show()
 		m.targetPlaylistSelect.Hide()
 	} else {
+		// Když se přepíná na playlist, zkus znovu načíst playlisty
+		if err := m.dbMgr.Connect(); err == nil {
+			if err := m.loadPlaylists(); err != nil {
+				// Pokud se načtení nezdaří, zobraz chybu, ale nezastavuj proces
+				context := &common.ErrorContext{
+					Module:      m.GetConfigName(),
+					Operation:   "Load Playlists",
+					Severity:    common.SeverityWarning,
+					Recoverable: true,
+				}
+				m.ErrorHandler.ShowStandardError(err, context)
+			}
+			m.dbMgr.Finalize()
+		}
 		m.targetFolderField.Hide()
 		m.targetPlaylistSelect.Show()
 	}
 }
 
 // Start performs the main hot cue synchronization process.
-func (m *HotCueSyncModule) Start() error {
+func (m *HotCueSyncModule) Start() {
+	// Save the configuration before starting the process
+	m.SaveConfig()
+
+	// Clear any previous status messages
+	m.ClearStatusMessages()
+
 	// Validate inputs
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "" {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
+			Operation:   "	",
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosourcefolder")), context)
-		return nil
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosrcfolder")), context)
+		return
 	}
 
 	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "" {
@@ -844,16 +827,41 @@ func (m *HotCueSyncModule) Start() error {
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetfolder")), context)
-		return nil
+		return
+	}
+	// Validate source folder exists
+	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
 	}
 
+	// Validate target folder exists
+	targetPath := common.NormalizePath(m.targetFolderEntry.Text)
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.notargetfolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
 	// Show progress dialog
 	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
 
 	// Start processing in goroutine
 	go m.processUpdate()
 
-	return nil
 }
 
 // processUpdate performs the actual hot cue synchronization process.
@@ -894,7 +902,7 @@ func (m *HotCueSyncModule) processUpdate() {
 
 	// Check if operation was cancelled
 	if m.IsCancelled() {
-		m.HandleProcessCancellation("hotcuesync.status.stopped", 0, len(sourceTracks))
+		m.HandleProcessCancellation("common.status.stopped", 0, len(sourceTracks))
 		common.UpdateButtonToCompleted(m.submitBtn)
 		return
 	}
@@ -920,7 +928,7 @@ func (m *HotCueSyncModule) processUpdate() {
 
 	// Check if operation was cancelled
 	if m.IsCancelled() {
-		m.HandleProcessCancellation("hotcuesync.status.stopped", 0, len(sourceTracks))
+		m.HandleProcessCancellation("common.status.stopped", 0, len(sourceTracks))
 		common.UpdateButtonToCompleted(m.submitBtn)
 		return
 	}
@@ -952,7 +960,7 @@ func (m *HotCueSyncModule) processUpdate() {
 	}()
 
 	// Track successful and skipped files
-	successCount := 0
+	processedCount := 0
 	skippedCount := 0
 
 	// Update progress before processing
@@ -960,18 +968,18 @@ func (m *HotCueSyncModule) processUpdate() {
 	m.AddInfoMessage(locales.Translate("common.status.updating"))
 
 	// Process each source track
-	for i, sourceTrack := range sourceTracks {
+	for _, sourceTrack := range sourceTracks {
 		// Check if operation was cancelled
 		if m.IsCancelled() {
-			m.HandleProcessCancellation("hotcuesync.status.stopped", successCount, len(sourceTracks))
+			m.HandleProcessCancellation("common.status.stopped", processedCount, len(sourceTracks))
 			m.dbMgr.RollbackTransaction()
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
 
 		// Update progress
-		progress := 0.2 + (float64(i+1) / float64(len(sourceTracks)) * 0.8)
-		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), i+1, len(sourceTracks)))
+		progress := 0.2 + (float64(processedCount+1) / float64(len(sourceTracks)) * 0.8)
+		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), processedCount+1, len(sourceTracks)))
 
 		// Get target tracks
 		targetTracks, err := m.getTargetTracks(sourceTrack)
@@ -998,14 +1006,15 @@ func (m *HotCueSyncModule) processUpdate() {
 		for _, targetTrack := range targetTracks {
 			// Check if operation was cancelled
 			if m.IsCancelled() {
-				m.HandleProcessCancellation("hotcuesync.status.stopped", successCount, len(sourceTracks))
+				m.HandleProcessCancellation("common.status.stopped", processedCount, len(sourceTracks))
 				m.dbMgr.RollbackTransaction()
 				common.UpdateButtonToCompleted(m.submitBtn)
 				return
 			}
 
 			// Copy hot cues
-			if err := m.copyHotCues(sourceTrack.ID, targetTrack.ID); err != nil {
+			err = m.copyHotCues(sourceTrack.ID, targetTrack.ID)
+			if err != nil {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Copy Hot Cues",
@@ -1019,7 +1028,8 @@ func (m *HotCueSyncModule) processUpdate() {
 			}
 
 			// Copy track metadata
-			if err := m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID); err != nil {
+			err = m.copyTrackMetadata(sourceTrack.ID, targetTrack.ID)
+			if err != nil {
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Copy Track Metadata",
@@ -1032,31 +1042,20 @@ func (m *HotCueSyncModule) processUpdate() {
 				return
 			}
 		}
-		successCount++
+		processedCount++
 
 		// Small delay to prevent database overload
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// Commit transaction
-	if err := m.dbMgr.CommitTransaction(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Commit Transaction",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), context)
-		m.CloseProgressDialog()
-		return
-	}
-
-	// Create and show summary message
-	summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), successCount, skippedCount)
+	// Update progress and status
+	summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount)
 	m.UpdateProgressStatus(1.0, summaryMessage)
 	m.AddInfoMessage(summaryMessage)
 
 	// Complete progress dialog and update button
 	m.CompleteProgressDialog()
+
+	// Update submit button to show completion
 	common.UpdateButtonToCompleted(m.submitBtn)
 }

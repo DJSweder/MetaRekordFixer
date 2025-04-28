@@ -45,6 +45,7 @@
     "common.err.noentryfound": "Es wurden keine zu aktualisierenden Datensätze gefunden.",
     "common.err.nofiles": "Am angegebenen Speicherort wurden keine Dateien zum Aktualisieren der Datenbank gefunden.",
     "common.err.nosrcfolder": "Quellordner existiert nicht",
+    "common.err.notargetfolder": "",
     "common.err.nosrcfolderpath": "Quellordner „%s“ existiert nicht.",
     "common.err.playlistload": "Fehler beim Laden der Wiedergabeliste: %v",
     "common.err.statusfinal": "Ein Fehler ist aufgetreten. Der Vorgang kann nicht fortgesetzt werden.",
@@ -142,7 +143,7 @@
     "hotcuesync.err.nosourcetracks": "keine Quelltitel zur Verarbeitung gefunden",
     "hotcuesync.err.nosrcfolder": "Ungültiger Quellordner.",
     "hotcuesync.err.nosrcplaylist": "Keine Quell-Playlist.",
-    "hotcuesync.err.notgtfolder": "Ungültiger Zielordner.",
+    "hotcuesync.err.notargetfolder": "Ungültiger Zielordner.",
     "hotcuesync.err.notgtplaylist": "Keine Ziel-Playlist ausgewählt.",
     "hotcuesync.err.notgttracks": "Keine passenden Zieltitel gefunden für:",
     "hotcuesync.err.panic": "Unerwarteter Anwendungsfehler.",
@@ -189,5 +190,7 @@
     "updater.tracks.countinfolder": "Anzahl der zu aktualisierenden Dateien im Ordner: %d",
     "updater.tracks.morefiles": "... und %d weitere Dateien.",
     "updater.tracks.playlistcount": "Anzahl der zu aktualisierenden Songs in der Wiedergabeliste: %d",
-    "updater.tracks.starting": "Sammlungsaktualisierung gestartet."
+    "updater.tracks.starting": "Sammlungsaktualisierung gestartet.",
+    "hotcuesync.err.notexistsourcefldr": "",
+    "hotcuesync.err.notexiststargetfldr": ""
 }

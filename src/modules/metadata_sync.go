@@ -188,9 +188,9 @@ func (m *MetadataSyncModule) initializeUI() {
 
 	// Initialize sync button
 	m.submitBtn = common.CreateSubmitButton(locales.Translate("metsync.button.sync"), func() {
-		m.ClearStatusMessages()
 		go m.Start()
-	})
+	},
+	)
 }
 
 // Start initiates the metadata synchronization process.
@@ -204,8 +204,11 @@ func (m *MetadataSyncModule) Start() {
 		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
-	// Save configuration before starting
+	// Save the configuration before starting the process
 	m.SaveConfig()
+
+	// Clear any previous status messages
+	m.ClearStatusMessages()
 
 	// Validate filled source folder entryField
 	if m.sourceFolderEntry.Text == "" {

@@ -239,11 +239,9 @@ func (m *TracksUpdater) initializeUI() {
 	// The submit button is disabled to prevent the user from starting the module
 	// before the module is fully loaded.
 	// When the user clicks the submit button, start the module.
-	m.submitBtn = common.CreateDisabledSubmitButton(
-		locales.Translate("updater.button.libupd"),
-		func() {
-			go m.Start()
-		},
+	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("updater.button.libupd"), func() {
+		go m.Start()
+	},
 	)
 }
 

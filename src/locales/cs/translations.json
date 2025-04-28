@@ -45,6 +45,7 @@
     "common.err.noentryfound": "Nebyly nalezeny žádné záznamy k aktualizaci.",
     "common.err.nofiles": "V zadaném umístění nebyly nalezeny žádné soubory pro aktualizaci databáze.",
     "common.err.nosrcfolder": "Zdrojová složka neexistuje",
+    "common.err.notargetfolder": "Cílová složka neexistuje.",
     "common.err.nosrcfolderpath": "Zdrojová složka '%s' neexistuje.",
     "common.err.playlistload": "Nepodařilo se načíst seznam playlistů.",
     "common.err.statusfinal": "Vyskytla se chyba, není možné pokračovat.",
@@ -140,9 +141,9 @@
     "hotcuesync.err.loadtrackdata": "chyba při načítání dat skladby: %v",
     "hotcuesync.err.maxidcheck": "chyba při zjišťování max ID",
     "hotcuesync.err.nosourcetracks": "nenalezeny žádné zdrojové skladby pro zpracování",
-    "hotcuesync.err.nosrcfolder": "Zdrojová složka je neplatná",
+    "hotcuesync.err.nosrcfolder": "Není zadaná zdrojová složka.",
     "hotcuesync.err.nosrcplaylist": "Žádný zdrojový playlist",
-    "hotcuesync.err.notgtfolder": "Cílová složka není platná",
+    "hotcuesync.err.notargetfolder": "Není zadaná cílová složka.",
     "hotcuesync.err.notgtplaylist": "Není vybrán cílový playlist",
     "hotcuesync.err.notgttracks": "Nenalezeny odpovídající cílové skladby pro",
     "hotcuesync.err.panic": "Neočekávaná chyba v aplikaci",
@@ -189,5 +190,7 @@
     "updater.tracks.countinfolder": "Počet souborů ve složce k aktualizaci: %d",
     "updater.tracks.morefiles": "…a dalších %d souborů",
     "updater.tracks.playlistcount": "Počet skladeb v playlistu k aktualizaci: %d",
-    "updater.tracks.starting": "Spuštěna aktualizace sbírky."
+    "updater.tracks.starting": "Spuštěna aktualizace sbírky.",
+    "hotcuesync.err.notexistsourcefldr": "",
+    "hotcuesync.err.notexiststargetfldr": ""
 }

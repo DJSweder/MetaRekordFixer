@@ -386,19 +386,15 @@ func (m *DateSyncModule) initializeUI() {
 	})
 
 	// Create standard update button
-	m.standardUpdateBtn = common.CreateSubmitButton(
-		locales.Translate("datesync.button.startupdate"),
-		func() {
-			m.Start("standard")
-		},
+	m.standardUpdateBtn = common.CreateSubmitButton(locales.Translate("datesync.button.startupdate"), func() {
+		m.Start("standard")
+	},
 	)
 
 	// Create custom date update button
-	m.customDateUpdateBtn = common.CreateSubmitButton(
-		locales.Translate("datesync.button.startcustomupdate"),
-		func() {
-			m.Start("custom")
-		},
+	m.customDateUpdateBtn = common.CreateSubmitButton(locales.Translate("datesync.button.startcustomupdate"), func() {
+		m.Start("custom")
+	},
 	)
 
 	// Add initial folder entries
