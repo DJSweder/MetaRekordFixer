@@ -136,7 +136,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Validation",
-			Severity:    common.SeverityWarning,
+			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
@@ -149,7 +149,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Connection",
-			Severity:    common.SeverityWarning,
+			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
@@ -163,7 +163,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Database Access",
-			Severity:    common.SeverityWarning,
+			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.playlistload")), context)
@@ -388,11 +388,20 @@ func (m *HotCueSyncModule) initializeUI() {
 }
 
 // copyHotCues copies hot cues from the source track to the target track.
+// It retrieves hot cues from the source track using the database manager,
+// and then applies them to the target track. The function handles both
+// the retrieval and update of hot cue data.
+//
+// Parameters:
+//   - sourceID: The ID of the source track to copy hot cues from
+//   - targetID: The ID of the target track to copy hot cues to
+//
+// Returns:
+//   - error: Returns nil if successful, otherwise returns an error with a localized message
+//     describing what went wrong (e.g., database query errors, update errors)
 func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
-
 	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
 	if err != nil {
-
 		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
 	}
 
@@ -407,7 +416,6 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Get the Kind value from the hot cue
 		kind, ok := hotCue["Kind"]
 		if !ok {
-
 			continue
 		}
 
@@ -431,17 +439,17 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 
 		// SQL query preparation for inserting hot cue
 		query := `
-            INSERT INTO djmdCue (
-                ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
-                OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
-                InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
-                rb_local_deleted, rb_local_synced, created_at, updated_at
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, ?, ?, ?, ?, 
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        `
+			INSERT INTO djmdCue (
+				ID, ContentID, InMsec, InFrame, InMpegFrame, InMpegAbs, OutMsec, OutFrame, OutMpegFrame, 
+				OutMpegAbs, Kind, Color, ColorTableIndex, ActiveLoop, Comment, BeatLoopSize, CueMicrosec, 
+				InPointSeekInfo, OutPointSeekInfo, ContentUUID, UUID, rb_data_status, rb_local_data_status, 
+				rb_local_deleted, rb_local_synced, created_at, updated_at
+			) VALUES (
+				?, ?, ?, ?, ?, ?, ?, ?, ?, 
+				?, ?, ?, ?, ?, ?, ?, ?, 
+				?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+			)
+		`
 
 		// Parameters for the insert preparation
 		params := []interface{}{
@@ -463,19 +471,19 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		}
 	}
 
+	m.Logger.Info(locales.Translate("hotcuesync.status.copiedcues"), hotCueCount, sourceID, targetID)
 	return nil
 }
 
 // copyTrackMetadata copies specific metadata fields from source track to target track.
 // Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
 func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
-
 	// Query to get source track metadata
 	query := `
-        SELECT StockDate, DateCreated, ColorID, DJPlayCount
-        FROM djmdContent
-        WHERE ID = ?
-    `
+		SELECT StockDate, DateCreated, ColorID, DJPlayCount
+		FROM djmdContent
+		WHERE ID = ?
+	`
 
 	row := m.dbMgr.QueryRow(query, sourceID)
 	if row == nil {
@@ -498,10 +506,10 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 
 	// Update target track with source track metadata
 	updateQuery := `
-        UPDATE djmdContent
-        SET StockDate = ?, DateCreated = ?, ColorID = ?, DJPlayCount = ?, updated_at = ?
-        WHERE ID = ?
-    `
+		UPDATE djmdContent
+		SET StockDate = ?, DateCreated = ?, ColorID = ?, DJPlayCount = ?, updated_at = ?
+		WHERE ID = ?
+	`
 
 	err = m.dbMgr.Execute(updateQuery,
 		stockDate.ValueOrNil(),
@@ -513,32 +521,17 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
 	}
 
+	m.Logger.Info(locales.Translate("hotcuesync.status.copiedmetadata"), sourceID, targetID)
 	return nil
 }
 
 // getSourceTracks retrieves source tracks from the database based on the selected source type.
 func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
-
 	var tracks []common.TrackItem
-	var err error
 
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		// Source is a folder
-		folderPath := m.sourceFolderEntry.Text
-		if folderPath == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosrcfolder"))
-		}
-
-		tracks, err = m.dbMgr.GetTracksBasedOnFolder(folderPath)
-		if err != nil {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.loadtrackdata"))
-		}
+		tracks, _ = m.dbMgr.GetTracksBasedOnFolder(m.sourceFolderEntry.Text)
 	} else {
-		// Source is a playlist
-		if m.sourcePlaylistSelect.Selected == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosrcplaylist"))
-		}
-
 		// Find playlist ID
 		var playlistID string
 
@@ -546,19 +539,11 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 		for _, p := range m.playlists {
 			if p.Path == m.sourcePlaylistSelect.Selected {
 				playlistID = p.ID
-
 				break
 			}
 		}
 
-		if playlistID == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
-		}
-
-		tracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
-		if err != nil {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.loadtrackdata"))
-		}
+		tracks, _ = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
 	}
 
 	if len(tracks) == 0 {
@@ -573,31 +558,15 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 	ID       string
 	FileName string
 }, error) {
-
 	// Extract the file name from the source track's folder path without extension
 	fileName := filepath.Base(sourceTrack.FolderPath)
 	relativePathWithoutExt := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
 	var targetTracks []common.TrackItem
-	var err error
 
 	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		// Target is a folder
-		targetFolderPath := m.targetFolderEntry.Text
-		if targetFolderPath == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.notgtfolder"))
-		}
-
-		targetTracks, err = m.dbMgr.GetTracksBasedOnFolder(targetFolderPath)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.loadtrackdata"), err)
-		}
+		targetTracks, _ = m.dbMgr.GetTracksBasedOnFolder(m.targetFolderEntry.Text)
 	} else {
-		// Target is a playlist
-		if m.targetPlaylistSelect.Selected == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.notgtplaylist"))
-		}
-
 		// Find playlist ID
 		var playlistID string
 
@@ -609,14 +578,7 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 			}
 		}
 
-		if playlistID == "" {
-			return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.playlistnotfound"))
-		}
-
-		targetTracks, err = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.loadtrackdata"), err)
-		}
+		targetTracks, _ = m.dbMgr.GetTracksBasedOnPlaylist(playlistID)
 	}
 
 	// Prepare final result slice
@@ -637,7 +599,6 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 
 		// Compare relative paths (without extension) using case-sensitive comparison
 		if targetRelativePathWithoutExt == relativePathWithoutExt {
-
 			result = append(result, struct {
 				ID       string
 				FileName string
@@ -649,11 +610,9 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 	}
 
 	if len(result) == 0 {
-		// No matching target tracks found
-		return []struct {
-			ID       string
-			FileName string
-		}{}, nil
+		m.Logger.Warning(locales.Translate("hotcuesync.err.notgttracks"), fileName)
+	} else {
+		m.Logger.Info(locales.Translate("hotcuesync.status.foundtargettracks"), fileName, len(result))
 	}
 
 	return result, nil
@@ -711,6 +670,7 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	common.SetPlaylistSelectState(m.sourcePlaylistSelect, true, sourceSelectedValue)
 	common.SetPlaylistSelectState(m.targetPlaylistSelect, true, targetSelectedValue)
 
+	m.Logger.Info(locales.Translate("hotcuesync.status.loadedplaylists"), len(playlists))
 	return nil
 }
 
@@ -755,10 +715,9 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 		m.sourceFolderField.Show()
 		m.sourcePlaylistSelect.Hide()
 	} else {
-		// Když se přepíná na playlist, zkus znovu načíst playlisty
+		// Switch from type folder to playlist will load playlists again
 		if err := m.dbMgr.Connect(); err == nil {
 			if err := m.loadPlaylists(); err != nil {
-				// Pokud se načtení nezdaří, zobraz chybu, ale nezastavuj proces
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Load Playlists",
@@ -780,10 +739,9 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 		m.targetFolderField.Show()
 		m.targetPlaylistSelect.Hide()
 	} else {
-		// Když se přepíná na playlist, zkus znovu načíst playlisty
+		// Switch from type folder to playlist will load playlists again
 		if err := m.dbMgr.Connect(); err == nil {
 			if err := m.loadPlaylists(); err != nil {
-				// Pokud se načtení nezdaří, zobraz chybu, ale nezastavuj proces
 				context := &common.ErrorContext{
 					Module:      m.GetConfigName(),
 					Operation:   "Load Playlists",
@@ -811,11 +769,12 @@ func (m *HotCueSyncModule) Start() {
 	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "" {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "	",
-			Severity:    common.SeverityWarning,
-			Recoverable: true,
+			Operation:   "Input Validation",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosrcfolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
@@ -823,36 +782,64 @@ func (m *HotCueSyncModule) Start() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Input Validation",
-			Severity:    common.SeverityWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetfolder")), context)
-		return
-	}
-	// Validate source folder exists
-	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Input Validation",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetfolder")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
+	// Validate source folder exists
+	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			context := &common.ErrorContext{
+				Module:      m.GetConfigName(),
+				Operation:   "Input Validation",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
+			}
+			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+			return
+		}
+	}
+
 	// Validate target folder exists
-	targetPath := common.NormalizePath(m.targetFolderEntry.Text)
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		targetPath := common.NormalizePath(m.targetFolderEntry.Text)
+		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+			context := &common.ErrorContext{
+				Module:      m.GetName(),
+				Operation:   "Input Validation",
+				Severity:    common.SeverityCritical,
+				Recoverable: false,
+			}
+			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.notargetfolder")), context)
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+			return
+		}
+	}
+	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) && m.sourcePlaylistSelect.Selected == "" {
 		context := &common.ErrorContext{
-			Module:      m.GetName(),
+			Module:      m.GetConfigName(),
 			Operation:   "Input Validation",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.notargetfolder")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosrcplaylistsel")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) && m.targetPlaylistSelect.Selected == "" {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Input Validation",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetplaylistsel")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -889,14 +876,15 @@ func (m *HotCueSyncModule) processUpdate() {
 	// Get source tracks
 	sourceTracks, err := m.getSourceTracks()
 	if err != nil {
+		m.CloseProgressDialog()
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Get Source Tracks",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.CloseProgressDialog()
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosourcetracks")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
@@ -913,18 +901,20 @@ func (m *HotCueSyncModule) processUpdate() {
 
 	// Create database backup
 	if err := m.dbMgr.BackupDatabase(); err != nil {
+		m.CloseProgressDialog()
 		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
+			Module:      m.GetName(),
 			Operation:   "Database Backup",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.CloseProgressDialog()
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
 	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.srctrackscount"), len(sourceTracks)))
 
 	// Check if operation was cancelled
 	if m.IsCancelled() {
@@ -977,10 +967,6 @@ func (m *HotCueSyncModule) processUpdate() {
 			return
 		}
 
-		// Update progress
-		progress := 0.2 + (float64(processedCount+1) / float64(len(sourceTracks)) * 0.8)
-		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), processedCount+1, len(sourceTracks)))
-
 		// Get target tracks
 		targetTracks, err := m.getTargetTracks(sourceTrack)
 		if err != nil {
@@ -1001,6 +987,10 @@ func (m *HotCueSyncModule) processUpdate() {
 			skippedCount++
 			continue
 		}
+
+		// Update progress
+		progress := 0.2 + (float64(processedCount+1) / float64(len(sourceTracks)) * 0.8)
+		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), processedCount+1, len(sourceTracks)))
 
 		// Process target tracks
 		for _, targetTrack := range targetTracks {
@@ -1024,6 +1014,7 @@ func (m *HotCueSyncModule) processUpdate() {
 				m.ErrorHandler.ShowStandardError(err, context)
 				m.dbMgr.RollbackTransaction()
 				m.CloseProgressDialog()
+				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
 			}
 
@@ -1039,19 +1030,33 @@ func (m *HotCueSyncModule) processUpdate() {
 				m.ErrorHandler.ShowStandardError(err, context)
 				m.dbMgr.RollbackTransaction()
 				m.CloseProgressDialog()
+				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
 			}
-		}
-		processedCount++
+			processedCount++
 
-		// Small delay to prevent database overload
-		time.Sleep(10 * time.Millisecond)
+			// Small delay to prevent database overload
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
 
 	// Update progress and status
-	summaryMessage := fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount)
-	m.UpdateProgressStatus(1.0, summaryMessage)
-	m.AddInfoMessage(summaryMessage)
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
+
+	// Commit transaction
+	if err := m.dbMgr.CommitTransaction(); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Commit Transaction",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), context)
+		m.CloseProgressDialog()
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
 
 	// Complete progress dialog and update button
 	m.CompleteProgressDialog()

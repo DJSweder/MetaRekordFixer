@@ -34,10 +34,10 @@ type RekordboxTools struct {
 }
 
 type moduleInfo struct {
-	module    common.Module
-	tabItem   *container.TabItem
-	isLoaded  bool
-	createFn  func() common.Module
+	module   common.Module
+	tabItem  *container.TabItem
+	isLoaded bool
+	createFn func() common.Module
 }
 
 // NewRekordboxTools initializes the main application with proper logging, theme, and window setup.
@@ -74,7 +74,7 @@ func NewRekordboxTools() *RekordboxTools {
 	// Initialize localization before creating window
 	lang := detectLanguage(configMgr, logger)
 	if err := locales.LoadTranslations(lang); err != nil {
-		logger.Error("Failed to initialize localization:", err)
+		logger.Error("Failed to initialize localization: %s", err)
 		os.Exit(1)
 	}
 
@@ -161,7 +161,7 @@ func (rt *RekordboxTools) createModuleTabItem(info *moduleInfo) *container.TabIt
 		// Create temporary module just to get name and icon
 		tempModule := info.createFn()
 		dbReqs := tempModule.GetDatabaseRequirements()
-		
+
 		if !dbReqs.NeedsDatabase {
 			// Module doesn't need database, create it immediately
 			info.module = tempModule
@@ -173,20 +173,20 @@ func (rt *RekordboxTools) createModuleTabItem(info *moduleInfo) *container.TabIt
 			return container.NewTabItem(tempModule.GetName(), placeholder)
 		}
 	}
-	
+
 	return container.NewTabItem(info.module.GetName(), info.module.GetContent())
 }
 
 // createMainContent creates the main window content with tabs
 func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 	rt.tabContainer = container.NewAppTabs()
-	
+
 	// First create all tab items
 	for _, info := range rt.modules {
 		info.tabItem = rt.createModuleTabItem(info)
 		rt.tabContainer.Append(info.tabItem)
 	}
-	
+
 	// Then select the first tab (metadata_sync) and ensure it's loaded
 	if len(rt.tabContainer.Items) > 0 {
 		firstTab := rt.tabContainer.Items[0]
@@ -211,7 +211,7 @@ func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 				// Create the module
 				info.module = info.createFn()
 				info.isLoaded = true
-				
+
 				// Update tab content
 				tab.Content = info.module.GetContent()
 				rt.tabContainer.Refresh()
@@ -221,7 +221,7 @@ func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 	}
 
 	rt.tabContainer.SetTabLocation(container.TabLocationTop)
-	
+
 	menuBar := rt.createMenuBar()
 	content := container.NewVBox(menuBar, rt.tabContainer)
 	rt.mainWindow.SetContent(content)
@@ -244,7 +244,7 @@ func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	if rt.dbManager == nil {
 		// Create a new DBManager instance without connecting to the database
-		dbManager, err := common.NewDBManager(rt.configMgr.GetGlobalConfig().DatabasePath, nil, nil)
+		dbManager, err := common.NewDBManager(rt.configMgr.GetGlobalConfig().DatabasePath, rt.logger, rt.errorHandler)
 		if err != nil {
 			rt.logger.Error("Failed to initialize DBManager: %v", err)
 		}
@@ -371,7 +371,7 @@ func main() {
 	// Initialize localization before creating window
 	lang := detectLanguage(configMgr, logger)
 	if err := locales.LoadTranslations(lang); err != nil {
-		logger.Error("Failed to initialize localization:", err)
+		logger.Error("Failed to initialize localization: %s", err)
 		os.Exit(1)
 	}
 

@@ -6,7 +6,6 @@ import (
 	"MetaRekordFixer/locales"
 	"fmt"
 	"image/color"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -517,7 +516,7 @@ func ShowLogViewerWindow(parent fyne.Window) {
 			loadLogContent(logPath, logText, scrollContainerRef)
 		},
 	)
-
+	refreshBtn.Importance = widget.HighImportance
 	// Create close button
 	closeBtn := widget.NewButtonWithIcon(
 		locales.Translate("common.button.close"),
@@ -560,7 +559,7 @@ func ShowLogViewerWindow(parent fyne.Window) {
 // and scrolls to the end of the content.
 func loadLogContent(logPath string, logText *widget.Entry, scrollContainer *container.Scroll) {
 	// Read log file content
-	content, err := ioutil.ReadFile(logPath)
+	content, err := os.ReadFile(logPath)
 	if err != nil {
 		logText.SetText(fmt.Sprintf(locales.Translate("common.err.readlog"), err))
 		return

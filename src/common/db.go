@@ -149,6 +149,7 @@ func (m *DBManager) BeginTransaction() error {
 
 	m.activeTransaction = tx
 	m.useTransactions = true
+	m.logger.Info("Started database transaction")
 
 	return nil
 }
@@ -166,7 +167,7 @@ func (m *DBManager) CommitTransaction() error {
 	if err != nil {
 		return fmt.Errorf(locales.Translate("common.db.txcommiterr"), err)
 	}
-
+	m.logger.Info("Committed database transaction")
 	m.activeTransaction = nil
 	return nil
 }
@@ -184,6 +185,7 @@ func (m *DBManager) RollbackTransaction() error {
 	if err != nil {
 		return fmt.Errorf(locales.Translate("common.db.txrollbackerr"), err)
 	}
+	m.logger.Info("Rolled back database transaction")
 
 	m.activeTransaction = nil
 	return nil

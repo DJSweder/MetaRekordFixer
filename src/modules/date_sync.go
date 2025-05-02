@@ -864,7 +864,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}

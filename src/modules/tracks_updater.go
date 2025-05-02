@@ -5,6 +5,7 @@ import (
 	"MetaRekordFixer/locales"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -319,10 +320,11 @@ func (m *TracksUpdater) Start() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Input Validation",
-			Severity:    common.SeverityWarning,
-			Recoverable: true,
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
@@ -331,10 +333,25 @@ func (m *TracksUpdater) Start() {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
 			Operation:   "Input Validation",
-			Severity:    common.SeverityWarning,
-			Recoverable: true,
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.nofolder")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	// Validate folder exists
+	filesPath := common.NormalizePath(m.folderEntry.Text)
+	if _, err := os.Stat(filesPath); os.IsNotExist(err) {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "StartSync",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.foldernotexist")), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
@@ -370,14 +387,15 @@ func (m *TracksUpdater) processUpdate() {
 	// Backup the database.
 	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
 	if err := m.dbMgr.BackupDatabase(); err != nil {
+		m.CloseProgressDialog()
 		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
+			Module:      m.GetName(),
 			Operation:   "Database Backup",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.CloseProgressDialog()
+		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
