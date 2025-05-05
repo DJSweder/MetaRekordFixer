@@ -1,7 +1,7 @@
 [![cs](https://img.shields.io/badge/cs-C2143D?style=plastic&label=lang&logoColor=%23ffffff&labelColor=%23C2143D&color=%2311457E)](README.cs.md)
 
 # Notice
-<img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="200">
+<img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="250">
 MetaRekordFixer (hereinafter referred to as "the application") is an unofficial tool intended for personal use only and is not a product of AlphaTeta, the developer of rekordbox<sup>TM</sup> software. Use of the application is at the user's own risk; the author assumes no responsibility for any potential damage (e.g., data loss or corruption) caused by using the application. As a precaution against possible negative consequences, a backup of the rekordbox<sup>TM</sup> software database, which the application accesses directly, is created before any user-requested and confirmed changes.
 
 # Why Was This Application Created?
