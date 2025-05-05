@@ -2,7 +2,7 @@
 
 # Notice
 <img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="250">
-MetaRekordFixer (hereinafter referred to as "the application") is an unofficial tool intended for personal use only and is not a product of AlphaTeta, the developer of rekordbox<sup>TM</sup> software. Use of the application is at the user's own risk; the author assumes no responsibility for any potential damage (e.g., data loss or corruption) caused by using the application. As a precaution against possible negative consequences, a backup of the rekordbox<sup>TM</sup> software database, which the application accesses directly, is created before any user-requested and confirmed changes.
+MetaRekordFixer (hereinafter referred to as "the application") is an unofficial tool intended for personal use only and is not a product of AlphaTeta, the developer of rekordbox<sup>TM</sup> software. Use of the application is at the user`s own risk; the author assumes no responsibility for any potential damage (e.g., data loss or corruption) caused by using the application. As a precaution against possible negative consequences, a backup of the rekordbox<sup>TM</sup> software database, which the application accesses directly, is created before any user-requested and confirmed changes.
 
 # Why Was This Application Created?
 
@@ -28,7 +28,7 @@ The author solved this by ensuring that every FLAC in his collection has an MP3 
 
 ### 2. Some metadata is not saved for FLAC files. ###
 
-rekordbox<sup>TM</sup> doesn't store metadata such as *release date, album artist, mix title,* and *original artist* for FLAC files, while it correctly saves these for MP3 files. MetaRekordFixer leverages this as follows:
+rekordbox<sup>TM</sup> doesn`t store metadata such as *release date, album artist, mix title,* and *original artist* for FLAC files, while it correctly saves these for MP3 files. MetaRekordFixer leverages this as follows:
 
 - The basic assumption is that MP3 equivalents of the original FLAC tracks are imported into the rekordbox<sup>TM</sup> database in the same structure (see above).
 - Metadata from these MP3s is copied into the database entries for the FLAC library items.
@@ -61,7 +61,7 @@ When adding FLAC tracks, the author also acquires MP3 equivalents. For convenien
 
 # How the Application Works
 
-The application uses direct access to the rekordbox<sup>TM</sup> database, which is usually located at `%appdata%/Roaming/Pioneer/rekordbox` under the filename `master.db`. This location must be specified in the Settings. Backups of this database are also stored here. Format conversion is performed using the external tools ffprobe and ffmpeg from the `/tools` folder in the application's installation directory.
+The application uses direct access to the rekordbox<sup>TM</sup> database, which is usually located at `%appdata%/Roaming/Pioneer/rekordbox` under the filename `master.db`. This location must be specified in the Settings. Backups of this database are also stored here. Format conversion is performed using the external tools ffprobe and ffmpeg from the `/tools` folder in the application`s installation directory.
 
 # Installation
 
@@ -69,4 +69,4 @@ Currently available for Windows only. The installer can be downloaded from [rele
 
 # Final Information
 
-The application was created by a DJ without programming experience. It may therefore contain bugs or issues related to individual DJs' collection management habits. The development of the application continues, with new features and development of existing ones planned.
+The application was created by a DJ without programming experience. It may therefore contain bugs or issues related to individual DJs` collection management habits. The development of the application continues, with new features and development of existing ones planned.
