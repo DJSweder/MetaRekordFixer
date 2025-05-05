@@ -13,14 +13,14 @@ Autorem aplikace je aktivní DJ. Klade velký důraz na správná metadata ve sv
 Hlavní nedostatky, které autor potřeboval řešit, byly tyto:
 1. [Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.](#1-starší-cdj-přístroje-společnosti-pioneer-nepodporují-formát-flac)
 2. [Neukládání některých metadat u FLAC.](#2-neukládání-některých-metadat-u-flac)
-3. [Přenos (HOT) CUEs a dalších informací].(#3-přenos-hot-cues-a-dalších-informací)
+3. [Přenos (HOT) CUEs a dalších informací.](#3-přenos-hot-cues-a-dalších-informací)
 4. [Nemožnost změnit formát skladby.](#4-nemožnost-změnit-formát-skladby)
 5. [CDJ neumožňuje řadit skladby dle data vydání.](#5-cdj-neumožňuje-řadit-skladby-dle-data-vydání)
 
 
 ### 1. Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.
 
-Autor tuto situaci vyřešil tím, že každý FLAC v jeho sbírce má svojí MP3 verzi uloženou odděleně od hlavní sbírky. V úložišti má 2 hlavní složky: 'Music' (hlavní sbírka obsahující FLAC a MP3) a 'Music MP3' (sbírka obsahující MP3 vytvořené z FLAC ve složce 'Music'). Tato složka má stejnou adresářovou strukturu, jako složka 'Music'. V Rekordboxu<sup>TM</sup> jsou na první úrovni (root) 2 složky : 'Music' a 'Music MP3'. Složka 'Music' obsahuje playlisty, jejichž názvy i obsah odpovídají složkám 'Music'. Složka 'Music MP3' má taktéž playlisty podle složek a jejich obsahu v úložišti. Je však doplněna MP3 skladbami z hlavní sbírky ('Music'). Pak už jen stačí vyexportovat obě složky z Rekordboxu<sup>TM</sup> na přenosné úložiště (USB Flash, HDD, SDD, SD karta) a v případě, že DJ má před sebou starší CD, vybírá si skladby ze složky 'Music MP3'. Níže konkrétní příklad struktury souborů a playlistů pro snažší pochopení.
+Autor tuto situaci vyřešil tím, že každý FLAC v jeho sbírce má svojí MP3 verzi uloženou odděleně od hlavní sbírky. V úložišti má 2 hlavní složky: `Music` (hlavní sbírka obsahující FLAC a MP3) a `Music MP3` (sbírka obsahující MP3 vytvořené z FLAC ve složce `Music`). Tato složka má stejnou adresářovou strukturu, jako složka `Music`. V Rekordboxu<sup>TM</sup> jsou na první úrovni (root) 2 složky : `Music` a `Music MP3`. Složka `Music` obsahuje playlisty, jejichž názvy i obsah odpovídají složkám `Music`. Složka `Music MP3` má taktéž playlisty podle složek a jejich obsahu v úložišti. Je však doplněna MP3 skladbami z hlavní sbírky (`Music`). Pak už jen stačí vyexportovat obě složky z Rekordboxu<sup>TM</sup> na přenosné úložiště (USB Flash, HDD, SDD, SD karta) a v případě, že DJ má před sebou starší CD, vybírá si skladby ze složky `Music MP3`. Níže konkrétní příklad struktury souborů a playlistů pro snažší pochopení.
 
 <img alt="Files & playlist structure" src="media/files_and_playlists_structure.png">
 
@@ -55,7 +55,7 @@ Autor si při přidávání skladeb ve formátu FLAC rovnou pořizuje MP3 ekviva
 
 # Jakým způsobem aplikace pracuje
 
-Aplikace používá přímý přístup do databáze Rekordboxu<sup>TM</sup>, která je nejčastěji umístěna v '%appdata%/Roaming/Pioneer/rekordbox' pod názvem souboru 'master.db'. Toto umístění je nutné vložit do Nastavení. Zde jsou ukládány též zálohy této databáze. Konverze formátů je prováděna prostřednictvím externích nástrojů ffprobe a ffmpeg ze složky /tools v instalační složce aplikace.
+Aplikace používá přímý přístup do databáze Rekordboxu<sup>TM</sup>, která je nejčastěji umístěna v `%appdata%/Roaming/Pioneer/rekordbox` pod názvem souboru `master.db`. Toto umístění je nutné vložit do Nastavení. Zde jsou ukládány též zálohy této databáze. Konverze formátů je prováděna prostřednictvím externích nástrojů ffprobe a ffmpeg ze složky /tools v instalační složce aplikace.
 
 # Instalace
 
