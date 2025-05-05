@@ -11,10 +11,10 @@ Autorem aplikace je aktivní DJ. Klade velký důraz na správná metadata ve sv
 
 Hlavní nedostatky, které autor potřeboval řešit, byly tyto:
 1. [Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.](#1-starší-cdj-přístroje-společnosti-pioneer-nepodporují-formát-flac)
-2. [Neukládání některých metadat u FLAC.]()
-3. [Přenos (HOT) CUEs a dalších informací].()
-4. [Nemožnost změnit formát skladby.]()
-5. [CDJ neumožňuje řadit skladby dle data vydání.]()
+2. [Neukládání některých metadat u FLAC.](#2-neukládání-některých-metadat-u-flac)
+3. [Přenos (HOT) CUEs a dalších informací].(#3-přenos-hot-cues-a-dalších-informací)
+4. [Nemožnost změnit formát skladby.](#4-nemožnost-změnit-formát-skladby)
+5. [CDJ neumožňuje řadit skladby dle data vydání.](#5-cdj-neumožňuje-řadit-skladby-dle-data-vydání)
 
 
 ### 1. Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.
