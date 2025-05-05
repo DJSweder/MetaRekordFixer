@@ -1,5 +1,6 @@
+[![en](https://img.shields.io/badge/en-C2143D?style=plastic&label=lang&logoColor=%23ffffff&labelColor=%23C2143D&color=%2387CEEB)](README.md)
 # Upozornění
-
+<img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="200">
 MetaRekordFixer (dále jen "aplikace") je neoficiální nástroj určený pouze pro osobní použití a není produktem společnosti AlphaTeta, která je autorem software Rekordbox. Použití aplikace je na vlastní riziko uživatele, autor v žádném případě neodpovídá za případné škody (např. ztráta či poškození dat), které si uživatel způsobí jejím používáním. Jako prevence možných negativních dopadů je před jakoukoliv uživatelem požadovanou a potvrzenou změnou provedena záloha databáze software Rekordbox, do které aplikace přímo přistupuje.
 
 # Proč vznikla tato aplikace?
@@ -19,6 +20,8 @@ Hlavní nedostatky, které autor potřeboval řešit, byly tyto:
 1. Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.
 
 Autor tuto situaci vyřešil tím, že každý FLAC v jeho sbírce má svojí MP3 verzi uloženou odděleně od hlavní sbírky. V úložišti má 2 hlavní složky: 'Music' (hlavní sbírka obsahující FLAC a MP3) a 'Music MP3' (sbírka obsahující MP3 vytvořené z FLAC ve složce 'Music'). Tato složka má stejnou adresářovou strukturu, jako složka 'Music'. V Rekordboxu jsou na první úrovni (root) 2 složky : 'Music' a 'Music MP3'. Složka 'Music' obsahuje playlisty, jejichž názvy i obsah odpovídají složkám 'Music'. Složka 'Music MP3' má taktéž playlisty podle složek a jejich obsahu v úložišti. Je však doplněna MP3 skladbami z hlavní sbírky ('Music'). Pak už jen stačí vyexportovat obě složky z Rekordboxu na přenosné úložiště (USB Flash, HDD, SDD, SD karta) a v případě, že DJ má před sebou starší CD, vybírá si skladby ze složky 'Music MP3'. Níže konkrétní příklad struktury souborů a playlistů pro snažší pochopení.
+
+<img alt="Files & playlist structure" src="media/files_and_playlists_structure.png">
 
 2. Neukládání některých metadat u FLAC.
 
@@ -55,7 +58,7 @@ Aplikace používá přímý přístup do databáze Rekordboxu, která je nejča
 
 # Instalace
 
-Momentálně pouze pro Windows. V releases je ke stažení instalátor, který stačí jen spustit a následovat jednotlivé kroky. Nejsou potřeba práva administrátora, protože aplikace se vč. nástrojů na konverzi nainstaluje do %appdata%/Local/Programs/MetaRekordFixer. Součástí je i autodetekce jazyka dle nastavení sytému, aktuálně podporovanými jazyky je Angličtina (výchozí pro nepodporované jazyky), Čeština, Němčina.
+Momentálně pouze pro Windows. V [releases](../../releases/latest) je ke stažení instalátor, který stačí jen spustit a následovat jednotlivé kroky. Nejsou potřeba práva administrátora, protože aplikace se vč. nástrojů na konverzi nainstaluje do %appdata%/Local/Programs/MetaRekordFixer. Součástí je i autodetekce jazyka dle nastavení sytému, aktuálně podporovanými jazyky je Angličtina (výchozí pro nepodporované jazyky), Čeština, Němčina.
 
 # Závěrečné informace
 Aplikaci vytvořil DJ bez programátorských zkušeností. Je tedy možné, že obsahuje nějaké chyby či problémy, které mohou souviset individuálními zvyklostmi DJů při správě své sbírky skladeb. Vývoj aplikace nadále pokračuje, v plánu jsou nové funkce a rozvoj těch stávajících.
