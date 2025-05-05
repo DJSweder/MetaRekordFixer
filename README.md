@@ -1,4 +1,4 @@
-
+[![cs](https://img.shields.io/badge/cs-C2143D?style=plastic&label=lang&logoColor=%23ffffff&labelColor=%23C2143D&color=%2311457E)](README.cs.md)
 
 # Notice
 <img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="200">
