@@ -1,4 +1,4 @@
-[![en](https://img.shields.io/badge/en-C2143D?style=plastic&label=lang&logoColor=%23ffffff&labelColor=%23C2143D&color=%2387CEEB)](README.md)
+[![en](https://img.shields.io/badge/en-C2143D?style=plastic&label=jazyk&logoColor=%23ffffff&labelColor=%23C2143D&color=%2387CEEB)](README.md)
 # Upozornění
 <img alt="Files & playlist structure" src="media/MetaRekordFixer_logo_transparent.png" align="right" width="200">
 MetaRekordFixer (dále jen "aplikace") je neoficiální nástroj určený pouze pro osobní použití a není produktem společnosti AlphaTeta, která je autorem software Rekordbox. Použití aplikace je na vlastní riziko uživatele, autor v žádném případě neodpovídá za případné škody (např. ztráta či poškození dat), které si uživatel způsobí jejím používáním. Jako prevence možných negativních dopadů je před jakoukoliv uživatelem požadovanou a potvrzenou změnou provedena záloha databáze software Rekordbox, do které aplikace přímo přistupuje.
