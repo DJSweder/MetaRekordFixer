@@ -811,7 +811,7 @@ func (m *HotCueSyncModule) Start() {
 		targetPath := common.NormalizePath(m.targetFolderEntry.Text)
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 			context := &common.ErrorContext{
-				Module:      m.GetName(),
+				Module:      m.GetConfigName(),
 				Operation:   "Input Validation",
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
@@ -903,7 +903,7 @@ func (m *HotCueSyncModule) processUpdate() {
 	if err := m.dbMgr.BackupDatabase(); err != nil {
 		m.CloseProgressDialog()
 		context := &common.ErrorContext{
-			Module:      m.GetName(),
+			Module:      m.GetConfigName(),
 			Operation:   "Database Backup",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
