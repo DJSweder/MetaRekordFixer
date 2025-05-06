@@ -12,16 +12,22 @@ The author of the application is an active DJ who places great emphasis on corre
 
 The main shortcomings the author needed to solve were:
 
-1. [Older Pioneer CDJ players do not support the FLAC format.](#1-older-pioneer-cdj-players-do-not-support-the-flac-format)
-2. [Some metadata is not saved for FLAC files.](#2-some-metadata-is-not-saved-for-flac-files)
-3. [Transfer of (HOT) CUEs and other information.](3-transfer-of-hot-cues-and-other-information)
-4. [Inability to change the track format.](#4-inability-to-change-the-track-format)
-5. [CDJs do not allow sorting tracks by release date.](#5-cdjs-do-not-allow-sorting-tracks-by-release-date)
-6. [Lack of format conversion.](#6-lack-of-format-conversion)
+- [Notice](#notice)
+- [Why Was This Application Created?](#why-was-this-application-created)
+- [What Does the Application Specifically Address?](#what-does-the-application-specifically-address)
+    - [1. Older Pioneer CDJ players do not support the FLAC format.](#1-older-pioneer-cdj-players-do-not-support-the-flac-format)
+    - [2. Some metadata is not saved for FLAC files.](#2-some-metadata-is-not-saved-for-flac-files)
+    - [3. Transfer of (HOT) CUEs and other information.](#3-transfer-of-hot-cues-and-other-information)
+    - [4. Inability to change the track format.](#4-inability-to-change-the-track-format)
+    - [5. CDJs do not allow sorting tracks by release date.](#5-cdjs-do-not-allow-sorting-tracks-by-release-date)
+    - [6. Lack of format conversion.](#6-lack-of-format-conversion)
+- [How the Application Works](#how-the-application-works)
+- [Installation](#installation)
+- [Final Information](#final-information)
 
 ### 1. Older Pioneer CDJ players do not support the FLAC format. ###
 
-The author solved this by ensuring that every FLAC in his collection has an MP3 version stored separately from the main collection. The storage contains two main folders: `Music` (the main collection with FLAC and MP3) and `Music MP3` (a collection of MP3s created from the FLACs in `Music`). This folder structure is mirrored. In rekordbox<sup>TM</sup>, there are two root folders: `Music` and `Music MP3`. `Music` contains playlists that match the folders in `Music`, and `Music` contains playlists based on the folders and contents in the storage, supplemented with MP3s from the main collection. Both folders can then be exported from rekordbox<sup>TM</sup> to portable storage (USB Flash, HDD, SSD, SD card), and if the DJ is using older CDJs, they select tracks from `Music MP3`. See a specific example below of the files and playlist structure for easier understanding.
+The author solved this by ensuring that every FLAC in his collection has an MP3 version stored separately from the main collection. The storage contains two main folders: `Music` (the main collection with FLAC and MP3) and `Music MP3` (a collection of MP3s created from the FLACs located in `Music`). This folder structure is mirrored. In rekordbox<sup>TM</sup>, there are two root folders: `Music` and `Music MP3`. `Music` contains playlists that match the folders in `Music`, and `Music` contains playlists based on the folders and contents in the storage, supplemented with MP3s from the main collection. Both folders can then be exported from rekordbox<sup>TM</sup> to portable storage (USB Flash, HDD, SSD, SD card), and if the DJ is using older CDJs, he select tracks from `Music MP3`. See a specific example below of the files and playlist structure for easier understanding.
 
 
 <img alt="Files & playlist structure" src="media/files_and_playlists_structure.png">
