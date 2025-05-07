@@ -30,7 +30,7 @@ type TracksUpdater struct {
 }
 
 // NewTracksUpdater creates a new instance of TracksUpdater.
-func NewTracksUpdater(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdater {
+func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdater {
 	m := &TracksUpdater{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,

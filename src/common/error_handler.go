@@ -11,15 +11,6 @@ import (
 // ErrorSeverity represents the severity level of an error
 type ErrorSeverity int
 
-// Deprecated: Will be removed after new error handling implementation is complete.
-// Use SeverityXXX constants from severity.go instead.
-const (
-	ErrorInfo     ErrorSeverity = iota // Use SeverityInfo instead
-	ErrorWarning                       // Use SeverityWarning instead
-	ErrorCritical                      // Use SeverityError instead
-	ErrorFatal                         // Use SeverityCritical instead
-)
-
 // ErrorContext provides additional information about an error
 type ErrorContext struct {
 	Module      string

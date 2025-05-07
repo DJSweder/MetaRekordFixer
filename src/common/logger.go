@@ -33,12 +33,19 @@ type Logger struct {
 }
 
 // NewLogger creates a new logger instance
-func NewLogger(logPath string, config ModuleConfig) (*Logger, error) {
-	logger := &Logger{
-		logPath:    logPath,
-		maxSizeMB:  config.GetInt("max_size_mb", 10),
-		maxAgeDays: config.GetInt("max_age_days", 7),
-	}
+func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) { 
+	// Default values for maxSizeMB and maxAgeDays
+	if maxSizeMB <= 0 { 
+		maxSizeMB = 10 
+	} 
+	if maxAgeDays <= 0 { 
+		maxAgeDays = 7 
+	} 
+	logger := &Logger{ 
+		logPath: logPath, 
+		maxSizeMB: maxSizeMB,
+		maxAgeDays: maxAgeDays,
+ 	}
 
 	// Create log directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {

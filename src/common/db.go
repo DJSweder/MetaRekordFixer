@@ -111,13 +111,6 @@ func (m *DBManager) Connect() error {
 	return nil
 }
 
-// Close closes the database connection
-// This method is deprecated, use Finalize() instead
-func (m *DBManager) Close() error {
-	// For backward compatibility, we call Finalize()
-	return m.Finalize()
-}
-
 // EnsureConnected ensures the database connection is active
 func (m *DBManager) EnsureConnected(skipConnect bool) error {
 	if !m.isConnected && !skipConnect {
@@ -291,6 +284,13 @@ func (m *DBManager) BackupDatabase() error {
 		return fmt.Errorf(locales.Translate("common.db.filenotexist"), m.dbPath)
 	}
 
+	// Finalize connection if exists
+	m.logger.Info(locales.Translate("common.log.dbclosing"))
+	if err := m.Finalize(); err != nil {
+		m.logger.Error("Failed to close database for backup: %v", err)
+		return fmt.Errorf(locales.Translate("common.err.dbclose"))
+	}
+
 	// Generate the backup file name with the current timestamp
 	backupFileName := fmt.Sprintf("master_backup_%s.db", time.Now().Format("2006-01-02@15_04_05"))
 	backupPath := filepath.Join(filepath.Dir(m.dbPath), backupFileName)
@@ -357,13 +357,6 @@ func (m *DBManager) Finalize() error {
 	if !m.isConnected || m.db == nil {
 		m.finalized = true
 		return nil
-	}
-
-	// If there's an active transaction, roll it back
-	if m.activeTransaction != nil {
-		m.logger.Info("Rolling back active transaction during finalization")
-		m.activeTransaction.Rollback()
-		m.activeTransaction = nil
 	}
 
 	// Force synchronization before closing - helps with removing .db-shm and .db-wal files

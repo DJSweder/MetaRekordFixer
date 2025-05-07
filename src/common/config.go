@@ -14,9 +14,8 @@ import (
 
 // GlobalConfig holds global application settings
 type GlobalConfig struct {
-	DatabasePath  string
-	Language      string
-	LoggingConfig ModuleConfig
+	DatabasePath string
+	Language     string
 }
 
 // ModuleConfig defines a configuration structure for modules
@@ -126,7 +125,7 @@ func (mgr *ConfigManager) saveConfig() error {
 		mgr.globalConfig.DatabasePath = "" // Set default value
 	}
 	if mgr.globalConfig.Language == "" {
-		mgr.globalConfig.Language = "cs" // Default language
+		mgr.globalConfig.Language = "en" // Default language
 	}
 
 	config := struct {
@@ -258,10 +257,7 @@ func CreateConfigFile(configPath string) error {
 	}{
 		Global: GlobalConfig{
 			DatabasePath: "",
-			Language:     "cs",
-			LoggingConfig: ModuleConfig{
-				Extra: make(map[string]string),
-			},
+			Language:     "en",
 		},
 		Modules: make(map[string]ModuleConfig),
 	}

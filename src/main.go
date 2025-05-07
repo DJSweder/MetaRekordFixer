@@ -42,36 +42,41 @@ type moduleInfo struct {
 
 // NewRekordboxTools initializes the main application with proper logging, theme, and window setup.
 func NewRekordboxTools() *RekordboxTools {
-	// Create and set up our Fyne application
-	fyneApp := app.NewWithID("com.example.metarekordfixer")
-	fyneApp.SetIcon(assets.ResourceAppLogo)
-	fyneApp.Settings().SetTheme(theme.NewCustomTheme()) // Use our custom dark theme
-
-	// Check if the configuration file exists and create it with default values if not
-	configPath := getConfigPath()
-	configMgr, err := common.NewConfigManager(configPath)
-	if err != nil {
-		// Create missing directories if they don't exist
-		_ = common.EnsureDirectoryExists(common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer"))
-		// Create the configuration file with default values
-		err = common.CreateConfigFile(configPath)
-		if err != nil {
-			os.Exit(1)
-		}
-		configMgr, err = common.NewConfigManager(configPath)
-		if err != nil {
-			os.Exit(1)
-		}
-	}
-
-	// Initialize logger
+	// Initialize logger first
 	logPath := common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer", "log", "metarekordfixer.log")
-	logger, err := common.NewLogger(logPath, configMgr.GetGlobalConfig().LoggingConfig)
+	logMaxSizeMB := 10
+	logMaxAgeDays := 7
+	logger, err := common.NewLogger(logPath, logMaxSizeMB, logMaxAgeDays)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	// Initialize localization before creating window
+	// Create and set up our Fyne application
+	fyneApp := app.NewWithID("com.example.metarekordfixer")
+	fyneApp.SetIcon(assets.ResourceAppLogo)
+	fyneApp.Settings().SetTheme(theme.NewCustomTheme())
+
+	// Setup configuration
+	configPath := getConfigPath()
+	if err := common.EnsureDirectoryExists(common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer")); err != nil {
+		logger.Error("Failed to create config directory: %v", err)
+		os.Exit(1)
+	}
+
+	configMgr, err := common.NewConfigManager(configPath)
+	if err != nil {
+		if err := common.CreateConfigFile(configPath); err != nil {
+			logger.Error("Failed to create config file: %v", err)
+			os.Exit(1)
+		}
+		configMgr, err = common.NewConfigManager(configPath)
+		if err != nil {
+			logger.Error("Failed to initialize config manager: %v", err)
+			os.Exit(1)
+		}
+	}
+
+	// Initialize localization
 	lang := detectLanguage(configMgr, logger)
 	if err := locales.LoadTranslations(lang); err != nil {
 		logger.Error("Failed to initialize localization: %s", err)
@@ -83,19 +88,16 @@ func NewRekordboxTools() *RekordboxTools {
 	mainWindow.Resize(fyne.NewSize(1000, 700))
 
 	// Log application startup
-	logger.Info("Application starting")
+	logger.Info("%s", locales.Translate("main.log.appstart"))
 
-	// Initialize dbManager only when needed, not during startup
-	var dbManager *common.DBManager
-
-	// Initialize error handler with new logger
+	// Initialize error handler
 	errorHandler := common.NewErrorHandler(logger, mainWindow)
 
 	return &RekordboxTools{
 		app:          fyneApp,
 		mainWindow:   mainWindow,
 		configMgr:    configMgr,
-		dbManager:    dbManager,
+		dbManager:    nil, // Will be initialized on demand
 		logger:       logger,
 		errorHandler: errorHandler,
 	}
@@ -140,7 +142,7 @@ func (rt *RekordboxTools) initModules() {
 		},
 		{
 			createFn: func() common.Module {
-				m := modules.NewTracksUpdater(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				m := modules.NewTracksUpdaterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
@@ -270,14 +272,14 @@ func detectLanguage(configMgr *common.ConfigManager, logger *common.Logger) stri
 	configLang := strings.ToLower(globalConfig.Language)
 	supportedLangs := getAvailableLanguages()
 
-	logger.Debug("Configured language: %s", configLang)
-	logger.Debug("Supported languages: %v", supportedLangs)
+	logger.Info("Configured language: %s", configLang)
+	logger.Info("Supported languages: %v", supportedLangs)
 
 	// If user-specified language is recognized, use it.
 	if configLang != "" {
 		for _, lang := range supportedLangs {
 			if configLang == lang.Code || configLang == strings.ToLower(lang.Name) {
-				logger.Debug("Using configured language: %s", lang.Code)
+				logger.Info("Using configured language: %s", lang.Code)
 				return lang.Code
 			}
 		}
@@ -289,19 +291,19 @@ func detectLanguage(configMgr *common.ConfigManager, logger *common.Logger) stri
 		systemLang = systemLang[:2] // Use only first two letters
 	}
 
-	logger.Debug("System language: %s", systemLang)
+	logger.Info("System language: %s", systemLang)
 
 	// If system language is recognized, use it. Otherwise fallback to English.
 	if systemLang != "" {
 		for _, lang := range supportedLangs {
 			if systemLang == lang.Code {
-				logger.Debug("Using system language: %s", lang.Code)
+				logger.Info("Using system language: %s", lang.Code)
 				return lang.Code
 			}
 		}
 	}
 
-	logger.Debug("Falling back to default language: en")
+	logger.Error("Falling back to default language: en")
 	return "en"
 }
 
@@ -339,73 +341,6 @@ type languageItem struct {
 
 // main is the entry point. It ensures config and language, then starts the RekordboxTools app.
 func main() {
-	// Create and set up our Fyne application
-	fyneApp := app.NewWithID("com.example.metarekordfixer")
-	fyneApp.SetIcon(assets.ResourceAppLogo)
-	fyneApp.Settings().SetTheme(theme.NewCustomTheme()) // Use our custom dark theme
-
-	// Check if the configuration file exists and create it with default values if not
-	configPath := getConfigPath()
-	configMgr, err := common.NewConfigManager(configPath)
-	if err != nil {
-		// Create missing directories if they don't exist
-		_ = common.EnsureDirectoryExists(common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer"))
-		// Create the configuration file with default values
-		err = common.CreateConfigFile(configPath)
-		if err != nil {
-			os.Exit(1)
-		}
-		configMgr, err = common.NewConfigManager(configPath)
-		if err != nil {
-			os.Exit(1)
-		}
-	}
-
-	// Initialize logger
-	logPath := common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer", "log", "metarekordfixer.log")
-	logger, err := common.NewLogger(logPath, configMgr.GetGlobalConfig().LoggingConfig)
-	if err != nil {
-		os.Exit(1)
-	}
-
-	// Initialize localization before creating window
-	lang := detectLanguage(configMgr, logger)
-	if err := locales.LoadTranslations(lang); err != nil {
-		logger.Error("Failed to initialize localization: %s", err)
-		os.Exit(1)
-	}
-
-	// Create the main window with localized title
-	mainWindow := fyneApp.NewWindow(locales.Translate("main.app.title"))
-	mainWindow.Resize(fyne.NewSize(1000, 700))
-
-	// Log application startup
-	logger.Info("Application starting")
-
-	// Initialize dbManager only when needed, not during startup
-	var dbManager *common.DBManager
-
-	// Initialize error handler with new logger
-	errorHandler := common.NewErrorHandler(logger, mainWindow)
-	errorHandler.SetWindow(mainWindow)
-
-	// Initialize language
-	globalConfig := configMgr.GetGlobalConfig()
-	language := globalConfig.Language
-	if language == "" {
-		language = detectLanguage(configMgr, logger)
-		globalConfig.Language = language
-		configMgr.SaveGlobalConfig(globalConfig)
-	}
-
-	rt := &RekordboxTools{
-		app:          fyneApp,
-		mainWindow:   mainWindow,
-		configMgr:    configMgr,
-		dbManager:    dbManager,
-		logger:       logger,
-		errorHandler: errorHandler,
-	}
-
+	rt := NewRekordboxTools()
 	rt.Run()
 }

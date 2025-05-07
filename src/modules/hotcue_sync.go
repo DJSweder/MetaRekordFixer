@@ -923,11 +923,11 @@ func (m *HotCueSyncModule) processUpdate() {
 		return
 	}
 
-	// Start database transaction
-	if err := m.dbMgr.BeginTransaction(); err != nil {
+	// Connect to database
+	if err := m.dbMgr.Connect(); err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Begin Transaction",
+			Operation:   "Database Connection",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
@@ -935,19 +935,7 @@ func (m *HotCueSyncModule) processUpdate() {
 		m.CloseProgressDialog()
 		return
 	}
-
-	// Ensure database connection is properly closed
-	defer func() {
-		if err := m.dbMgr.Finalize(); err != nil {
-			context := &common.ErrorContext{
-				Module:      m.GetConfigName(),
-				Operation:   "Close Database",
-				Severity:    common.SeverityWarning,
-				Recoverable: true,
-			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.dbcloseerr"), err), context)
-		}
-	}()
+	defer m.dbMgr.Finalize()
 
 	// Track successful and skipped files
 	processedCount := 0
@@ -962,7 +950,6 @@ func (m *HotCueSyncModule) processUpdate() {
 		// Check if operation was cancelled
 		if m.IsCancelled() {
 			m.HandleProcessCancellation("common.status.stopped", processedCount, len(sourceTracks))
-			m.dbMgr.RollbackTransaction()
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
@@ -977,7 +964,6 @@ func (m *HotCueSyncModule) processUpdate() {
 				Recoverable: false,
 			}
 			m.ErrorHandler.ShowStandardError(err, context)
-			m.dbMgr.RollbackTransaction()
 			m.CloseProgressDialog()
 			return
 		}
@@ -997,7 +983,6 @@ func (m *HotCueSyncModule) processUpdate() {
 			// Check if operation was cancelled
 			if m.IsCancelled() {
 				m.HandleProcessCancellation("common.status.stopped", processedCount, len(sourceTracks))
-				m.dbMgr.RollbackTransaction()
 				common.UpdateButtonToCompleted(m.submitBtn)
 				return
 			}
@@ -1012,7 +997,6 @@ func (m *HotCueSyncModule) processUpdate() {
 					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(err, context)
-				m.dbMgr.RollbackTransaction()
 				m.CloseProgressDialog()
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
@@ -1028,7 +1012,6 @@ func (m *HotCueSyncModule) processUpdate() {
 					Recoverable: false,
 				}
 				m.ErrorHandler.ShowStandardError(err, context)
-				m.dbMgr.RollbackTransaction()
 				m.CloseProgressDialog()
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
@@ -1043,20 +1026,6 @@ func (m *HotCueSyncModule) processUpdate() {
 	// Update progress and status
 	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
-
-	// Commit transaction
-	if err := m.dbMgr.CommitTransaction(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Commit Transaction",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txcommiterr"), err), context)
-		m.CloseProgressDialog()
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
 
 	// Complete progress dialog and update button
 	m.CompleteProgressDialog()
