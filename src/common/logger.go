@@ -10,19 +10,6 @@ import (
 	"time"
 )
 
-// LogLevel represents the severity of a log message
-type LogLevel string
-
-// Deprecated: Will be removed after new error handling implementation is complete.
-// Use SeverityXXX constants from severity.go instead.
-const (
-	LogLevelDebug   LogLevel = "DEBUG"   // Use SeverityInfo instead
-	LogLevelInfo    LogLevel = "INFO"    // Use SeverityInfo instead
-	LogLevelWarning LogLevel = "WARNING" // Use SeverityWarning instead
-	LogLevelError   LogLevel = "ERROR"   // Use SeverityError instead
-)
-
-// Logger handles application logging with file rotation
 type Logger struct {
 	logPath     string
 	logFile     *os.File
@@ -33,19 +20,19 @@ type Logger struct {
 }
 
 // NewLogger creates a new logger instance
-func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) { 
+func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) {
 	// Default values for maxSizeMB and maxAgeDays
-	if maxSizeMB <= 0 { 
-		maxSizeMB = 10 
-	} 
-	if maxAgeDays <= 0 { 
-		maxAgeDays = 7 
-	} 
-	logger := &Logger{ 
-		logPath: logPath, 
-		maxSizeMB: maxSizeMB,
+	if maxSizeMB <= 0 {
+		maxSizeMB = 10
+	}
+	if maxAgeDays <= 0 {
+		maxAgeDays = 7
+	}
+	logger := &Logger{
+		logPath:    logPath,
+		maxSizeMB:  maxSizeMB,
 		maxAgeDays: maxAgeDays,
- 	}
+	}
 
 	// Create log directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
@@ -72,7 +59,7 @@ func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) {
 }
 
 // Log writes a message to the log file
-func (l *Logger) Log(level LogLevel, format string, args ...interface{}) error {
+func (l *Logger) Log(level Severity, format string, args ...interface{}) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -99,22 +86,22 @@ func (l *Logger) Log(level LogLevel, format string, args ...interface{}) error {
 
 // Debug logs a debug message
 func (l *Logger) Debug(format string, args ...interface{}) {
-	l.Log(LogLevelDebug, format, args...)
+	l.Log(SeverityInfo, format, args...)
 }
 
 // Info logs an info message
 func (l *Logger) Info(format string, args ...interface{}) {
-	l.Log(LogLevelInfo, format, args...)
+	l.Log(SeverityInfo, format, args...)
 }
 
 // Warning logs a warning message
 func (l *Logger) Warning(format string, args ...interface{}) {
-	l.Log(LogLevelWarning, format, args...)
+	l.Log(SeverityWarning, format, args...)
 }
 
 // Error logs an error message
 func (l *Logger) Error(format string, args ...interface{}) {
-	l.Log(LogLevelError, format, args...)
+	l.Log(SeverityError, format, args...)
 }
 
 // Close closes the log file

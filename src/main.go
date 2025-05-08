@@ -4,9 +4,6 @@ package main
 
 import (
 	"os"
-	"strings"
-	"syscall"
-	"unsafe"
 
 	"MetaRekordFixer/assets"
 	"MetaRekordFixer/common"
@@ -77,11 +74,7 @@ func NewRekordboxTools() *RekordboxTools {
 	}
 
 	// Initialize localization
-	lang := detectLanguage(configMgr, logger)
-	if err := locales.LoadTranslations(lang); err != nil {
-		logger.Error("Failed to initialize localization: %s", err)
-		os.Exit(1)
-	}
+	common.DetectAndSetLanguage(configMgr, logger)
 
 	// Create the main window with localized title
 	mainWindow := fyneApp.NewWindow(locales.Translate("main.app.title"))
@@ -264,79 +257,6 @@ func getConfigPath() string {
 		return "settings.conf"
 	}
 	return common.JoinPaths(appData, "MetaRekordFixer", "settings.conf")
-}
-
-// detectLanguage determines the application language based on config or system settings.
-func detectLanguage(configMgr *common.ConfigManager, logger *common.Logger) string {
-	globalConfig := configMgr.GetGlobalConfig()
-	configLang := strings.ToLower(globalConfig.Language)
-	supportedLangs := getAvailableLanguages()
-
-	logger.Info("Configured language: %s", configLang)
-	logger.Info("Supported languages: %v", supportedLangs)
-
-	// If user-specified language is recognized, use it.
-	if configLang != "" {
-		for _, lang := range supportedLangs {
-			if configLang == lang.Code || configLang == strings.ToLower(lang.Name) {
-				logger.Info("Using configured language: %s", lang.Code)
-				return lang.Code
-			}
-		}
-	}
-
-	// Try to detect system language
-	systemLang := getSystemLanguage()
-	if len(systemLang) >= 2 {
-		systemLang = systemLang[:2] // Use only first two letters
-	}
-
-	logger.Info("System language: %s", systemLang)
-
-	// If system language is recognized, use it. Otherwise fallback to English.
-	if systemLang != "" {
-		for _, lang := range supportedLangs {
-			if systemLang == lang.Code {
-				logger.Info("Using system language: %s", lang.Code)
-				return lang.Code
-			}
-		}
-	}
-
-	logger.Error("Falling back to default language: en")
-	return "en"
-}
-
-// getSystemLanguage retrieves the system language on Windows via kernel32.dll calls.
-func getSystemLanguage() string {
-	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	getUserDefaultLocaleName := kernel32.NewProc("GetUserDefaultLocaleName")
-
-	// Buffer to store the locale name
-	localeName := make([]uint16, 85) // LOCALE_NAME_MAX_LENGTH is 85
-	getUserDefaultLocaleName.Call(uintptr(unsafe.Pointer(&localeName[0])), uintptr(len(localeName)))
-
-	return strings.ToLower(syscall.UTF16ToString(localeName))
-}
-
-// getAvailableLanguages scans the locales directory from the embedded FS and returns a list of available languages.
-func getAvailableLanguages() []languageItem {
-	langs := locales.GetAvailableLanguages()
-	var langItems []languageItem
-	for _, code := range langs {
-		name := locales.Translate("settings.lang." + code)
-		if strings.HasPrefix(name, "settings.lang.") {
-			name = code
-		}
-		langItems = append(langItems, languageItem{Code: code, Name: name})
-	}
-	return langItems
-}
-
-// languageItem is a helper for language detection, storing both code and display name.
-type languageItem struct {
-	Code string // e.g. "cs", "en", "de"
-	Name string // e.g. "Čeština", "English", "Deutsch"
 }
 
 // main is the entry point. It ensures config and language, then starts the RekordboxTools app.
