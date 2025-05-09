@@ -71,8 +71,8 @@ When adding FLAC tracks, the author also acquires MP3 equivalents. For convenien
 The application uses direct access to the rekordbox<sup>TM</sup> database, which is usually located at `%appdata%/Roaming/Pioneer/rekordbox` under the filename `master.db`. This location must be specified in the Settings. Backups of this database are also stored here. Format conversion is performed using the external tools ffprobe and ffmpeg from the `/tools` folder in the application`s installation directory.
 
 *Important note:*
-                    *1. The Rekordbox<sup>TM</sup> software must not be running while working in the application.*
-                    *2. The application is designed to work with a local database file, so the correct functionality of the application is not guaranteed if the database file is located on a network drive.*
+1. *The Rekordbox<sup>TM</sup> software must not be running while working in the application.*
+2. *The application is designed to work with a local database file, so the correct functionality of the application is not guaranteed if the database file is located on a network drive.*
 
 # Installation
 
