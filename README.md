@@ -48,7 +48,7 @@ The DJ created a library containing MP3 copies of his FLAC tracks for compatibil
 - Set data transfer between items by selecting source and target folders containing the files.
 - Set data transfer between playlists, useful if tracks are in different folders.
 - Combine both: source items from a folder, target items from a playlist, and vice versa.
-Important note: If the source or target file is MP3, its bitrate must be constant. With variable bitrate, transferred CUE points may not be at the correct positions.
+*Important note: If the source or target file is MP3, its bitrate must be constant. With variable bitrate, transferred CUE points may not be at the correct positions.*
 
 ### 4. Inability to change the track format. ###
 
@@ -68,10 +68,13 @@ When adding FLAC tracks, the author also acquires MP3 equivalents. For convenien
 # How the Application Works
 
 The application uses direct access to the rekordbox<sup>TM</sup> database, which is usually located at `%appdata%/Roaming/Pioneer/rekordbox` under the filename `master.db`. This location must be specified in the Settings. Backups of this database are also stored here. Format conversion is performed using the external tools ffprobe and ffmpeg from the `/tools` folder in the application`s installation directory.
+*Important notice:*
+                    *1. The Rekordbox<sup>TM</sup> software must not be running while working in the application.*
+                    *2. The application is designed to work with a local database file, so the correct functionality of the application is not guaranteed if the database file is located on a network drive.*
 
 # Installation
 
-Currently available for Windows only. The installer can be downloaded from [releases page](../../releases/latest); simply run it and follow the steps. Administrator rights are not required, as the application-including conversion tools-installs to `%appdata%/Local/Programs/MetaRekordFixer`. The application includes automatic language detection based on system settings; currently supported languages are English (default for unsupported languages), Czech, and German.
+Currently available for Windows only. The installer can be downloaded from [releases page](../../releases/latest); simply run it and follow the steps. Administrator rights are not required, because the application is installed in `%appdata%/Local/Programs/MetaRekordFixer`. During the installation, ffmpeg and ffprobe, which are needed for file conversion, will also be downloaded. The application includes automatic language detection based on system settings; currently supported languages are English (default for unsupported languages), Czech, and German.
 
 # Final Information
 

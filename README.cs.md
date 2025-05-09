@@ -11,11 +11,18 @@ Autorem aplikace je aktivní DJ. Klade velký důraz na správná metadata ve sv
 # Co konkrétně aplikace řeší?
 
 Hlavní nedostatky, které autor potřeboval řešit, byly tyto:
-1. [Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.](#1-starší-cdj-přístroje-společnosti-pioneer-nepodporují-formát-flac)
-2. [Neukládání některých metadat u FLAC.](#2-neukládání-některých-metadat-u-flac)
-3. [Přenos (HOT) CUEs a dalších informací.](#3-přenos-hot-cues-a-dalších-informací)
-4. [Nemožnost změnit formát skladby.](#4-nemožnost-změnit-formát-skladby)
-5. [CDJ neumožňuje řadit skladby dle data vydání.](#5-cdj-neumožňuje-řadit-skladby-dle-data-vydání)
+- [Upozornění](#upozornění)
+- [Proč vznikla tato aplikace?](#proč-vznikla-tato-aplikace)
+- [Co konkrétně aplikace řeší?](#co-konkrétně-aplikace-řeší)
+    - [1. Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.](#1-starší-cdj-přístroje-společnosti-pioneer-nepodporují-formát-flac)
+    - [2. Neukládání některých metadat u FLAC.](#2-neukládání-některých-metadat-u-flac)
+    - [3. Přenos (HOT) CUEs a dalších informací.](#3-přenos-hot-cues-a-dalších-informací)
+    - [4. Nemožnost změnit formát skladby.](#4-nemožnost-změnit-formát-skladby)
+    - [5. CDJ neumožňuje řadit skladby dle data vydání.](#5-cdj-neumožňuje-řadit-skladby-dle-data-vydání)
+    - [6. Chybí převod mezi formáty.](#6-chybí-převod-mezi-formáty)
+- [Jakým způsobem aplikace pracuje](#jakým-způsobem-aplikace-pracuje)
+- [Instalace](#instalace)
+- [Závěrečné informace](#závěrečné-informace)
 
 
 ### 1. Starší CDJ přístroje společnosti Pioneer nepodporují formát FLAC.
@@ -29,7 +36,7 @@ Autor tuto situaci vyřešil tím, že každý FLAC v jeho sbírce má svojí MP
 rekordbox<sup>TM</sup> u FLAC souborů nezapisuje tyto údaje: datum vydání, intepret alba, název mixu, původní interpret. U MP3 souborů však tato data zapíše korektně. MetaRekordFixer toho využije tímto způsobem:
 - základním předpokladem je, že v databázi Rekordboxu<sup>TM</sup> jsou naimportovány MP3 ekvivalenty originálních FLAC skladeb ve stejné struktuře (viz výše)
 - metadata z těchto MP3 jsou zkopírována do databáze k položkám knihovny ve formátu FLAC
-Důležité upozornění: soubory MP3 a FLAC musí mít stejný název (bez ohledu na příponu).
+*Důležité upozornění: soubory MP3 a FLAC musí mít stejný název (bez ohledu na příponu).*
 
 ### 3. Přenos (HOT) CUEs a dalších informací.
 
@@ -37,7 +44,7 @@ DJ si vytvořil knihovnu obsahující MP3 kopie svých FLAC skladeb pro zajišt�
 - nastavit, aby se data překopírovala mezi položkami výběrem zdrojové a cílové složky ve kterých jsou soubory
 - nastavit, aby se data překopírovala mezi playlisty, což je užitečné v případě, že jsou skladby v různých složkách
 - funguje i kombinace, že zdrojem jsou položky ve složce, cílem položky z playlistu a naopak.
-Důležité upozornění: pokud je zdroj nebo cíl soubor MP3, je nutné, aby jeho bitrate byl konstatní. Při variabilním bitrate nemusí být překopírované CUE body na správných místech.
+*Důležité upozornění: pokud je zdroj nebo cíl soubor MP3, je nutné, aby jeho bitrate byl konstatní. Při variabilním bitrate nemusí být překopírované CUE body na správných místech.*
 
 ### 4. Nemožnost změnit formát skladby.
 
@@ -56,10 +63,13 @@ Autor si při přidávání skladeb ve formátu FLAC rovnou pořizuje MP3 ekviva
 # Jakým způsobem aplikace pracuje
 
 Aplikace používá přímý přístup do databáze Rekordboxu<sup>TM</sup>, která je nejčastěji umístěna v `%appdata%/Roaming/Pioneer/rekordbox` pod názvem souboru `master.db`. Toto umístění je nutné vložit do Nastavení. Zde jsou ukládány též zálohy této databáze. Konverze formátů je prováděna prostřednictvím externích nástrojů ffprobe a ffmpeg ze složky /tools v instalační složce aplikace.
+*Důležité upozornění:* 
+                     *1. Během práce v aplikaci nesmí být software Rekordbox<sup>TM</sup> spuštěn.* 
+                     *2. Aplikace je navržena pro práci s lokálním souborem databáze, neručíme tedy za správnou funkčnost aplikace, pokud je soubor databáze umístěn na síťovém disku.*
 
 # Instalace
 
-Momentálně pouze pro Windows. V [releases](../../releases/latest) je ke stažení instalátor, který stačí jen spustit a následovat jednotlivé kroky. Nejsou potřeba práva administrátora, protože aplikace se vč. nástrojů na konverzi nainstaluje do %appdata%/Local/Programs/MetaRekordFixer. Součástí je i autodetekce jazyka dle nastavení sytému, aktuálně podporovanými jazyky je Angličtina (výchozí pro nepodporované jazyky), Čeština, Němčina.
+Momentálně pouze pro Windows. V [releases](../../releases/latest) je ke stažení instalátor, který stačí jen spustit a následovat jednotlivé kroky. Nejsou potřeba práva administrátora, protože aplikace se nainstaluje do %appdata%/Local/Programs/MetaRekordFixer. Během instalace dojde i ke stažení ffmpeg a ffprobe, které jsou potřeba pro konverzi souborů. Součástí je i autodetekce jazyka dle nastavení sytému, aktuálně podporovanými jazyky je Angličtina (výchozí pro nepodporované jazyky), Čeština, Němčina.
 
 # Závěrečné informace
 Aplikaci vytvořil DJ bez programátorských zkušeností. Je tedy možné, že obsahuje nějaké chyby či problémy, které mohou souviset individuálními zvyklostmi DJů při správě své sbírky skladeb. Vývoj aplikace nadále pokračuje, v plánu jsou nové funkce a rozvoj těch stávajících.
