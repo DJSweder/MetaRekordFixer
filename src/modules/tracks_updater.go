@@ -225,7 +225,7 @@ func (m *TracksUpdater) initializeUI() {
 	// When the user chooses a folder, set the text entry to the path of the chosen folder
 	// and save the config.
 	folderSelectionField := common.CreateFolderSelectionField(
-		locales.Translate("updater.folder.newfiles"),
+		locales.Translate("common.entry.placeholderpath"),
 		m.folderEntry,
 		func(path string) {
 			m.folderEntry.SetText(path)
@@ -394,7 +394,7 @@ func (m *TracksUpdater) processUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}

@@ -124,7 +124,7 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 
 	// Source folder container
 	sourceBrowseBtn := common.CreateNativeFolderBrowseButton(
-		locales.Translate("convert.label.sourcefolder"),
+		locales.Translate("common.entry.placeholderpath"),
 		"",
 		func(path string) {
 			m.sourceFolderEntry.SetText(path)
@@ -139,7 +139,7 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 
 	// Target folder container
 	targetBrowseBtn := common.CreateNativeFolderBrowseButton(
-		locales.Translate("convert.label.targetfolder"),
+		locales.Translate("common.entry.placeholderpath"),
 		"",
 		func(path string) {
 			m.targetFolderEntry.SetText(path)

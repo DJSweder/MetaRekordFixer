@@ -420,7 +420,7 @@ func (m *DateSyncModule) addCustomDateFolderEntry() {
 	// Initialize entry field for custom date folder selection
 	entry := widget.NewEntry()
 	customDateFolderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.customdate"),
+		locales.Translate("common.entry.placeholderpath"),
 		entry,
 		func(path string) {
 			entry.SetText(path)
@@ -448,7 +448,7 @@ func (m *DateSyncModule) addExcludedFolderEntry() {
 	// Initialize entry field for folder selection
 	entry := widget.NewEntry()
 	folderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.excluded"),
+		locales.Translate("common.entry.placeholderpath"),
 		entry,
 		func(path string) {
 			entry.SetText(path)
@@ -498,7 +498,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 		m.foldersContainer.Add(folderField)
 	} else {
 		folderField = common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.customdate"),
+			locales.Translate("common.entry.placeholderpath"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
@@ -638,9 +638,17 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	// Get total number of records to be updated
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM djmdContent %s", whereClause)
 	var totalCount int
-	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
-	if err != nil {
-		return 0, fmt.Errorf("error counting records: %w", err)
+	var err error
+	if err = m.dbMgr.QueryRow(countQuery).Scan(&totalCount); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Query",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return 0, nil
 	}
 
 	// Add info message about number of records to update
@@ -655,9 +663,16 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 
 	// Update query
 	updateQuery := fmt.Sprintf("UPDATE djmdContent SET StockDate = ReleaseDate, DateCreated = ReleaseDate %s", whereClause)
-	err = m.dbMgr.Execute(updateQuery)
-	if err != nil {
-		return 0, fmt.Errorf("error updating dates: %w", err)
+	if err = m.dbMgr.Execute(updateQuery); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Update",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return 0, nil
 	}
 
 	return totalCount, nil
@@ -681,9 +696,17 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 	// Get total number of records to be updated
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM djmdContent %s", whereClause)
 	var totalCount int
-	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
-	if err != nil {
-		return 0, fmt.Errorf("error counting records: %w", err)
+	var err error
+	if err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Query",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return 0, nil
 	}
 
 	// Add info message about number of records to update
@@ -703,11 +726,17 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 			DateCreated = ?
 		%s`, whereClause)
 
-	err = m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02"), customDate.Format("2006-01-02"))
-	if err != nil {
-		return 0, fmt.Errorf("error updating dates: %w", err)
+	if err = m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02"), customDate.Format("2006-01-02")); err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetConfigName(),
+			Operation:   "Database Update",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return 0, nil
 	}
-
 	return totalCount, nil
 }
 
@@ -769,7 +798,7 @@ func (m *DateSyncModule) Start(mode string) {
 					Severity:    common.SeverityCritical,
 					Recoverable: false,
 				}
-				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.noexcluded")), context)
+				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.noexcludedfolder")), context)
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
 			}
@@ -785,7 +814,7 @@ func (m *DateSyncModule) Start(mode string) {
 						Severity:    common.SeverityCritical,
 						Recoverable: false,
 					}
-					m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nosrcfolderpath"), folderName), context)
+					m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.foldernotexist"), folderName), context)
 					m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 					return
 				}
@@ -794,9 +823,6 @@ func (m *DateSyncModule) Start(mode string) {
 
 		// Show progress dialog
 		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
 
 		// Start the process in a goroutine
 		go m.processStandardUpdate()
@@ -815,7 +841,7 @@ func (m *DateSyncModule) Start(mode string) {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.nocustomfolders")), context)
+			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.nocustomfolder")), context)
 			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
@@ -831,7 +857,7 @@ func (m *DateSyncModule) Start(mode string) {
 					Severity:    common.SeverityCritical,
 					Recoverable: false,
 				}
-				m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.nosrcfolderpath"), folderName), context)
+				m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("datesync.err.foldernotexist"), folderName), context)
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 				return
 			}
@@ -853,9 +879,6 @@ func (m *DateSyncModule) Start(mode string) {
 		// Show progress dialog
 		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
 
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
-
 		// Start the process in a goroutine
 		go m.processCustomUpdate()
 	}
@@ -873,11 +896,13 @@ func (m *DateSyncModule) processStandardUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
-	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
+	// Add initial status message
+	m.AddInfoMessage(locales.Translate("common.status.start"))
+	m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 	// Check if cancelled after database backup
 	if m.IsCancelled() {
@@ -896,7 +921,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -959,7 +984,9 @@ func (m *DateSyncModule) processCustomUpdate() {
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
-	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
+	// Add initial status message
+	m.AddInfoMessage(locales.Translate("common.status.start"))
+	m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 	// Check if cancelled after database backup
 	if m.IsCancelled() {

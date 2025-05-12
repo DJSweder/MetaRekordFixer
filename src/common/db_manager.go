@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"MetaRekordFixer/locales"
+	"strings"
 
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
@@ -88,6 +89,13 @@ func (m *DBManager) Connect() error {
 	err = db.Ping()
 	if err != nil {
 		db.Close()
+		// Analyzovat typ chyby
+		if strings.Contains(err.Error(), "file is not a database") {
+			return fmt.Errorf(locales.Translate("common.db.invalidformat"), err)
+		}
+		if strings.Contains(err.Error(), "no such table") {
+			return fmt.Errorf(locales.Translate("common.db.missingtables"), err)
+		}
 		return fmt.Errorf(locales.Translate("common.db.dbconnecterr"), err)
 	}
 
@@ -298,7 +306,6 @@ func (m *DBManager) BackupDatabase() error {
 	// Copy the database file to the backup location
 	err := CopyFile(m.dbPath, backupPath)
 	if err != nil {
-		m.logger.Error("problem with backup: %v", err)
 		return fmt.Errorf(locales.Translate("common.db.backupcopyerr"), err)
 	}
 

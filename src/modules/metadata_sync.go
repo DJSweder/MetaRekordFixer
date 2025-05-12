@@ -172,7 +172,7 @@ func (m *MetadataSyncModule) initializeUI() {
 
 	// Initialize folder selection button using standardized function
 	folderSelectionField := common.CreateFolderSelectionField(
-		locales.Translate("metsync.label.source"),
+		locales.Translate("common.entry.placeholderpath"),
 		m.sourceFolderEntry,
 		func(path string) {
 			m.sourceFolderEntry.SetText(common.NormalizePath(path))
@@ -305,7 +305,7 @@ func (m *MetadataSyncModule) Start() {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+			m.ErrorHandler.ShowStandardError(err, context)
 			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}

@@ -334,7 +334,7 @@ func (m *HotCueSyncModule) initializeUI() {
 		m.SaveConfig()
 	})
 	m.sourceFolderField = common.CreateFolderSelectionField(
-		locales.Translate("hotcuesync.data.source"),
+		locales.Translate("common.entry.placeholderpath"),
 		m.sourceFolderEntry,
 		m.CreateChangeHandler(func() {
 			m.SaveConfig()
@@ -347,7 +347,7 @@ func (m *HotCueSyncModule) initializeUI() {
 		m.SaveConfig()
 	})
 	m.targetFolderField = common.CreateFolderSelectionField(
-		locales.Translate("hotcuesync.data.target"),
+		locales.Translate("common.entry.placeholderpath"),
 		m.targetFolderEntry,
 		m.CreateChangeHandler(func() {
 			m.SaveConfig()
@@ -908,7 +908,7 @@ func (m *HotCueSyncModule) processUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.backupdb"), err), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
