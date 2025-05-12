@@ -1,4 +1,4 @@
-// common/language.go
+// common/language_manager.go
 
 package common
 

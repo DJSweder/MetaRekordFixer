@@ -378,11 +378,20 @@ func (m *DateSyncModule) initializeUI() {
 
 	// Create calendar button
 	m.calendarBtn = widget.NewButtonWithIcon("", theme.HistoryIcon(), func() {
+		// Create dialog with calendar that will close automatically after date selection
 		calendar := NewCustomCalendar(func(selectedDate time.Time) {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
 		})
-		dialog.ShowCustom(locales.Translate("datesync.dialog.calendar"), locales.Translate("common.button.close"), calendar, m.Window)
+		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesync.dialog.calendar"), calendar, m.Window)
+		calendar.onSelected = func(selectedDate time.Time) {
+			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
+			m.SaveConfig()
+			dlg.Hide()
+		}
+
+		dlg.Show()
+
 	})
 
 	// Create standard update button

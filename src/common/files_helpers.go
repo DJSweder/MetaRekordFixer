@@ -1,4 +1,4 @@
-// common/module_files.go
+// common/files_helpers.go
 
 package common
 
@@ -10,21 +10,6 @@ import (
 	"strings"
 	"time"
 )
-
-// FileOperationResult represents the result of a file operation
-type FileOperationResult struct {
-	Success      bool
-	FilePath     string
-	ErrorMessage string
-}
-
-// FileOperationProgress provides information about file operation progress
-type FileOperationProgress struct {
-	CurrentFile    string
-	TotalFiles     int
-	CompletedFiles int
-	Progress       float64
-}
 
 // FileInfo provides extended information about a file
 type FileInfo struct {
@@ -45,6 +30,15 @@ func NormalizePath(path string) string {
 		return ""
 	}
 	return filepath.Clean(filepath.FromSlash(path))
+}
+
+// DirectoryExists checks if a directory exists
+func DirectoryExists(dirPath string) bool {
+	info, err := os.Stat(dirPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
 
 // EnsureDirectoryExists ensures the specified directory exists
@@ -68,15 +62,6 @@ func EnsureDirectoryExists(path string) error {
 	}
 
 	return err // Some other error occurred
-}
-
-// DirectoryExists checks if a directory exists
-func DirectoryExists(dirPath string) bool {
-	info, err := os.Stat(dirPath)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
 }
 
 // ListFilesWithExtensions returns a list of files with the specified extensions
@@ -135,30 +120,6 @@ func GetFileInfo(filePath string) (FileInfo, error) {
 	fileInfo.IsDir = info.IsDir()
 
 	return fileInfo, nil
-}
-
-// ReadTextFile reads a text file and returns its content
-func ReadTextFile(filePath string) (string, error) {
-	if !DirectoryExists(filepath.Dir(filePath)) {
-		return "", fmt.Errorf("directory does not exist: %s", filepath.Dir(filePath))
-	}
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file %s: %v", filePath, err)
-	}
-
-	return string(data), nil
-}
-
-// WriteTextFile writes text content to a file
-func WriteTextFile(filePath string, content string) error {
-	err := os.WriteFile(filePath, []byte(content), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write to file %s: %v", filePath, err)
-	}
-
-	return nil
 }
 
 // CopyFile copies a file from source to destination
@@ -240,11 +201,6 @@ func JoinPaths(elements ...string) string {
 	return filepath.Join(elements...)
 }
 
-// GetDirectoryPath returns the directory path of a file path
-func GetDirectoryPath(path string) string {
-	return filepath.Dir(path)
-}
-
 // ToDbPath converts a filesystem path to a format suitable for Rekordbox database queries
 // It ensures paths use forward slashes and adds a trailing slash if needed for LIKE queries
 func ToDbPath(path string, addTrailingSlash bool) string {
@@ -257,51 +213,4 @@ func ToDbPath(path string, addTrailingSlash bool) string {
 	}
 
 	return path
-}
-
-// GetFileNameWithoutExtension returns the filename without its extension
-func GetFileNameWithoutExtension(fileName string) string {
-	// Get the base name (without directory)
-	baseName := filepath.Base(fileName)
-	
-	// Find the last dot in the filename
-	extIndex := strings.LastIndex(baseName, ".")
-	
-	// If there's no extension, return the filename as is
-	if extIndex == -1 {
-		return baseName
-	}
-	
-	// Return the part before the extension
-	return baseName[:extIndex]
-}
-
-// GetRelativePathWithoutExtension extracts the relative path without extension from a file path
-// It removes the root directory and file extension to help match files across different root folders
-func GetRelativePathWithoutExtension(filePath string, rootDir string) string {
-	// Normalize paths to use forward slashes
-	filePath = filepath.ToSlash(filePath)
-	rootDir = filepath.ToSlash(rootDir)
-	
-	// Ensure rootDir ends with a slash
-	if !strings.HasSuffix(rootDir, "/") {
-		rootDir += "/"
-	}
-	
-	// Extract the relative path by removing the root directory prefix
-	relativePath := ""
-	if strings.HasPrefix(filePath, rootDir) {
-		relativePath = filePath[len(rootDir):]
-	} else {
-		// If the file is not in the root directory, just use the full path
-		relativePath = filePath
-	}
-	
-	// Remove the file extension
-	extIndex := strings.LastIndex(relativePath, ".")
-	if extIndex != -1 {
-		relativePath = relativePath[:extIndex]
-	}
-	
-	return relativePath
 }

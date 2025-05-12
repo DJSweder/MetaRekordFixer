@@ -1,4 +1,4 @@
-// common/config.go
+// common/config_manager.go
 
 package common
 
@@ -183,31 +183,9 @@ func (c *ModuleConfig) SetBool(key string, value bool) {
 	c.Extra[key] = fmt.Sprintf("%t", value)
 }
 
-// GetInt retrieves an integer value from the module configuration
-func (c ModuleConfig) GetInt(key string, defaultValue int) int {
-	if value, exists := c.Extra[key]; exists {
-		intValue, err := parseInt(value)
-		if err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
-
 // SetInt stores an integer value in the module configuration
 func (c *ModuleConfig) SetInt(key string, value int) {
 	c.Extra[key] = fmt.Sprintf("%d", value)
-}
-
-// GetFloat retrieves a float value from the module configuration
-func (c ModuleConfig) GetFloat(key string, defaultValue float64) float64 {
-	if value, exists := c.Extra[key]; exists {
-		floatValue, err := parseFloat(value)
-		if err == nil {
-			return floatValue
-		}
-	}
-	return defaultValue
 }
 
 // SetFloat stores a float value in the module configuration
@@ -218,20 +196,6 @@ func (c *ModuleConfig) SetFloat(key string, value float64) {
 // IsNilConfig checks if a given configuration is nil
 func IsNilConfig(cfg ModuleConfig) bool {
 	return cfg.Extra == nil
-}
-
-// parseInt safely parses an integer string
-func parseInt(value string) (int, error) {
-	var parsedValue int
-	_, err := fmt.Sscanf(value, "%d", &parsedValue)
-	return parsedValue, err
-}
-
-// parseFloat safely parses a float string
-func parseFloat(value string) (float64, error) {
-	var parsedValue float64
-	_, err := fmt.Sscanf(value, "%f", &parsedValue)
-	return parsedValue, err
 }
 
 // FileExists checks if a file exists

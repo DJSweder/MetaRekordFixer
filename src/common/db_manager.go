@@ -1,4 +1,4 @@
-// common/db.go
+// common/db_manager.go
 
 package common
 
@@ -288,7 +288,7 @@ func (m *DBManager) BackupDatabase() error {
 	m.logger.Info(locales.Translate("common.log.dbclosing"))
 	if err := m.Finalize(); err != nil {
 		m.logger.Error("Failed to close database for backup: %v", err)
-		return fmt.Errorf(locales.Translate("common.err.dbclose"))
+		return fmt.Errorf(locales.Translate("common.err.dbclose"), err)
 	}
 
 	// Generate the backup file name with the current timestamp
@@ -298,6 +298,7 @@ func (m *DBManager) BackupDatabase() error {
 	// Copy the database file to the backup location
 	err := CopyFile(m.dbPath, backupPath)
 	if err != nil {
+		m.logger.Error("problem with backup: %v", err)
 		return fmt.Errorf(locales.Translate("common.db.backupcopyerr"), err)
 	}
 

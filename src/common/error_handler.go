@@ -1,3 +1,5 @@
+// common/error_handler.go
+
 package common
 
 import (
@@ -8,8 +10,26 @@ import (
 	"fyne.io/fyne/v2"
 )
 
-// ErrorSeverity represents the severity level of an error
-type ErrorSeverity int
+// Severity represents the severity level of a message or error.
+// It is used consistently across logging, error handling, and status messages.
+type Severity string
+
+const (
+	// SeverityInfo represents informational messages that don't indicate any problem
+	SeverityInfo Severity = "INFO"
+
+	// SeverityWarning represents warning messages that indicate potential issues
+	// but don't prevent the application from functioning
+	SeverityWarning Severity = "WARNING"
+
+	// SeverityError represents error messages that indicate failures in specific operations
+	// but allow the application to continue running
+	SeverityError Severity = "ERROR"
+
+	// SeverityCritical represents critical errors that may prevent parts of the application
+	// from functioning correctly
+	SeverityCritical Severity = "CRITICAL"
+)
 
 // ErrorContext provides additional information about an error
 type ErrorContext struct {
@@ -52,11 +72,6 @@ func NewErrorHandler(logger *Logger, window fyne.Window) *ErrorHandler {
 	}
 }
 
-// SetWindow sets the window for displaying error dialogs
-func (h *ErrorHandler) SetWindow(window fyne.Window) {
-	h.window = window
-}
-
 // GetLogger returns the logger instance
 func (h *ErrorHandler) GetLogger() *Logger {
 	return h.logger
@@ -95,11 +110,6 @@ func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
 // FormatError creates a standardized error message
 func (h *ErrorHandler) FormatError(operation string, err error) error {
 	return fmt.Errorf("%s: %v", operation, err)
-}
-
-// IsRecoverable checks if the error is recoverable
-func (h *ErrorHandler) IsRecoverable(err error) bool {
-	return true
 }
 
 // ShowStandardError displays an error with standard formatting and context

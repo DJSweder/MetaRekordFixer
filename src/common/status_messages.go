@@ -127,7 +127,4 @@ func (smc *StatusMessagesContainer) ClearMessages() {
 	smc.Refresh()
 }
 
-// GetMessages returns all messages
-func (smc *StatusMessagesContainer) GetMessages() []StatusMessage {
-	return smc.messages
-}
+

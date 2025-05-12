@@ -1,4 +1,4 @@
-// common/module_ui_helpers.go
+// common/ui_helpers.go
 
 package common
 
@@ -123,91 +123,9 @@ func CreateNativeFolderBrowseButton(title string, buttonText string, changeHandl
 	})
 }
 
-// CreateFileBrowseButton creates a standardized file browse button with filter
-func CreateFileBrowseButton(window fyne.Window, entry *widget.Entry, buttonText string, changeHandler func(string), filter []string) *widget.Button {
-	return widget.NewButtonWithIcon(buttonText, theme.FileIcon(), func() {
-		dialog.ShowFileOpen(func(uri fyne.URIReadCloser, err error) {
-			if err == nil && uri != nil {
-				entry.SetText(uri.URI().Path())
-				if changeHandler != nil {
-					changeHandler(uri.URI().Path())
-				}
-			}
-		}, window)
-	})
-}
-
 // CreateActionButton creates a standardized action button
 func CreateActionButton(text string, icon fyne.Resource, action func()) *widget.Button {
 	return widget.NewButtonWithIcon(text, icon, action)
-}
-
-// CreateButtonBar creates a button container with equal spacing
-func CreateButtonBar(buttons ...*widget.Button) fyne.CanvasObject {
-	container := container.NewHBox(layout.NewSpacer())
-
-	for _, button := range buttons {
-		container.Add(button)
-	}
-
-	container.Add(layout.NewSpacer())
-	return container
-}
-
-// CreateLoadingOverlay creates an overlay with a loading indicator
-func CreateLoadingOverlay(parent fyne.Window, message string) *dialog.CustomDialog {
-	progress := widget.NewProgressBarInfinite()
-	label := widget.NewLabel(message)
-	label.Alignment = fyne.TextAlignCenter
-
-	content := container.NewVBox(progress, label)
-	d := dialog.NewCustom("", "", content, parent)
-	d.SetDismissText("")
-
-	return d
-}
-
-// ShowConfirmDialogWithCancel displays a confirmation dialog with cancel option
-func ShowConfirmDialogWithCancel(title, message string, onConfirm, onCancel func(), window fyne.Window) *dialog.CustomDialog {
-	confirmBtn := widget.NewButtonWithIcon(locales.Translate("common.button.confirm"), theme.ConfirmIcon(), onConfirm)
-	cancelBtn := widget.NewButtonWithIcon(locales.Translate("common.button.cancel"), theme.CancelIcon(), onCancel)
-
-	content := container.NewVBox(
-		widget.NewLabel(message),
-		container.NewHBox(layout.NewSpacer(), cancelBtn, confirmBtn),
-	)
-
-	return dialog.NewCustom(title, "", content, window)
-}
-
-// ShowTextInputDialog displays a text input dialog
-func ShowTextInputDialog(title, message, defaultValue string, onSubmit func(string), window fyne.Window) *dialog.CustomDialog {
-	// Create entry field with default value
-	entry := widget.NewEntry()
-	entry.SetText(defaultValue)
-
-	// Create submit button
-	submitBtn := widget.NewButtonWithIcon(locales.Translate("common.button.submit"), theme.ConfirmIcon(), func() {
-		if onSubmit != nil {
-			onSubmit(entry.Text)
-		}
-	})
-	submitBtn.Importance = widget.HighImportance
-
-	// Create cancel button
-	cancelBtn := widget.NewButtonWithIcon(locales.Translate("common.button.cancel"), theme.CancelIcon(), nil)
-
-	// Create content container
-	content := container.NewVBox(
-		widget.NewLabel(message),
-		entry,
-		container.NewHBox(layout.NewSpacer(), cancelBtn, submitBtn),
-	)
-
-	// Create and show dialog
-	d := dialog.NewCustom(title, "", content, window)
-	d.Show()
-	return d
 }
 
 // CreateFolderSelectionField creates a standardized folder selection field with browse button
@@ -299,13 +217,6 @@ func CreateSubmitButtonWithIcon(title string, icon fyne.Resource, handler func()
 	return btn
 }
 
-// CreateRightAlignedSubmitButton creates a standardized submit button with high importance,
-// aligned to the right using a spacer
-func CreateRightAlignedSubmitButton(title string, handler func()) *fyne.Container {
-	btn := CreateSubmitButton(title, handler)
-	return container.NewHBox(layout.NewSpacer(), btn)
-}
-
 // CreateDescriptionLabel creates a standardized description label with wrapping and bold text
 // This label is used for module descriptions and other informational text
 func CreateDescriptionLabel(text string) *widget.Label {
@@ -321,17 +232,6 @@ func CreateCalendarDayButton(day int, onSelected func()) *widget.Button {
 	btn := widget.NewButton(fmt.Sprintf("%d", day), onSelected)
 	btn.Importance = widget.HighImportance
 	return btn
-}
-
-// ErrorDialogDetails represents details shown in the error dialog
-type ErrorDialogDetails struct {
-	Module      string
-	Operation   string
-	Error       error
-	Severity    Severity
-	Recoverable bool
-	Timestamp   string
-	StackTrace  string
 }
 
 // ShowStandardError displays a standardized error dialog with log folder access

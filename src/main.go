@@ -29,7 +29,7 @@ type RekordboxTools struct {
 	errorHandler *common.ErrorHandler
 	tabContainer *container.AppTabs
 }
-
+// moduleInfo holds information about a module.
 type moduleInfo struct {
 	module   common.Module
 	tabItem  *container.TabItem
