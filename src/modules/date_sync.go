@@ -420,7 +420,7 @@ func (m *DateSyncModule) addCustomDateFolderEntry() {
 	// Initialize entry field for custom date folder selection
 	entry := widget.NewEntry()
 	customDateFolderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.customdate"),
+		locales.Translate("common.entry.placeholderpath"),
 		entry,
 		func(path string) {
 			entry.SetText(path)
@@ -448,7 +448,7 @@ func (m *DateSyncModule) addExcludedFolderEntry() {
 	// Initialize entry field for folder selection
 	entry := widget.NewEntry()
 	folderField := common.CreateFolderSelectionFieldWithDelete(
-		locales.Translate("datesync.label.excluded"),
+		locales.Translate("common.entry.placeholderpath"),
 		entry,
 		func(path string) {
 			entry.SetText(path)
@@ -480,7 +480,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 	var folderField fyne.CanvasObject
 	if isExcluded {
 		folderField = common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.excluded"),
+			locales.Translate("common.entry.placeholderpath"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
@@ -498,7 +498,7 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 		m.foldersContainer.Add(folderField)
 	} else {
 		folderField = common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.customdate"),
+			locales.Translate("common.entry.placeholderpath"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
@@ -540,7 +540,7 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 	m.customDateContainer.Objects = nil
 	for _, entry := range m.customDateFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.customdate"),
+			locales.Translate("common.entry.placeholderpath"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
@@ -590,7 +590,7 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 	m.foldersContainer.Objects = nil
 	for _, entry := range m.excludedFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
-			locales.Translate("datesync.label.excluded"),
+			locales.Translate("common.entry.placeholderpath"),
 			entry,
 			func(path string) {
 				entry.SetText(path)
