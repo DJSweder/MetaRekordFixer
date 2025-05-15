@@ -79,24 +79,18 @@ func NewMusicConverterModule(window fyne.Window, configMgr *common.ConfigManager
 		ModuleBase:   common.NewModuleBase(window, configMgr, errorHandler),
 		isConverting: false,
 	}
-
-	// Initialize UI components without triggering callbacks
-	m.IsLoadingConfig = true
-	m.initializeUI()
-	m.IsLoadingConfig = false
-
 	// Check if module has configuration, if not, create default
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
 
-	// Check if config is empty by checking if any MP3 settings exist
-	if cfg.Get("mp3_bitrate", "") == "" {
-		// No existing config found, create default
+	if len(cfg.Fields) == 0 {
 		cfg = m.SetDefaultConfig()
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	}
-
-	// Load configuration
+	// Initialize UI and load config
+	m.IsLoadingConfig = true
+	m.initializeUI()
 	m.LoadConfig(cfg)
+	m.IsLoadingConfig = false
 
 	return m
 }
@@ -245,11 +239,11 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	if m.targetFormatSelect != nil {
 		if targetFormat := cfg.Get("target_format", ""); targetFormat != "" {
 			m.targetFormatSelect.SetSelected(targetFormat)
-			// Aktualizujeme panel s parametry podle vybranu00e9ho formu00e1tu
+			// Update format settings panel based on selected format
 			m.updateFormatSettings(targetFormat)
 		} else {
 			m.targetFormatSelect.SetSelected("MP3")
-			// Aktualizujeme panel s parametry pro MP3
+			// Update format settings panel for MP3
 			m.updateFormatSettings("MP3")
 		}
 	}
@@ -313,61 +307,64 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 
 // SaveConfig saves the current module configuration
 func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
-	cfg := common.ModuleConfig{Extra: make(map[string]string)}
+	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
+	if cfg.Fields == nil {
+		cfg = m.SetDefaultConfig()
+	}
 
-	// Save source and target folder paths
+	// Save source and target folder paths with validation
 	if m.sourceFolderEntry != nil {
-		cfg.Set("source_folder", m.sourceFolderEntry.Text)
+		cfg.SetWithDefinition("source_folder", m.sourceFolderEntry.Text, "folder", true, "exists")
 	}
 	if m.targetFolderEntry != nil {
-		cfg.Set("target_folder", m.targetFolderEntry.Text)
+		cfg.SetWithDefinition("target_folder", m.targetFolderEntry.Text, "folder", true, "exists")
 	}
 
-	// Save format selections
+	// Save format selections with validation
 	if m.sourceFormatSelect != nil {
-		cfg.Set("source_format", m.sourceFormatSelect.Selected)
+		cfg.SetWithDefinition("source_format", m.sourceFormatSelect.Selected, "select", true, "none")
 	}
 	if m.targetFormatSelect != nil {
-		cfg.Set("target_format", m.targetFormatSelect.Selected)
+		cfg.SetWithDefinition("target_format", m.targetFormatSelect.Selected, "select", true, "none")
 	}
 
 	// Save checkboxes
 	if m.rewriteExistingCheckbox != nil {
-		cfg.SetBool("rewrite_existing", m.rewriteExistingCheckbox.Checked)
+		cfg.SetBoolWithDefinition("rewrite_existing", m.rewriteExistingCheckbox.Checked, false, "none")
 	}
 	if m.makeTargetFolderCheckbox != nil {
-		cfg.SetBool("make_target_folder", m.makeTargetFolderCheckbox.Checked)
+		cfg.SetBoolWithDefinition("make_target_folder", m.makeTargetFolderCheckbox.Checked, false, "none")
 	}
 
-	// Save format-specific settings
+	// Save format-specific settings with dependencies
 	// MP3
 	if m.MP3BitrateSelect != nil {
-		cfg.Set("mp3_bitrate", m.MP3BitrateSelect.Selected)
+		cfg.SetWithDependency("mp3_bitrate", m.MP3BitrateSelect.Selected, "select", true, "target_format", "MP3", "none")
 	}
 
 	if m.MP3SampleRateSelect != nil {
-		cfg.Set("mp3_samplerate", m.MP3SampleRateSelect.Selected)
+		cfg.SetWithDependency("mp3_samplerate", m.MP3SampleRateSelect.Selected, "select", true, "target_format", "MP3", "none")
 	}
 
 	// FLAC
 	if m.FLACCompressionSelect != nil {
-		cfg.Set("flac_compression", m.FLACCompressionSelect.Selected)
+		cfg.SetWithDependency("flac_compression", m.FLACCompressionSelect.Selected, "select", true, "target_format", "FLAC", "none")
 	}
 
 	if m.FLACSampleRateSelect != nil {
-		cfg.Set("flac_samplerate", m.FLACSampleRateSelect.Selected)
+		cfg.SetWithDependency("flac_samplerate", m.FLACSampleRateSelect.Selected, "select", true, "target_format", "FLAC", "none")
 	}
 
 	if m.FLACBitDepthSelect != nil {
-		cfg.Set("flac_bitdepth", m.FLACBitDepthSelect.Selected)
+		cfg.SetWithDependency("flac_bitdepth", m.FLACBitDepthSelect.Selected, "select", true, "target_format", "FLAC", "none")
 	}
 
 	// WAV
 	if m.WAVSampleRateSelect != nil {
-		cfg.Set("wav_samplerate", m.WAVSampleRateSelect.Selected)
+		cfg.SetWithDependency("wav_samplerate", m.WAVSampleRateSelect.Selected, "select", true, "target_format", "WAV", "none")
 	}
 	if m.WAVBitDepthSelect != nil {
-		cfg.Set("wav_bitdepth", m.WAVBitDepthSelect.Selected)
+		cfg.SetWithDependency("wav_bitdepth", m.WAVBitDepthSelect.Selected, "select", true, "target_format", "WAV", "none")
 	}
 
 	// Store to config manager
@@ -1400,34 +1397,35 @@ func (m *MusicConverterModule) getAudioProperties(filePath string) (bitDepth str
 
 // SetDefaultConfig sets the default configuration values for the module
 func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
+
 	// Create new config
 	cfg := common.NewModuleConfig()
 
 	// Set default source and target folders to empty strings
-	cfg.Set("source_folder", "")
-	cfg.Set("target_folder", "")
+	cfg.SetWithDefinition("source_folder", "", "folder", true, "exists")
+	cfg.SetWithDefinition("target_folder", "", "folder", true, "exists")
 
 	// Set default formats
 	// cfg.Set("source_format", locales.Translate("convert.srcformats.all"))
-	cfg.Set("source_format", "")
-	cfg.Set("target_format", "")
+	cfg.SetWithDefinition("source_format", locales.Translate("convert.srcformats.all"), "select", true, "none")
+	cfg.SetWithDefinition("target_format", "MP3", "select", true, "none")
 
 	// Set default checkboxes
-	cfg.SetBool("rewrite_existing", false)
-	cfg.SetBool("make_target_folder", false)
+	cfg.SetBoolWithDefinition("rewrite_existing", false, false, "none")
+	cfg.SetBoolWithDefinition("make_target_folder", false, false, "none")
 
 	// Set default MP3 settings
-	cfg.Set("mp3_bitrate", "320 kbps")
-	cfg.Set("mp3_samplerate", locales.Translate("convert.configpar.copypar"))
+	cfg.SetWithDependency("mp3_bitrate", "320 kbps", "select", true, "target_format", "MP3", "none")
+	cfg.SetWithDependency("mp3_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "MP3", "none")
 
 	// Set default FLAC settings
-	cfg.Set("flac_compression", locales.Translate("convert.configpar.compressfull"))
-	cfg.Set("flac_samplerate", locales.Translate("convert.configpar.copypar"))
-	cfg.Set("flac_bitdepth", locales.Translate("convert.configpar.copypar"))
+	cfg.SetWithDependency("flac_compression", locales.Translate("convert.configpar.compressfull"), "select", true, "target_format", "FLAC", "none")
+	cfg.SetWithDependency("flac_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "FLAC", "none")
+	cfg.SetWithDependency("flac_bitdepth", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "FLAC", "none")
 
 	// Set default WAV settings
-	cfg.Set("wav_samplerate", locales.Translate("convert.configpar.copypar"))
-	cfg.Set("wav_bitdepth", locales.Translate("convert.configpar.copypar"))
+	cfg.SetWithDependency("wav_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "WAV", "none")
+	cfg.SetWithDependency("wav_bitdepth", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "WAV", "none")
 
 	return cfg
 }

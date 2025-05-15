@@ -20,7 +20,8 @@ type GlobalConfig struct {
 
 // ModuleConfig defines a configuration structure for modules
 type ModuleConfig struct {
-	Extra map[string]string
+	Extra  map[string]string // will be deprecated in the future
+	Fields map[string]FieldDefinition
 }
 
 // ConfigManager handles application configuration
@@ -29,6 +30,21 @@ type ConfigManager struct {
 	globalConfig  GlobalConfig
 	moduleConfigs map[string]ModuleConfig
 	mutex         sync.Mutex
+}
+
+// FieldDefinition defines validation rules for a configuration field
+type FieldDefinition struct {
+	FieldType      string // folder, date, checkbox, select, playlist, file
+	Required       bool
+	DependsOn      string
+	ActiveWhen     string
+	ValidationType string // exists, valid_date, filled, exists | write
+	Value          string
+}
+
+// ValidateField validates a single field based on its definition and value
+func (f *FieldDefinition) ValidateField(value string) error {
+	return nil
 }
 
 // NewConfigManager initializes a new configuration manager
@@ -68,8 +84,8 @@ func (mgr *ConfigManager) GetModuleConfig(moduleName string) ModuleConfig {
 	defer mgr.mutex.Unlock()
 
 	if config, exists := mgr.moduleConfigs[moduleName]; exists {
-		if config.Extra == nil {
-			config.Extra = make(map[string]string)
+		if config.Fields == nil {
+			config.Fields = make(map[string]FieldDefinition)
 			mgr.moduleConfigs[moduleName] = config
 		}
 		return config
@@ -153,39 +169,112 @@ func (mgr *ConfigManager) saveConfig() error {
 // NewModuleConfig creates a new empty module configuration
 func NewModuleConfig() ModuleConfig {
 	return ModuleConfig{
-		Extra: make(map[string]string),
+		Extra:  make(map[string]string), // Will be deprecated in the future
+		Fields: make(map[string]FieldDefinition),
 	}
 }
 
 // Get retrieves a string value from the module configuration
 func (c ModuleConfig) Get(key string, defaultValue string) string {
+	if field, exists := c.Fields[key]; exists {
+		return field.Value
+	}
+	// For backward compatibility. Will be deprecated in the future.
 	if value, exists := c.Extra[key]; exists {
 		return value
 	}
 	return defaultValue
 }
 
-// Set stores a string value in the module configuration
+// Set stores a string value in the module configuration. Will be deprecated in the future
 func (c *ModuleConfig) Set(key string, value string) {
 	c.Extra[key] = value
 }
 
+func (c *ModuleConfig) SetWithDefinition(key string, value string, fieldType string, required bool, validationType string) {
+
+	// Save definition
+	if c.Fields == nil {
+		c.Fields = make(map[string]FieldDefinition)
+	}
+	c.Fields[key] = FieldDefinition{
+		FieldType:      fieldType,
+		Required:       required,
+		Value:          value,
+		ValidationType: validationType,
+	}
+}
+
+func (c *ModuleConfig) SetWithDependency(key string, value string, fieldType string, required bool, dependsOn string, activeWhen string, validationType string) {
+	c.SetWithDefinition(key, value, fieldType, required, validationType)
+	if field, exists := c.Fields[key]; exists {
+		field.DependsOn = dependsOn
+		field.ActiveWhen = activeWhen
+		c.Fields[key] = field
+	}
+}
+
 // GetBool retrieves a boolean value from the module configuration
 func (c ModuleConfig) GetBool(key string, defaultValue bool) bool {
+	if field, exists := c.Fields[key]; exists {
+		return field.Value == "true"
+	}
+	// For backward compatibility. Will be deprecated in the future
 	if value, exists := c.Extra[key]; exists {
 		return value == "true"
 	}
 	return defaultValue
 }
 
-// SetBool stores a boolean value in the module configuration
+// SetBool stores a boolean value in the module configuration. Will be deprecated in the future
 func (c *ModuleConfig) SetBool(key string, value bool) {
 	c.Extra[key] = fmt.Sprintf("%t", value)
 }
+func (c *ModuleConfig) SetBoolWithDefinition(key string, value bool, required bool, validationType string) {
+	if c.Fields == nil {
+		c.Fields = make(map[string]FieldDefinition)
+	}
+	c.Fields[key] = FieldDefinition{
+		FieldType:      "checkbox",
+		Required:       required,
+		Value:          fmt.Sprintf("%t", value),
+		ValidationType: validationType,
+	}
+}
 
-// SetInt stores an integer value in the module configuration
+func (c *ModuleConfig) SetBoolWithDependency(key string, value bool, required bool, dependsOn string, activeWhen string, validationType string) {
+	c.SetBoolWithDefinition(key, value, required, validationType)
+	if field, exists := c.Fields[key]; exists {
+		field.DependsOn = dependsOn
+		field.ActiveWhen = activeWhen
+		c.Fields[key] = field
+	}
+}
+
+// SetInt stores an integer value in the module configuration. Will be deprecated in the future
 func (c *ModuleConfig) SetInt(key string, value int) {
 	c.Extra[key] = fmt.Sprintf("%d", value)
+}
+
+// SetIntWithDefinition stores an integer value in the module configuration
+func (c *ModuleConfig) SetIntWithDefinition(key string, value int, required bool) {
+	if c.Fields == nil {
+		c.Fields = make(map[string]FieldDefinition)
+	}
+	c.Fields[key] = FieldDefinition{
+		FieldType: "number", // for numeric values
+		Required:  required,
+		Value:     fmt.Sprintf("%d", value),
+	}
+}
+
+func (c *ModuleConfig) SetIntWithDependency(key string, value int, required bool, dependsOn string, activeWhen string) {
+	c.SetIntWithDefinition(key, value, required)
+	if field, exists := c.Fields[key]; exists {
+		field.DependsOn = dependsOn
+		field.ActiveWhen = activeWhen
+		c.Fields[key] = field
+	}
 }
 
 // SetFloat stores a float value in the module configuration

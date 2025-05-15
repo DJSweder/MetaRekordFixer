@@ -257,11 +257,17 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	if common.IsNilConfig(cfg) {
-		// Initialize with default values and save them
+	// Check if configuration is nil or Fields are not initialized
+	if cfg.Fields == nil {
 		cfg = common.NewModuleConfig()
+
+		// Set default values with their definitions
+		cfg.SetWithDefinition("custom_date", "", "date", true, "valid_date")
+		cfg.SetWithDefinition("custom_date_folders", "", "folder", true, "exists")
+		cfg.SetWithDefinition("exclude_folders_enabled", "false", "checkbox", false, "none")
+		cfg.SetWithDependency("excluded_folders", "", "folder", true, "exclude_folders_enabled", "true", "filled")
+
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-		return
 	}
 
 	// Clear existing entries
@@ -270,12 +276,11 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.excludedFoldersEntry = nil
 	m.customDateFoldersEntry = nil
 
-	// Load excluded folders - use the dedicated checkbox state field
-	excludeFoldersEnabled := cfg.GetBool("exclude_folders_enabled", false)
-	m.excludeFoldersCheck.SetChecked(excludeFoldersEnabled)
+	// Load excluded folders checkbox state
+	m.excludeFoldersCheck.SetChecked(cfg.GetBool("exclude_folders_enabled", false))
 
+	// Load excluded folders if enabled
 	excludedFoldersEntry := cfg.Get("excluded_folders", "")
-
 	if excludedFoldersEntry != "" {
 		folderPaths := strings.Split(excludedFoldersEntry, "|")
 		for _, folderPath := range folderPaths {
@@ -286,14 +291,12 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	}
 
 	// Ensure there's at least one empty entry for excluded folders
-	// Also ensure that the last entry is empty for better UX
 	if len(m.excludedFoldersEntry) == 0 || m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1].Text != "" {
 		m.addExcludedFolderEntry()
 	}
 
 	// Load custom date folders
 	customDateFoldersEntry := cfg.Get("custom_date_folders", "")
-
 	if customDateFoldersEntry != "" {
 		folderPaths := strings.Split(customDateFoldersEntry, "|")
 		for _, folderPath := range folderPaths {
@@ -304,16 +307,12 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	}
 
 	// Ensure there's at least one empty entry for custom date folders
-	// Also ensure that the last entry is empty for better UX
 	if len(m.customDateFoldersEntry) == 0 || m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1].Text != "" {
 		m.addCustomDateFolderEntry()
 	}
 
 	// Load custom date
-	customDate := cfg.Get("custom_date", "")
-	if customDate != "" {
-		m.datePickerEntry.SetText(customDate)
-	}
+	m.datePickerEntry.SetText(cfg.Get("custom_date", ""))
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
@@ -325,29 +324,47 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	// Build fresh config
 	cfg := common.NewModuleConfig()
 
-	// Store checkbox states
-	cfg.SetBool("exclude_folders_enabled", m.excludeFoldersCheck.Checked)
+	// Store checkbox state with definition
+	cfg.SetWithDefinition("exclude_folders_enabled",
+		fmt.Sprintf("%t", m.excludeFoldersCheck.Checked),
+		"checkbox",
+		false,
+		"none")
 
-	// Save excluded folders
+	// Save excluded folders with dependency
 	var excludedFoldersEntry []string
 	for _, entry := range m.excludedFoldersEntry {
 		if entry.Text != "" {
 			excludedFoldersEntry = append(excludedFoldersEntry, entry.Text)
 		}
 	}
-	cfg.Set("excluded_folders", strings.Join(excludedFoldersEntry, "|"))
+	cfg.SetWithDependency("excluded_folders",
+		strings.Join(excludedFoldersEntry, "|"),
+		"folder",
+		true,
+		"exclude_folders_enabled",
+		"true",
+		"filled")
 
-	// Save custom date folders
+	// Save custom date folders with definition
 	var customDateFoldersEntry []string
 	for _, entry := range m.customDateFoldersEntry {
 		if entry.Text != "" {
 			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
 		}
 	}
-	cfg.Set("custom_date_folders", strings.Join(customDateFoldersEntry, "|"))
+	cfg.SetWithDefinition("custom_date_folders",
+		strings.Join(customDateFoldersEntry, "|"),
+		"folder",
+		true,
+		"exists")
 
-	// Save custom date
-	cfg.Set("custom_date", m.datePickerEntry.Text)
+	// Save custom date with definition
+	cfg.SetWithDefinition("custom_date",
+		m.datePickerEntry.Text,
+		"date",
+		true,
+		"valid_date")
 
 	// Store to config manager
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)

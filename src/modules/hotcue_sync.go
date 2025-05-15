@@ -189,9 +189,19 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if configuration is nil or has uninitialized Extra field
-	if common.IsNilConfig(cfg) {
-		return
+	// Check if configuration is nil or Fields are not initialized
+	if cfg.Fields == nil {
+		cfg = common.NewModuleConfig()
+
+		// Set default values with their definitions
+		cfg.SetWithDefinition("source_type", string(SourceTypeFolder), "select", true, "none")
+		cfg.SetWithDefinition("target_type", string(SourceTypeFolder), "select", true, "none")
+		cfg.SetWithDependency("source_folder", "", "folder", true, "source_type", "folder", "exists")
+		cfg.SetWithDependency("target_folder", "", "folder", true, "target_type", "folder", "exists")
+		cfg.SetWithDependency("source_playlist", "", "playlist", true, "source_type", "playlist", "filled")
+		cfg.SetWithDependency("target_playlist", "", "playlist", true, "target_type", "playlist", "filled")
+
+		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	}
 
 	// Load source type
@@ -240,6 +250,7 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
+// SaveConfig reads UI state and saves it into a new ModuleConfig.
 func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
@@ -254,7 +265,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	} else {
 		sourceType = SourceTypePlaylist
 	}
-	cfg.Set("source_type", string(sourceType))
+	cfg.SetWithDefinition("source_type", string(sourceType), "select", true, "none")
 
 	// Save target type
 	var targetType SourceType
@@ -263,17 +274,17 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	} else {
 		targetType = SourceTypePlaylist
 	}
-	cfg.Set("target_type", string(targetType))
+	cfg.SetWithDefinition("target_type", string(targetType), "select", true, "none")
 
 	// Save folder paths
-	cfg.Set("source_folder", m.sourceFolderEntry.Text)
-	cfg.Set("target_folder", m.targetFolderEntry.Text)
+	cfg.SetWithDependency("source_folder", m.sourceFolderEntry.Text, "folder", true, "source_type", "folder", "exists")
+	cfg.SetWithDependency("target_folder", m.targetFolderEntry.Text, "folder", true, "target_type", "folder", "exists")
 
 	// Save playlist selections
 	if sourceType == SourceTypePlaylist && m.sourcePlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.sourcePlaylistSelect.Selected {
-				cfg.Set("source_playlist", playlist.ID)
+				cfg.SetWithDependency("source_playlist", playlist.ID, "playlist", true, "source_type", "playlist", "filled")
 				break
 			}
 		}
@@ -282,7 +293,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	if targetType == SourceTypePlaylist && m.targetPlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.targetPlaylistSelect.Selected {
-				cfg.Set("target_playlist", playlist.ID)
+				cfg.SetWithDependency("target_playlist", playlist.ID, "playlist", true, "target_type", "playlist", "filled")
 				break
 			}
 		}

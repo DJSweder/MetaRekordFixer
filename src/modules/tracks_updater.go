@@ -150,26 +150,29 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if Extra field is initialized
-	if cfg.Extra == nil {
-		return
+	// Check if Fields are not initialized
+	if cfg.Fields == nil {
+		cfg = common.NewModuleConfig()
+
+		// Set default values with their definitions
+		cfg.SetWithDefinition("folder", "", "folder", true, "exists")
+		cfg.SetWithDefinition("playlist_id", "", "playlist", true, "filled")
+
+		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	}
 
-	if folder, ok := cfg.Extra["folder"]; ok && folder != "" {
-		m.folderEntry.SetText(folder)
-	}
+	// Load folder path
+	m.folderEntry.SetText(cfg.Get("folder", ""))
 
-	if playlistID, ok := cfg.Extra["playlist_id"]; ok && playlistID != "" {
-		m.pendingPlaylistID = playlistID // Save temporary PlaylistID for later use
+	// Load playlist ID
+	m.pendingPlaylistID = cfg.Get("playlist_id", "")
 
-		// Load playlist selection if playlists are already loaded
-		if len(m.playlists) > 0 {
-			// Find and set playlist
-			for _, playlist := range m.playlists {
-				if playlist.ID == m.pendingPlaylistID {
-					m.playlistSelect.SetSelected(playlist.Path)
-					break
-				}
+	// Load playlist selection if playlists are already loaded
+	if m.pendingPlaylistID != "" && len(m.playlists) > 0 {
+		for _, playlist := range m.playlists {
+			if playlist.ID == m.pendingPlaylistID {
+				m.playlistSelect.SetSelected(playlist.Path)
+				break
 			}
 		}
 	}
@@ -178,20 +181,27 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
 func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
-		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
+		return common.NewModuleConfig()
 	}
 
 	cfg := common.NewModuleConfig()
 
-	// Save folder path using NormalizePath which now handles empty strings correctly
-	cfg.Set("folder", common.NormalizePath(m.folderEntry.Text))
+	// Save folder path
+	cfg.SetWithDefinition("folder",
+		common.NormalizePath(m.folderEntry.Text),
+		"folder",
+		true,
+		"exists")
 
-	// Always save the pendingPlaylistID if it exists
+	// Save playlist ID
 	if m.pendingPlaylistID != "" {
-		cfg.Set("playlist_id", m.pendingPlaylistID)
+		cfg.SetWithDefinition("playlist_id",
+			m.pendingPlaylistID,
+			"playlist",
+			true,
+			"filled")
 	}
 
-	// Store to config manager
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	return cfg
 }

@@ -37,19 +37,20 @@ type Module interface {
 
 // ModuleBase provides common functionality for all modules
 type ModuleBase struct {
-	Window          fyne.Window
-	Content         fyne.CanvasObject
-	ConfigMgr       *ConfigManager
-	Progress        *widget.ProgressBar
-	Status          *widget.Label
-	ProgressDialog  *ProgressDialog
-	IsLoadingConfig bool
-	mutex           sync.Mutex
-	isCancelled     bool
-	ErrorHandler    *ErrorHandler
-	Logger          *Logger
-	StatusMessages  *StatusMessagesContainer // Container for status messages
-	dbRequirements  DatabaseRequirements
+	Window           fyne.Window
+	Content          fyne.CanvasObject
+	ConfigMgr        *ConfigManager
+	Progress         *widget.ProgressBar
+	Status           *widget.Label
+	ProgressDialog   *ProgressDialog
+	IsLoadingConfig  bool
+	mutex            sync.Mutex
+	isCancelled      bool
+	ErrorHandler     *ErrorHandler
+	Logger           *Logger
+	StatusMessages   *StatusMessagesContainer // Container for status messages
+	dbRequirements   DatabaseRequirements
+	fieldDefinitions map[string]FieldDefinition
 }
 
 // DatabaseRequirements defines how a module uses the database
@@ -58,6 +59,20 @@ type DatabaseRequirements struct {
 	NeedsDatabase bool
 	// NeedsImmediateAccess indicates if database access is required during initialization
 	NeedsImmediateAccess bool
+}
+
+func (m *ModuleBase) GetFieldDefinitions() map[string]FieldDefinition {
+	return m.fieldDefinitions
+}
+
+func (m *ModuleBase) DefineField(fieldName string, fieldType string, required bool) {
+	if m.fieldDefinitions == nil {
+		m.fieldDefinitions = make(map[string]FieldDefinition)
+	}
+	m.fieldDefinitions[fieldName] = FieldDefinition{
+		FieldType: fieldType,
+		Required:  required,
+	}
 }
 
 // NewModuleBase initializes a new ModuleBase
@@ -362,4 +377,9 @@ func (m *ModuleBase) HandleProcessCancellation(message string, params ...interfa
 
 	// Complete progress dialog and update UI
 	m.CompleteProgressDialog()
+}
+
+func (m *ModuleBase) ValidateFields() error {
+	// Validate all fields
+	return nil
 }

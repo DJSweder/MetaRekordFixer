@@ -47,10 +47,6 @@ func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, 
 		dbMgr:      dbMgr,
 	}
 
-	// Set database requirements
-	// m.SetDatabaseRequirements(true, false)
-
-	// Initialize UI components first
 	m.initializeUI()
 
 	// Then load configuration
@@ -122,18 +118,19 @@ func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if configuration is nil or Extra field is not initialized
-	if cfg.Extra == nil {
-		// Initialize with default values and save them
+	// Check if configuration is nil or Fields are not initialized
+	if cfg.Fields == nil {
 		cfg = common.NewModuleConfig()
+
+		// Set default values with their definitions
+		cfg.SetWithDefinition("source_folder", "", "folder", true, "exists")
+		cfg.SetBoolWithDefinition("recursive", false, false, "none")
+
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-		return
 	}
 
 	// Load source folder path
-	if folder, ok := cfg.Extra["source_folder"]; ok && folder != "" {
-		m.sourceFolderEntry.SetText(folder)
-	}
+	m.sourceFolderEntry.SetText(cfg.Get("source_folder", ""))
 
 	// Load recursive flag with default value false
 	m.recursiveCheck.SetChecked(cfg.GetBool("recursive", false))
@@ -147,13 +144,17 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 	}
 
 	// Build fresh config
-	cfg := common.NewModuleConfig()
+	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
 
 	// Save source folder path using NormalizePath
-	cfg.Set("source_folder", common.NormalizePath(m.sourceFolderEntry.Text))
+	cfg.SetWithDefinition("source_folder",
+		common.NormalizePath(m.sourceFolderEntry.Text),
+		"folder",
+		true,
+		"exists")
 
 	// Save recursive flag
-	cfg.SetBool("recursive", m.recursiveCheck.Checked)
+	cfg.SetBoolWithDefinition("recursive", m.recursiveCheck.Checked, false, "none")
 
 	// Store to config manager
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
