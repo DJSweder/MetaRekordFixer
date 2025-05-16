@@ -284,7 +284,7 @@ func (c *ModuleConfig) SetFloat(key string, value float64) {
 
 // IsNilConfig checks if a given configuration is nil
 func IsNilConfig(cfg ModuleConfig) bool {
-	return cfg.Extra == nil
+	return cfg.Fields == nil
 }
 
 // FileExists checks if a file exists
