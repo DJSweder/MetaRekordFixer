@@ -239,7 +239,7 @@ func (m *MetadataSyncModule) Start() {
 	}
 
 	// Validate source folder contains MP3 files
-	mp3Files, err := m.findMP3Files(sourcePath)
+	mp3Files, err := common.ListFilesWithExtensions(sourcePath, []string{".mp3"}, true)
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
@@ -514,19 +514,19 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 	common.UpdateButtonToCompleted(m.submitBtn)
 }
 
-func (m *MetadataSyncModule) findMP3Files(root string) ([]string, error) {
-	var files []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(info.Name(), ".mp3") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	return files, err
-}
+//func (m *MetadataSyncModule) findMP3Files(root string) ([]string, error) {
+//	var files []string
+//	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+//		if err != nil {
+//			return err
+//		}
+//		if info.IsDir() {
+//			return nil
+//		}
+//		if strings.HasSuffix(info.Name(), ".mp3") {
+//			files = append(files, path)
+//		}
+//		return nil
+//	})
+//	return files, err
+//}

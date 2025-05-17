@@ -24,12 +24,11 @@ type FileInfo struct {
 
 // NormalizePath provides normalized path
 func NormalizePath(path string) string {
-	path = strings.TrimSpace(path)
 	// Return empty string if path is empty
-	if path == "" {
+	if IsEmptyString(path) {
 		return ""
 	}
-	return filepath.Clean(filepath.FromSlash(path))
+	return filepath.Clean(filepath.FromSlash(strings.TrimSpace(path)))
 }
 
 // DirectoryExists checks if a directory exists
@@ -43,7 +42,7 @@ func DirectoryExists(dirPath string) bool {
 
 // EnsureDirectoryExists ensures the specified directory exists
 func EnsureDirectoryExists(path string) error {
-	if path == "" {
+	if IsEmptyString(path) {
 		return fmt.Errorf("path is empty")
 	}
 

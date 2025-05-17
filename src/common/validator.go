@@ -140,7 +140,7 @@ func (v *Validator) validateFields() error {
 		}
 
 		// Validate date format if needed
-		if field.FieldType == "date" && !isValidDateFormat(value) {
+		if field.FieldType == "date" && !IsValidDateFormat(value) {
 			err := errors.New(locales.Translate("validator.err.invaliddate"))
 			v.errorHandler.ShowStandardError(err, context)
 			return err
@@ -284,8 +284,8 @@ func (v *Validator) validateDatabaseConnection() error {
 	return nil
 }
 
-// isValidDateFormat checks if the given string is a valid date in the format YYYY-MM-DD.
-func isValidDateFormat(date string) bool {
+// IsValidDateFormat checks if the given string is a valid date in the format YYYY-MM-DD.
+func IsValidDateFormat(date string) bool {
 	_, err := time.Parse("2006-01-02", date)
 	return err == nil
 }

@@ -42,10 +42,11 @@ type FieldDefinition struct {
 	Value          string
 }
 
+// Empty function moved and extended to common/validator.go
 // ValidateField validates a single field based on its definition and value
-func (f *FieldDefinition) ValidateField(value string) error {
-	return nil
-}
+// func (f *FieldDefinition) ValidateField(value string) error {
+//	return nil
+//}
 
 // NewConfigManager initializes a new configuration manager
 func NewConfigManager(configPath string) (*ConfigManager, error) {
