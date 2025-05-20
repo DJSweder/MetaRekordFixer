@@ -223,5 +223,6 @@
     "validator.status.dbconnect": "Prüfung der Datenbankeinstellungen erfolgreich.",
     "validator.status.entries": "Prüfung der Eingabeparameter erfolgreich.",
     "validator.status.start": "Erste Prüfung gestartet.",
-    "valildator.err.foldernotexist": "Der angegebene Ordner '%s' existiert nicht."
+    "validator.err.foldernotexist": "Der angegebene Ordner '%s' existiert nicht.",
+    "validator.err.required": ""
 }

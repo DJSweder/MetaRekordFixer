@@ -5,7 +5,6 @@ import (
 	"MetaRekordFixer/locales"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -155,8 +154,8 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 		cfg = common.NewModuleConfig()
 
 		// Set default values with their definitions
-		cfg.SetWithDefinition("folder", "", "folder", true, "exists")
-		cfg.SetWithDefinition("playlist_id", "", "playlist", true, "filled")
+		cfg.SetWithDefinitionAndActions("folder", "", "folder", true, "exists", []string{"start"})
+		cfg.SetWithDefinitionAndActions("playlist_id", "", "playlist", true, "filled", []string{"start"})
 
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	}
@@ -187,19 +186,11 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 	cfg := common.NewModuleConfig()
 
 	// Save folder path
-	cfg.SetWithDefinition("folder",
-		common.NormalizePath(m.folderEntry.Text),
-		"folder",
-		true,
-		"exists")
+	cfg.SetWithDefinitionAndActions("folder", m.folderEntry.Text, "folder", true, "exists", []string{"start"})
 
 	// Save playlist ID
 	if m.pendingPlaylistID != "" {
-		cfg.SetWithDefinition("playlist_id",
-			m.pendingPlaylistID,
-			"playlist",
-			true,
-			"filled")
+		cfg.SetWithDefinitionAndActions("playlist_id", m.pendingPlaylistID, "playlist", true, "filled", []string{"start"})
 	}
 
 	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
@@ -319,48 +310,30 @@ func (m *TracksUpdater) loadPlaylists() error {
 }
 
 func (m *TracksUpdater) Start() {
+	// Disable the button during processing
+	m.submitBtn.Disable()
+	defer func() {
+		m.submitBtn.Enable()
+	}()
+
 	// Save the configuration before starting the process
 	m.SaveConfig()
 
-	// Clear any previous status messages
-	m.ClearStatusMessages()
+	// Create and run validator
+	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
+	if err := validator.Validate("start"); err != nil {
+		return
+	}
 
 	// Validate playlist selection
 	if m.playlistSelect.Selected == "" {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
+			Operation:   "Playlist selection validation",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	// Validate folder path
-	if m.folderEntry.Text == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.nofolder")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	// Validate folder exists
-	filesPath := common.NormalizePath(m.folderEntry.Text)
-	if _, err := os.Stat(filesPath); os.IsNotExist(err) {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "StartSync",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.foldernotexist")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -379,6 +352,7 @@ func (m *TracksUpdater) processUpdate() {
 	defer func() {
 		// Catch any panics or errors and show an error message.
 		if r := recover(); r != nil {
+			m.CloseProgressDialog()
 			context := &common.ErrorContext{
 				Module:      m.GetConfigName(),
 				Operation:   "Update Process",
@@ -387,30 +361,12 @@ func (m *TracksUpdater) processUpdate() {
 			}
 			m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
 			m.AddErrorMessage(locales.Translate("common.status.failed"))
-			m.CloseProgressDialog()
+
 		}
 	}()
 
 	// Add initial status message
 	m.AddInfoMessage(locales.Translate("common.status.start"))
-
-	// Backup the database.
-	m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
-	if err := m.dbMgr.BackupDatabase(); err != nil {
-		m.CloseProgressDialog()
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Database Backup",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	// Inform about the successful backup.
-	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 
 	// Check if the operation was cancelled.
 	if m.IsCancelled() {
@@ -420,19 +376,19 @@ func (m *TracksUpdater) processUpdate() {
 	}
 
 	// Connect to the database.
-	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.CloseProgressDialog()
-		return
-	}
-	defer m.dbMgr.Finalize()
+	//	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
+	//	if err := m.dbMgr.Connect(); err != nil {
+	//		context := &common.ErrorContext{
+	//			Module:      m.GetConfigName(),
+	//			Operation:   "Database Connection",
+	//			Severity:    common.SeverityCritical,
+	//			Recoverable: false,
+	//		}
+	//		m.ErrorHandler.ShowStandardError(err, context)
+	//		m.CloseProgressDialog()
+	//		return
+	//	}
+	// defer m.dbMgr.Finalize()
 
 	// Get the selected playlist.
 	m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))
@@ -452,13 +408,6 @@ func (m *TracksUpdater) processUpdate() {
 		}
 		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
 		m.CloseProgressDialog()
-		return
-	}
-
-	// Check if the operation was cancelled.
-	if m.IsCancelled() {
-		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
-		common.UpdateButtonToCompleted(m.submitBtn)
 		return
 	}
 

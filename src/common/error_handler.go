@@ -16,11 +16,11 @@ type Severity string
 
 const (
 	// SeverityInfo represents informational messages that don't indicate any problem
-	SeverityInfo Severity = "INFO"
+	SeverityInfo Severity = "INFO "
 
 	// SeverityWarning represents warning messages that indicate potential issues
 	// but don't prevent the application from functioning
-	SeverityWarning Severity = "WARNING"
+	SeverityWarning Severity = "WARN"
 
 	// SeverityError represents error messages that indicate failures in specific operations
 	// but allow the application to continue running

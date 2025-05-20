@@ -3,7 +3,6 @@ package modules
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -194,12 +193,12 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 		cfg = common.NewModuleConfig()
 
 		// Set default values with their definitions
-		cfg.SetWithDefinition("source_type", string(SourceTypeFolder), "select", true, "none")
-		cfg.SetWithDefinition("target_type", string(SourceTypeFolder), "select", true, "none")
-		cfg.SetWithDependency("source_folder", "", "folder", true, "source_type", "folder", "exists")
-		cfg.SetWithDependency("target_folder", "", "folder", true, "target_type", "folder", "exists")
-		cfg.SetWithDependency("source_playlist", "", "playlist", true, "source_type", "playlist", "filled")
-		cfg.SetWithDependency("target_playlist", "", "playlist", true, "target_type", "playlist", "filled")
+		cfg.SetWithDefinitionAndActions("source_type", string(SourceTypeFolder), "select", true, "none", []string{"start"})
+		cfg.SetWithDefinitionAndActions("target_type", string(SourceTypeFolder), "select", true, "none", []string{"start"})
+		cfg.SetWithDependencyAndActions("source_folder", "", "folder", true, "source_type", "folder", "exists", []string{"start"})
+		cfg.SetWithDependencyAndActions("target_folder", "", "folder", true, "target_type", "folder", "exists", []string{"start"})
+		cfg.SetWithDependencyAndActions("source_playlist", "", "playlist", true, "source_type", "playlist", "filled", []string{"start"})
+		cfg.SetWithDependencyAndActions("target_playlist", "", "playlist", true, "target_type", "playlist", "filled", []string{"start"})
 
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
 	}
@@ -265,7 +264,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	} else {
 		sourceType = SourceTypePlaylist
 	}
-	cfg.SetWithDefinition("source_type", string(sourceType), "select", true, "none")
+	cfg.SetWithDefinitionAndActions("source_type", string(sourceType), "select", true, "none", []string{"start"})
 
 	// Save target type
 	var targetType SourceType
@@ -274,17 +273,17 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	} else {
 		targetType = SourceTypePlaylist
 	}
-	cfg.SetWithDefinition("target_type", string(targetType), "select", true, "none")
+	cfg.SetWithDefinitionAndActions("target_type", string(targetType), "select", true, "none", []string{"start"})
 
 	// Save folder paths
-	cfg.SetWithDependency("source_folder", m.sourceFolderEntry.Text, "folder", true, "source_type", "folder", "exists")
-	cfg.SetWithDependency("target_folder", m.targetFolderEntry.Text, "folder", true, "target_type", "folder", "exists")
+	cfg.SetWithDependencyAndActions("source_folder", m.sourceFolderEntry.Text, "folder", true, "source_type", "folder", "exists", []string{"start"})
+	cfg.SetWithDependencyAndActions("target_folder", m.targetFolderEntry.Text, "folder", true, "target_type", "folder", "exists", []string{"start"})
 
 	// Save playlist selections
 	if sourceType == SourceTypePlaylist && m.sourcePlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.sourcePlaylistSelect.Selected {
-				cfg.SetWithDependency("source_playlist", playlist.ID, "playlist", true, "source_type", "playlist", "filled")
+				cfg.SetWithDependencyAndActions("source_playlist", playlist.ID, "playlist", true, "source_type", "playlist", "filled", []string{"start"})
 				break
 			}
 		}
@@ -293,7 +292,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	if targetType == SourceTypePlaylist && m.targetPlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.targetPlaylistSelect.Selected {
-				cfg.SetWithDependency("target_playlist", playlist.ID, "playlist", true, "target_type", "playlist", "filled")
+				cfg.SetWithDependencyAndActions("target_playlist", playlist.ID, "playlist", true, "target_type", "playlist", "filled", []string{"start"})
 				break
 			}
 		}
@@ -770,90 +769,18 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 
 // Start performs the main hot cue synchronization process.
 func (m *HotCueSyncModule) Start() {
+
 	// Save the configuration before starting the process
 	m.SaveConfig()
 
-	// Clear any previous status messages
-	m.ClearStatusMessages()
-
-	// Validate inputs
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.sourceFolderEntry.Text == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosrcfolder")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+	// Create and run validator
+	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
+	if err := validator.Validate("start"); err != nil {
 		return
 	}
+	// Initial progress
+	m.AddInfoMessage(locales.Translate("common.status.start"))
 
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) && m.targetFolderEntry.Text == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetfolder")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	// Validate source folder exists
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
-		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-			context := &common.ErrorContext{
-				Module:      m.GetConfigName(),
-				Operation:   "Input Validation",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-	}
-
-	// Validate target folder exists
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
-		targetPath := common.NormalizePath(m.targetFolderEntry.Text)
-		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-			context := &common.ErrorContext{
-				Module:      m.GetConfigName(),
-				Operation:   "Input Validation",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.notargetfolder")), context)
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-	}
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) && m.sourcePlaylistSelect.Selected == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosrcplaylistsel")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) && m.targetPlaylistSelect.Selected == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Input Validation",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.notargetplaylistsel")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
 	// Show progress dialog
 	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
 
@@ -876,13 +803,6 @@ func (m *HotCueSyncModule) processUpdate() {
 			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), context)
 		}
 	}()
-
-	// Clear previous status messages
-	m.ClearStatusMessages()
-
-	// Initial progress
-	m.UpdateProgressStatus(0.0, locales.Translate("common.status.start"))
-	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Get source tracks
 	sourceTracks, err := m.getSourceTracks()

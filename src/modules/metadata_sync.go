@@ -4,7 +4,6 @@ package modules
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -123,7 +122,7 @@ func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 		cfg = common.NewModuleConfig()
 
 		// Set default values with their definitions
-		cfg.SetWithDefinition("source_folder", "", "folder", true, "exists")
+		cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
 		cfg.SetBoolWithDefinition("recursive", false, false, "none")
 
 		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
@@ -147,11 +146,11 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
 
 	// Save source folder path using NormalizePath
-	cfg.SetWithDefinition("source_folder",
+	cfg.SetWithDefinitionAndActions("source_folder",
 		common.NormalizePath(m.sourceFolderEntry.Text),
 		"folder",
 		true,
-		"exists")
+		"exists", []string{"start"})
 
 	// Save recursive flag
 	cfg.SetBoolWithDefinition("recursive", m.recursiveCheck.Checked, false, "none")
@@ -202,44 +201,20 @@ func (m *MetadataSyncModule) Start() {
 	m.submitBtn.Disable()
 	defer func() {
 		m.submitBtn.Enable()
-		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
 	// Save the configuration before starting the process
 	m.SaveConfig()
 
-	// Clear any previous status messages
-	m.ClearStatusMessages()
-
-	// Validate filled source folder entryField
-	if m.sourceFolderEntry.Text == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "StartSync",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("metsync.err.nofolder")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+	// Create and run validator
+	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
+	if err := validator.Validate("start"); err != nil {
 		return
 	}
 
-	// Validate source folder exists
+	// Validate source folder contains MP3 files (specific to this module)
 	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
-	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "StartSync",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nosrcfolder")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	// Validate source folder contains MP3 files
-	mp3Files, err := common.ListFilesWithExtensions(sourcePath, []string{".mp3"}, true)
+	mp3Files, err := common.ListFilesWithExtensions(sourcePath, []string{".mp3"}, m.recursiveCheck.Checked)
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
@@ -264,19 +239,6 @@ func (m *MetadataSyncModule) Start() {
 		return
 	}
 
-	// Validate database path is set
-	if m.dbMgr.GetDatabasePath() == "" {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Validate Database Path",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
 	// Show progress dialog with cancel support
 	m.ShowProgressDialog(locales.Translate("metsync.dialog.header"))
 
@@ -296,47 +258,8 @@ func (m *MetadataSyncModule) Start() {
 			}
 		}()
 
-		// Create database backup
-		m.UpdateProgressStatus(0.1, locales.Translate("common.db.backupcreate"))
-		if err := m.dbMgr.BackupDatabase(); err != nil {
-			m.CloseProgressDialog()
-			context := &common.ErrorContext{
-				Module:      m.GetName(),
-				Operation:   "Database Backup",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(err, context)
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-
 		// Add initial status message
 		m.AddInfoMessage(locales.Translate("common.status.start"))
-		m.ModuleBase.AddInfoMessage(locales.Translate("common.db.backupdone"))
-
-		// Check if cancelled
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("common.status.stopped", 0, 0)
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
-		}
-
-		// Connect to database
-		m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
-		if err := m.dbMgr.Connect(); err != nil {
-			m.CloseProgressDialog()
-			context := &common.ErrorContext{
-				Module:      m.GetName(),
-				Operation:   "Database Connection",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-		defer m.dbMgr.Finalize()
 
 		// Check if cancelled
 		if m.IsCancelled() {

@@ -40,6 +40,7 @@ type FieldDefinition struct {
 	ActiveWhen     string
 	ValidationType string // exists, valid_date, filled, exists | write
 	Value          string
+	ValidateOnActions []string // list of actions for selected validation (eg. for modules with more functions with separated starting)
 }
 
 // Empty function moved and extended to common/validator.go
@@ -214,6 +215,37 @@ func (c *ModuleConfig) SetWithDependency(key string, value string, fieldType str
 		c.Fields[key] = field
 	}
 }
+
+// SetWithDefinitionAndActions stores a string value in the module configuration with field definition and validation actions
+func (cfg *ModuleConfig) SetWithDefinitionAndActions(key string, value string, fieldType string, required bool, validationType string, validateOnActions []string) {
+    if cfg.Fields == nil {
+        cfg.Fields = make(map[string]FieldDefinition)
+    }
+    cfg.Fields[key] = FieldDefinition{
+        FieldType:         fieldType,
+        Required:         required,
+        ValidationType:   validationType,
+        Value:           value,
+        ValidateOnActions: validateOnActions,
+    }
+}
+
+// SetWithDependencyAndActions stores a string value in the module configuration with dependency and validation actions
+func (cfg *ModuleConfig) SetWithDependencyAndActions(key string, value string, fieldType string, required bool, dependsOn string, activeWhen string, validationType string, validateOnActions []string) {
+    if cfg.Fields == nil {
+        cfg.Fields = make(map[string]FieldDefinition)
+    }
+    cfg.Fields[key] = FieldDefinition{
+        FieldType:         fieldType,
+        Required:         required,
+        DependsOn:       dependsOn,
+        ActiveWhen:      activeWhen,
+        ValidationType:   validationType,
+        Value:           value,
+        ValidateOnActions: validateOnActions,
+    }
+}
+
 
 // GetBool retrieves a boolean value from the module configuration
 func (c ModuleConfig) GetBool(key string, defaultValue bool) bool {

@@ -223,5 +223,6 @@
     "validator.status.dbconnect": "Kontrola nastavení databáze úspěšná.",
     "validator.status.entries": "Kontrola vstupních parametrů úspěšná.",
     "validator.status.start": "Spuštěna úvodní kontrola.",
-    "valildator.err.foldernotexist": "Zadaná složka '%s' neexistuje."
+    "validator.err.foldernotexist": "Zadaná složka '%s' neexistuje.",
+    "validator.err.required": "Není vyplněný nějaký povinný údaj."
 }

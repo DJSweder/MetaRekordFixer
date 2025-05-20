@@ -15,26 +15,31 @@ import (
 
 // Validator provides centralized validation functionality for modules.
 type Validator struct {
-	module      Module          // Reference to the module using the validator
-	configMgr   *ConfigManager  // For configuration access
-	dbMgr       *DBManager     // For database operations
+	module       Module         // Reference to the module using the validator
+	configMgr    *ConfigManager // For configuration access
+	dbMgr        *DBManager     // For database operations
 	errorHandler *ErrorHandler  // For error handling
 }
 
 // NewValidator creates a new instance of Validator.
 func NewValidator(module Module, configMgr *ConfigManager, dbMgr *DBManager, errorHandler *ErrorHandler) *Validator {
 	return &Validator{
-		module:      module,
-		configMgr:   configMgr,
-		dbMgr:       dbMgr,
+		module:       module,
+		configMgr:    configMgr,
+		dbMgr:        dbMgr,
 		errorHandler: errorHandler,
 	}
 }
 
 // Validate performs all necessary validations and returns an error if any validation fails.
-func (v *Validator) Validate() error {
+// The action parameter specifies which validation rules should be applied based on
+// the action being performed (e.g., "standard", "custom", etc.). If a field has
+// ValidateOnActions specified, it will only be validated when the current action
+// matches one of the specified actions. If ValidateOnActions is empty, the field
+// will be validated for all actions.
+func (v *Validator) Validate(action string) error {
 	// Get base module functionality
-	base, ok := v.module.(interface{
+	base, ok := v.module.(interface {
 		ClearStatusMessages()
 		AddInfoMessage(string)
 		AddErrorMessage(string)
@@ -50,7 +55,7 @@ func (v *Validator) Validate() error {
 	base.AddInfoMessage(locales.Translate("validator.status.start"))
 
 	// Validate input fields
-	if err := v.validateFields(); err != nil {
+	if err := v.validateFields(action); err != nil {
 		base.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return err
 	}
@@ -76,7 +81,7 @@ func (v *Validator) Validate() error {
 }
 
 // validateFields checks all fields according to their definitions and validation rules.
-func (v *Validator) validateFields() error {
+func (v *Validator) validateFields(action string) error {
 	// Get module configuration
 	cfg := v.configMgr.GetModuleConfig(v.module.GetConfigName())
 	if IsNilConfig(cfg) {
@@ -98,6 +103,20 @@ func (v *Validator) validateFields() error {
 
 	// Validate each field
 	for key, field := range cfg.Fields {
+		// Skip validation if field's ValidateOnActions doesn't include current action
+		if len(field.ValidateOnActions) > 0 {
+			actionFound := false
+			for _, validAction := range field.ValidateOnActions {
+				if validAction == action {
+					actionFound = true
+					break
+				}
+			}
+			if !actionFound {
+				continue
+			}
+		}
+
 		value := cfg.Get(key, "")
 
 		// Skip validation if field depends on another field and condition is not met
@@ -116,16 +135,25 @@ func (v *Validator) validateFields() error {
 			Recoverable: false,
 		}
 
+		// Validate date format if needed
+		if field.FieldType == "date" {
+			if !IsEmptyString(value) && !IsValidDateFormat(value) {
+				err := errors.New(locales.Translate("validator.err.invaliddate"))
+				v.errorHandler.ShowStandardError(err, context)
+				return err
+			}
+		}
+
 		// Check required fields
 		if field.Required && IsEmptyString(value) {
 			var err error
 			switch field.FieldType {
 			case "folder":
 				err = errors.New(locales.Translate("validator.err.nofolder"))
-			case "date":
-				err = errors.New(locales.Translate("validator.err.required"))
 			case "playlist":
 				err = errors.New(locales.Translate("validator.err.noplaylist"))
+			case "date":
+				err = errors.New(locales.Translate("validator.err.invaliddate"))
 			default:
 				err = errors.New(locales.Translate("validator.err.required"))
 			}
@@ -139,19 +167,22 @@ func (v *Validator) validateFields() error {
 			continue
 		}
 
-		// Validate date format if needed
-		if field.FieldType == "date" && !IsValidDateFormat(value) {
-			err := errors.New(locales.Translate("validator.err.invaliddate"))
-			v.errorHandler.ShowStandardError(err, context)
-			return err
-		}
-
 		// Validate field value based on validation type
 		if !IsEmptyString(field.ValidationType) {
 			switch field.ValidationType {
 			case "exists":
-				if !FileExists(value) {
-					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), value)
+				// Use DirectoryExists for folders, FileExists pro files
+				var exists bool
+				if field.FieldType == "folder" {
+					exists = DirectoryExists(value)
+				} else {
+					exists = FileExists(value)
+				}
+
+				if !exists {
+					// For error dialog get only foldername instead of path
+					displayName := filepath.Base(value)
+					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), displayName)
 					err := errors.New(msg)
 					v.errorHandler.ShowStandardError(err, context)
 					return err
@@ -159,8 +190,10 @@ func (v *Validator) validateFields() error {
 
 			case "exists | write":
 				// Check if folder exists
-				if !FileExists(value) {
-					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), value)
+				if !DirectoryExists(value) {
+					// Gent foldername only for error dialog
+					displayName := filepath.Base(value)
+					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), displayName)
 					err := errors.New(msg)
 					v.errorHandler.ShowStandardError(err, context)
 					return err

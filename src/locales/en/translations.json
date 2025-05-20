@@ -223,5 +223,6 @@
     "validator.status.dbconnect": "Database settings check successful.",
     "validator.status.entries": "Input parameters check successful.",
     "validator.status.start": "Initial check started.",
-    "valildator.err.foldernotexist": "The specified folder '%s' does not exist."
+    "validator.err.foldernotexist": "The specified folder '%s' does not exist.",
+    "validator.err.required": "Some required field is missing."
 }
