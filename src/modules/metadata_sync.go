@@ -163,6 +163,9 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components.
 // It creates and configures the entry fields, checkboxes, and buttons,
 // and sets up their event handlers.
+// initializeUI sets up the user interface components.
+// It creates and configures the entry fields, checkboxes, and buttons,
+// and sets up their event handlers.
 func (m *MetadataSyncModule) initializeUI() {
 	// Initialize entry fields
 	m.sourceFolderEntry = widget.NewEntry()
