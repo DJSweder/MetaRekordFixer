@@ -317,7 +317,7 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 		cfg.SetWithDefinitionAndActions("source_folder", m.sourceFolderEntry.Text, "folder", true, "exists", []string{"start"})
 	}
 	if m.targetFolderEntry != nil {
-		cfg.SetWithDefinitionAndActions("target_folder", m.targetFolderEntry.Text, "folder", true, "exists", []string{"start"})
+		cfg.SetWithDefinitionAndActions("target_folder", m.targetFolderEntry.Text, "folder", true, "exists | write", []string{"start"})
 	}
 
 	// Save format selections with validation
@@ -476,7 +476,7 @@ func (m *MusicConverterModule) initializeUI() {
 
 	// Submit button
 	m.submitBtn = common.CreateSubmitButton(locales.Translate("convert.button.start"), func() {
-		go m.startConversion()
+		go m.Start()
 	},
 	)
 
@@ -606,6 +606,25 @@ func (m *MusicConverterModule) IsCancelled() bool {
 	}
 	return isCancelled
 }
+func (m *MusicConverterModule) Start() {
+	// Disable the button during processing
+	m.submitBtn.Disable()
+	defer func() {
+		m.submitBtn.Enable()
+	}()
+
+	// Save the configuration before starting the process
+	m.SaveConfig()
+
+	// Create and run validator
+	validator := common.NewValidator(m, m.ConfigMgr, nil, m.ErrorHandler)
+	if err := validator.Validate("start"); err != nil {
+		return
+	}
+
+	// Start the conversion process
+	m.startConversion()
+}
 
 // startConversion begins the conversion process
 func (m *MusicConverterModule) startConversion() {
@@ -623,25 +642,10 @@ func (m *MusicConverterModule) startConversion() {
 		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
-	// Clear previous status messages
-	m.ClearStatusMessages()
-
 	// Validate inputs
 	sourceFolder := m.sourceFolderEntry.Text
 	targetFolder := m.targetFolderEntry.Text
 	targetFormat := m.targetFormatSelect.Selected
-
-	// Validate source folder exists
-	if _, err := os.Stat(sourceFolder); os.IsNotExist(err) {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "startConversion",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nosource")), context)
-		return
-	}
 
 	// Get format-specific settings
 	formatSettings := make(map[string]string)
@@ -685,7 +689,7 @@ func (m *MusicConverterModule) startConversion() {
 				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.createfolder")), context)
 				return
 			}
-			m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.foldercreated"), targetFolder))
+
 		}
 	} else {
 		// Check if target folder exists
@@ -701,27 +705,8 @@ func (m *MusicConverterModule) startConversion() {
 			return
 		}
 	}
-	// Try to make test file for write permission check
-	testFile := filepath.Join(targetFolder, ".write_test")
-	f, err := os.Create(testFile)
-	if err != nil {
-		// Permission denied
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "startConversion",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nowriteaccess")), context)
-		return
-	}
-	// Clean up test file
-	f.Close()
-	os.Remove(testFile)
-
 	// Add initial status message
-	m.AddInfoMessage(locales.Translate("convert.status.starting"))
+	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Log conversion parameters
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.source"), sourceFolder))
@@ -759,12 +744,32 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		locales.Translate("convert.dialog.header"),
 		func() {
 			cancel()
-			m.HandleProcessCancellation("convert.dialog.stop")
+			m.HandleProcessCancellation("common.status.stopping")
 		},
 	)
 
 	// Show progress dialog only after all validations pass
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), len(files)))
+
+	// Create initial target folder structure if needed
+	basePath := targetFolder
+	if m.makeTargetFolderCheckbox.Checked {
+		sourceFolderBase := filepath.Base(sourceFolder)
+		basePath = filepath.Join(targetFolder, sourceFolderBase)
+
+		// Ensure base target directory exists
+		if err := os.MkdirAll(basePath, 0755); err != nil {
+			context := &common.ErrorContext{
+				Module:    m.GetName(),
+				Operation: "createTargetFolder",
+				Severity:  common.SeverityWarning,
+			}
+			m.ErrorHandler.ShowStandardError(err, context)
+			m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.createfolder"), err))
+			return
+		}
+		m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.foldercreated"), sourceFolderBase))
+	}
 
 	// Track conversion statistics
 	successCount := 0
@@ -789,25 +794,7 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 		relPath, _ := filepath.Rel(sourceFolder, file)
 
 		// Determine target path
-		targetPath := targetFolder
-		if m.makeTargetFolderCheckbox.Checked {
-			// Create target folder if it doesn't exist
-			sourceFolderBase := filepath.Base(sourceFolder)
-			targetPath = filepath.Join(targetFolder, sourceFolderBase)
-
-			// Ensure target directory exists
-			if err := os.MkdirAll(targetPath, 0755); err != nil {
-				context := &common.ErrorContext{
-					Module:    m.GetName(),
-					Operation: "createTargetFolder",
-					Severity:  common.SeverityWarning,
-				}
-				m.ErrorHandler.ShowStandardError(err, context)
-				m.AddWarningMessage(fmt.Sprintf(locales.Translate("convert.err.createfolder"), err))
-				failedFiles = append(failedFiles, file)
-				continue
-			}
-		}
+		targetPath := basePath
 
 		// Get directory part of relative path
 		relDir := filepath.Dir(relPath)
@@ -1403,7 +1390,7 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 
 	// Set default source and target folders to empty strings
 	cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
-	cfg.SetWithDefinitionAndActions("target_folder", "", "folder", true, "exists", []string{"start"})
+	cfg.SetWithDefinitionAndActions("target_folder", "", "folder", true, "exists | write", []string{"start"})
 
 	// Set default formats
 	// cfg.Set("source_format", locales.Translate("convert.srcformats.all"))

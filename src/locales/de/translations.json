@@ -67,6 +67,7 @@
     "common.status.reading": "Daten werden geladen",
     "common.status.start": "Prozess gestartet.",
     "common.status.stopped": "Gestoppt. Anzahl der aktualisierten Songs: %d von insgesamt %d.",
+    "common.status.stopping": "",
     "common.status.toupdatecount": "Anzahl der zu aktualisierenden Songs: %d",
     "common.status.updating": "Datenaktualisierung läuft.",
     "convert.button.start": "Laufen",
@@ -103,6 +104,7 @@
     "convert.status.doneall": "Fertig, Anzahl der konvertierten Dateien: %d",
     "convert.status.failed": "Anzahl der Dateien mit Konvertierungsfehlern: %d",
     "convert.status.faileditems": "- %s",
+    "convert.status.foldercreated": "",
     "convert.status.format": "Ausgewähltes Konvertierungsformat: %s",
     "convert.status.progress": "%d von %d Dateien werden verarbeitet",
     "convert.status.skipped": "Anzahl der übersprungenen Dateien: %d",
@@ -216,13 +218,13 @@
     "updater.tracks.morefiles": "... und %d weitere Dateien.",
     "updater.tracks.playlistcount": "Anzahl der zu aktualisierenden Songs in der Wiedergabeliste: %d",
     "updater.tracks.starting": "Sammlungsaktualisierung gestartet.",
+    "validator.err.foldernotexist": "Der angegebene Ordner '%s' existiert nicht.",
     "validator.err.invaliddate": "Das Datum ist nicht korrekt eingetragen.",
     "validator.err.nofolder": "Kein Ordner angegeben.",
     "validator.err.noplaylist": "Keine Wiedergabeliste ausgewählt.",
     "validator.err.nowriteaccess": "Schreiben in Ordner '%s' nicht möglich.",
+    "validator.err.required": "",
     "validator.status.dbconnect": "Prüfung der Datenbankeinstellungen erfolgreich.",
     "validator.status.entries": "Prüfung der Eingabeparameter erfolgreich.",
-    "validator.status.start": "Erste Prüfung gestartet.",
-    "validator.err.foldernotexist": "Der angegebene Ordner '%s' existiert nicht.",
-    "validator.err.required": ""
+    "validator.status.start": "Erste Prüfung gestartet."
 }

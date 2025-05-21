@@ -191,7 +191,7 @@ func (v *Validator) validateFields(action string) error {
 			case "exists | write":
 				// Check if folder exists
 				if !DirectoryExists(value) {
-					// Gent foldername only for error dialog
+					// Get foldername only for error dialog
 					displayName := filepath.Base(value)
 					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), displayName)
 					err := errors.New(msg)
@@ -203,7 +203,9 @@ func (v *Validator) validateFields(action string) error {
 				tempFile := filepath.Join(value, ".write_test")
 				f, err := os.Create(tempFile)
 				if err != nil {
-					msg := fmt.Sprintf(locales.Translate("validator.err.nowriteaccess"), value)
+					// Get foldername only for error dialog
+					displayName := filepath.Base(value)
+					msg := fmt.Sprintf(locales.Translate("validator.err.nowriteaccess"), displayName)
 					err := errors.New(msg)
 					v.errorHandler.ShowStandardError(err, context)
 					return err

@@ -67,6 +67,7 @@
     "common.status.reading": "Loading data",
     "common.status.start": "Process started.",
     "common.status.stopped": "Stopped. Number of songs updated: %d out of %d total.",
+    "common.status.stopping": "Stopping…",
     "common.status.toupdatecount": "Number of songs to update: %d",
     "common.status.updating": "Data update in progress.",
     "convert.button.start": "Start encoding",
@@ -103,6 +104,7 @@
     "convert.status.doneall": "Done, converted files count: %d",
     "convert.status.failed": "Number of files with conversion errors: %d",
     "convert.status.faileditems": "- %s",
+    "convert.status.foldercreated": "",
     "convert.status.format": "Selected conversion format: %s",
     "convert.status.progress": "Processing %d of %d files",
     "convert.status.skipped": "Number of files skipped: %d",
@@ -216,13 +218,13 @@
     "updater.tracks.morefiles": "...and %d more files",
     "updater.tracks.playlistcount": "Number of songs in playlist to update: %d",
     "updater.tracks.starting": "Library update was started.",
+    "validator.err.foldernotexist": "The specified folder '%s' does not exist.",
     "validator.err.invaliddate": "The date is not filled in correctly.",
     "validator.err.nofolder": "No folder specified.",
     "validator.err.noplaylist": "No playlist selected.",
     "validator.err.nowriteaccess": "Unable to write to folder '%s'.",
+    "validator.err.required": "Some required field is missing.",
     "validator.status.dbconnect": "Database settings check successful.",
     "validator.status.entries": "Input parameters check successful.",
-    "validator.status.start": "Initial check started.",
-    "validator.err.foldernotexist": "The specified folder '%s' does not exist.",
-    "validator.err.required": "Some required field is missing."
+    "validator.status.start": "Initial check started."
 }
