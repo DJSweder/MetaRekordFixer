@@ -70,7 +70,7 @@ func (m *HotCueSyncModule) GetName() string {
 
 // GetConfigName returns the configuration key for this module.
 func (m *HotCueSyncModule) GetConfigName() string {
-	return "hotcue_sync"
+	return "hotcuesync"
 }
 
 // GetIcon returns the module's icon resource.
@@ -144,18 +144,18 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 	}
 
 	// Try to connect to database
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.SeverityCritical,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
-		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
-		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
-	}
-	defer m.dbMgr.Finalize()
+	//	if err := m.dbMgr.Connect(); err != nil {
+	//		context := &common.ErrorContext{
+	//			Module:      m.GetConfigName(),
+	//			Operation:   "Database Connection",
+	//			Severity:    common.SeverityCritical,
+	//			Recoverable: true,
+	//		}
+	//		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
+	//		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
+	//		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	//	}
+	//	defer m.dbMgr.Finalize()
 
 	// Load playlists
 	if err := m.loadPlaylists(); err != nil {
@@ -165,7 +165,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.playlistload")), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -767,19 +767,17 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 	}
 }
 
-// Start performs the main hot cue synchronization process.
+// Start performs the necessary steps before starting the main process
+// It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
+// and starts the main process.
+// Input validation also includes a test of the connection to the database and creating a backup of it.
 func (m *HotCueSyncModule) Start() {
-
-	// Save the configuration before starting the process
-	m.SaveConfig()
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
 	if err := validator.Validate("start"); err != nil {
 		return
 	}
-	// Initial progress
-	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Show progress dialog
 	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
@@ -828,45 +826,7 @@ func (m *HotCueSyncModule) processUpdate() {
 
 	// Update progress
 	m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
-	m.AddInfoMessage(locales.Translate("common.status.reading"))
-
-	// Create database backup
-	if err := m.dbMgr.BackupDatabase(); err != nil {
-		m.CloseProgressDialog()
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Backup",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(err, context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	m.AddInfoMessage(locales.Translate("common.db.backupdone"))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.srctrackscount"), len(sourceTracks)))
-
-	// Check if operation was cancelled
-	if m.IsCancelled() {
-		m.HandleProcessCancellation("common.status.stopped", 0, len(sourceTracks))
-		common.UpdateButtonToCompleted(m.submitBtn)
-		return
-	}
-
-	// Connect to database
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.db.txbeginerr"), err), context)
-		m.CloseProgressDialog()
-		return
-	}
-	defer m.dbMgr.Finalize()
 
 	// Track successful and skipped files
 	processedCount := 0

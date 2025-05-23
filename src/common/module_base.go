@@ -383,3 +383,10 @@ func (m *ModuleBase) ValidateFields() error {
 	// Validate all fields
 	return nil
 }
+
+// StartModuleProcess handles the common module startup flow.
+// It saves configuration, runs validation, shows progress dialog and starts the main process.
+// Parameters:
+//   - validator: pre-configured validator instance from the module
+//   - mode: validation mode ("start", "standard", "custom")
+//   - processFunc: function containing the main module logic

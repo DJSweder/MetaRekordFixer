@@ -61,7 +61,7 @@ func (m *MetadataSyncModule) GetName() string {
 
 // GetConfigName returns the configuration key for this module.
 func (m *MetadataSyncModule) GetConfigName() string {
-	return "metadata_sync"
+	return "metsync"
 }
 
 // GetIcon returns the module's icon resource.
@@ -196,18 +196,11 @@ func (m *MetadataSyncModule) initializeUI() {
 	)
 }
 
-// Start initiates the metadata synchronization process.
-// It validates the input, clears previous status messages,
-// and executes the synchronization.
+// Start performs the necessary steps before starting the main process
+// It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
+// and starts the main process.
+// Input validation also includes a test of the connection to the database and creating a backup of it.
 func (m *MetadataSyncModule) Start() {
-	// Disable the button during processing
-	m.submitBtn.Disable()
-	defer func() {
-		m.submitBtn.Enable()
-	}()
-
-	// Save the configuration before starting the process
-	m.SaveConfig()
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -225,7 +218,7 @@ func (m *MetadataSyncModule) Start() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.noreadaccess")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -260,9 +253,6 @@ func (m *MetadataSyncModule) Start() {
 				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			}
 		}()
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
 
 		// Check if cancelled
 		if m.IsCancelled() {
@@ -439,20 +429,3 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 	m.CompleteProgressDialog()
 	common.UpdateButtonToCompleted(m.submitBtn)
 }
-
-//func (m *MetadataSyncModule) findMP3Files(root string) ([]string, error) {
-//	var files []string
-//	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-//		if err != nil {
-//			return err
-//		}
-//		if info.IsDir() {
-//			return nil
-//		}
-//		if strings.HasSuffix(info.Name(), ".mp3") {
-//			files = append(files, path)
-//		}
-//		return nil
-//	})
-//	return files, err
-//}

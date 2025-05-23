@@ -89,14 +89,14 @@ func (m *DBManager) Connect() error {
 	err = db.Ping()
 	if err != nil {
 		db.Close()
-		// Analyzovat typ chyby
+		// Analyze type of error
 		if strings.Contains(err.Error(), "file is not a database") {
 			return fmt.Errorf(locales.Translate("common.db.invalidformat"), err)
 		}
 		if strings.Contains(err.Error(), "no such table") {
 			return fmt.Errorf(locales.Translate("common.db.missingtables"), err)
 		}
-		return fmt.Errorf(locales.Translate("common.db.dbconnecterr"), err)
+		return fmt.Errorf(locales.Translate("common.db.connecterr"), err)
 	}
 
 	// Set pragmas to disable WAL mode and optimize performance
@@ -317,7 +317,7 @@ func (m *DBManager) BackupDatabase() error {
 func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.connectdb"), err)
 	}
 
 	query := `
@@ -335,7 +335,7 @@ func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 
 	rows, err := m.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.playlistsloaderr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.playlistload"), err)
 	}
 	defer rows.Close()
 

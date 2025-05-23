@@ -15,8 +15,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// TracksUpdater is a module that handles updating track format in database.
-type TracksUpdater struct {
+// TracksUpdaterModule is a module that handles updating track format in database.
+type TracksUpdaterModule struct {
 	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
 	*common.ModuleBase
 	dbMgr             *common.DBManager
@@ -28,9 +28,9 @@ type TracksUpdater struct {
 	pendingPlaylistID string // Temporary storage for playlist ID
 }
 
-// NewTracksUpdater creates a new instance of TracksUpdater.
-func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdater {
-	m := &TracksUpdater{
+// NewTracksUpdater creates a new instance of TracksUpdaterModule.
+func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdaterModule {
+	m := &TracksUpdaterModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
@@ -48,23 +48,23 @@ func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager,
 }
 
 // GetName returns the localized name of this module.
-func (m *TracksUpdater) GetName() string {
+func (m *TracksUpdaterModule) GetName() string {
 	return locales.Translate("updater.mod.name")
 }
 
 // GetConfigName returns the module's configuration key.
-func (m *TracksUpdater) GetConfigName() string {
-	return "tracks_updater"
+func (m *TracksUpdaterModule) GetConfigName() string {
+	return "updater"
 }
 
 // GetIcon returns the module's icon resource.
-func (m *TracksUpdater) GetIcon() fyne.Resource {
+func (m *TracksUpdaterModule) GetIcon() fyne.Resource {
 	return theme.SearchReplaceIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages
 // This implements the method from ModuleBase to provide the module-specific UI
-func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
+func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with playlist selector and folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
@@ -95,7 +95,7 @@ func (m *TracksUpdater) GetModuleContent() fyne.CanvasObject {
 }
 
 // GetContent returns the module's main UI content and initializes database connection.
-func (m *TracksUpdater) GetContent() fyne.CanvasObject {
+func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
 		context := &common.ErrorContext{
@@ -110,18 +110,18 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 	}
 
 	// Try to connect to database
-	if err := m.dbMgr.Connect(); err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Database Connection",
-			Severity:    common.SeverityWarning,
-			Recoverable: true,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
-		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
-		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
-	}
-	defer m.dbMgr.Finalize()
+	//	if err := m.dbMgr.Connect(); err != nil {
+	//		context := &common.ErrorContext{
+	//			Module:      m.GetConfigName(),
+	//			Operation:   "Database Connection",
+	//			Severity:    common.SeverityWarning,
+	//			Recoverable: true,
+	//		}
+	//		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
+	//		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
+	//		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
+	//	}
+	//	defer m.dbMgr.Finalize()
 
 	// Load playlists
 	if err := m.loadPlaylists(); err != nil {
@@ -131,7 +131,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.playlistload")), context)
+		m.ErrorHandler.ShowStandardError(err, context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -145,7 +145,7 @@ func (m *TracksUpdater) GetContent() fyne.CanvasObject {
 }
 
 // LoadConfig applies the configuration to the UI components.
-func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
+func (m *TracksUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
@@ -178,7 +178,7 @@ func (m *TracksUpdater) LoadConfig(cfg common.ModuleConfig) {
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
-func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
+func (m *TracksUpdaterModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig()
 	}
@@ -198,7 +198,7 @@ func (m *TracksUpdater) SaveConfig() common.ModuleConfig {
 }
 
 // initializeUI sets up the user interface components.
-func (m *TracksUpdater) initializeUI() {
+func (m *TracksUpdaterModule) initializeUI() {
 	// Create a text entry for the user to input the folder path.
 	// When the user changes the text in the entry, save the config.
 	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
@@ -265,7 +265,7 @@ func getFileType(ext string) int {
 	}
 }
 
-func (m *TracksUpdater) loadPlaylists() error {
+func (m *TracksUpdaterModule) loadPlaylists() error {
 	err := m.dbMgr.Connect()
 	if err != nil {
 		return fmt.Errorf("%s %w", locales.Translate("common.err.connectdb"), err)
@@ -309,15 +309,11 @@ func (m *TracksUpdater) loadPlaylists() error {
 	return nil
 }
 
-func (m *TracksUpdater) Start() {
-	// Disable the button during processing
-	m.submitBtn.Disable()
-	defer func() {
-		m.submitBtn.Enable()
-	}()
-
-	// Save the configuration before starting the process
-	m.SaveConfig()
+// Start performs the necessary steps before starting the main process
+// It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
+// and starts the main process.
+// Input validation also includes a test of the connection to the database and creating a backup of it.
+func (m *TracksUpdaterModule) Start() {
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -325,6 +321,16 @@ func (m *TracksUpdater) Start() {
 		return
 	}
 
+	// Show the progress dialog
+	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
+
+	// Start processing in a goroutine
+	go m.processUpdate()
+}
+
+func (m *TracksUpdaterModule) processUpdate() {
+	// Track the number of updated files.
+	updateCount := 0
 	// Validate playlist selection
 	if m.playlistSelect.Selected == "" {
 		context := &common.ErrorContext{
@@ -337,18 +343,6 @@ func (m *TracksUpdater) Start() {
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
-
-	// Show the progress dialog
-	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
-
-	// Start processing in a goroutine
-	go m.processUpdate()
-}
-
-func (m *TracksUpdater) processUpdate() {
-	// Track the number of updated files.
-	updateCount := 0
-
 	defer func() {
 		// Catch any panics or errors and show an error message.
 		if r := recover(); r != nil {
@@ -365,30 +359,12 @@ func (m *TracksUpdater) processUpdate() {
 		}
 	}()
 
-	// Add initial status message
-	m.AddInfoMessage(locales.Translate("common.status.start"))
-
 	// Check if the operation was cancelled.
 	if m.IsCancelled() {
 		m.HandleProcessCancellation("updater.status.stopped", updateCount, 0)
 		common.UpdateButtonToCompleted(m.submitBtn)
 		return
 	}
-
-	// Connect to the database.
-	//	m.UpdateProgressStatus(0.2, locales.Translate("common.db.conn"))
-	//	if err := m.dbMgr.Connect(); err != nil {
-	//		context := &common.ErrorContext{
-	//			Module:      m.GetConfigName(),
-	//			Operation:   "Database Connection",
-	//			Severity:    common.SeverityCritical,
-	//			Recoverable: false,
-	//		}
-	//		m.ErrorHandler.ShowStandardError(err, context)
-	//		m.CloseProgressDialog()
-	//		return
-	//	}
-	// defer m.dbMgr.Finalize()
 
 	// Get the selected playlist.
 	m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))

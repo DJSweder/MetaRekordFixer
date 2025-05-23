@@ -102,7 +102,7 @@ func (m *MusicConverterModule) GetName() string {
 
 // GetConfigName returns the configuration identifier for the module
 func (m *MusicConverterModule) GetConfigName() string {
-	return "music_converter"
+	return "convert"
 }
 
 // GetIcon returns the module's icon
@@ -607,14 +607,6 @@ func (m *MusicConverterModule) IsCancelled() bool {
 	return isCancelled
 }
 func (m *MusicConverterModule) Start() {
-	// Disable the button during processing
-	m.submitBtn.Disable()
-	defer func() {
-		m.submitBtn.Enable()
-	}()
-
-	// Save the configuration before starting the process
-	m.SaveConfig()
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, nil, m.ErrorHandler)
@@ -672,41 +664,6 @@ func (m *MusicConverterModule) startConversion() {
 		formatSettings["sample_rate"] = sampleRate
 		formatSettings["bit_depth"] = bitDepth
 	}
-
-	// Check if target folder exists, create if needed and option is selected
-	if m.makeTargetFolderCheckbox.Checked {
-		// Create target folder if it doesn't exist
-		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
-			err := os.MkdirAll(targetFolder, 0755)
-			if err != nil {
-				m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-				context := &common.ErrorContext{
-					Module:      m.GetName(),
-					Operation:   "startConversion",
-					Severity:    common.SeverityCritical,
-					Recoverable: false,
-				}
-				m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.createfolder")), context)
-				return
-			}
-
-		}
-	} else {
-		// Check if target folder exists
-		if _, err := os.Stat(targetFolder); os.IsNotExist(err) {
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			context := &common.ErrorContext{
-				Module:      m.GetName(),
-				Operation:   "startConversion",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("convert.err.nofolder")), context)
-			return
-		}
-	}
-	// Add initial status message
-	m.AddInfoMessage(locales.Translate("common.status.start"))
 
 	// Log conversion parameters
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("convert.status.source"), sourceFolder))

@@ -38,6 +38,9 @@ func NewValidator(module Module, configMgr *ConfigManager, dbMgr *DBManager, err
 // matches one of the specified actions. If ValidateOnActions is empty, the field
 // will be validated for all actions.
 func (v *Validator) Validate(action string) error {
+	// Save configuration
+	v.module.SaveConfig()
+
 	// Get base module functionality
 	base, ok := v.module.(interface {
 		ClearStatusMessages()
@@ -75,6 +78,10 @@ func (v *Validator) Validate(action string) error {
 			return err
 		}
 		base.AddInfoMessage(locales.Translate("common.db.backupdone"))
+		base.AddInfoMessage(locales.Translate("common.status.start"))
+	} else {
+		// If no database is needed, just add start message
+		base.AddInfoMessage(locales.Translate("common.status.start"))
 	}
 
 	return nil

@@ -187,7 +187,7 @@ func (m *DateSyncModule) GetName() string {
 
 // GetConfigName returns the configuration identifier for the module
 func (m *DateSyncModule) GetConfigName() string {
-	return "date_sync"
+	return "datesync"
 }
 
 // GetIcon returns the module's icon
@@ -637,24 +637,15 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 	m.SaveConfig()
 }
 
-// Start initiates the date synchronization process.
-// It validates the input, clears previous status messages,
-// and executes the synchronization based on the specified mode.
-// The mode parameter determines which type of synchronization to perform:
-// - "standard" for standard date synchronization
-// - "custom" for custom date synchronization
-
+// Start performs the necessary steps before starting the main process
+// It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
+// and starts the main process based on specific mode:
+// - "standard" for date synchronization over music library
+// - "custom" to set specific date for songs stored in the selected location
+// Input validation also includes a test of the connection to the database and creating a backup of it.
 func (m *DateSyncModule) Start(mode string) {
-	// Disable the appropriate button during processing
 
 	if mode == "standard" {
-		m.standardUpdateBtn.Disable()
-		defer func() {
-			m.standardUpdateBtn.Enable()
-		}()
-
-		// Save the configuration before starting the process
-		m.SaveConfig()
 
 		// Create and run validator
 		validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -664,21 +655,11 @@ func (m *DateSyncModule) Start(mode string) {
 
 		// Show progress dialog with cancel support
 		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
 
 		// Start processing in goroutine
 		go m.processStandardUpdate()
 
 	} else if mode == "custom" {
-		m.customDateUpdateBtn.Disable()
-		defer func() {
-			m.customDateUpdateBtn.Enable()
-		}()
-
-		// Save the configuration before starting the process
-		m.SaveConfig()
 
 		// Create and run validator
 		validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -689,8 +670,6 @@ func (m *DateSyncModule) Start(mode string) {
 		// Show progress dialog with cancel support
 		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
 
-		// Add initial status message
-		m.AddInfoMessage(locales.Translate("common.status.start"))
 
 		// Start processing in goroutine
 		go m.processCustomUpdate()

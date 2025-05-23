@@ -20,7 +20,6 @@ type GlobalConfig struct {
 
 // ModuleConfig defines a configuration structure for modules
 type ModuleConfig struct {
-	Extra  map[string]string // will be deprecated in the future
 	Fields map[string]FieldDefinition
 }
 
@@ -34,12 +33,12 @@ type ConfigManager struct {
 
 // FieldDefinition defines validation rules for a configuration field
 type FieldDefinition struct {
-	FieldType      string // folder, date, checkbox, select, playlist, file
-	Required       bool
-	DependsOn      string
-	ActiveWhen     string
-	ValidationType string // exists, valid_date, filled, exists | write
-	Value          string
+	FieldType         string // folder, date, checkbox, select, playlist, file
+	Required          bool
+	DependsOn         string
+	ActiveWhen        string
+	ValidationType    string // exists, valid_date, filled, exists | write
+	Value             string
 	ValidateOnActions []string // list of actions for selected validation (eg. for modules with more functions with separated starting)
 }
 
@@ -171,7 +170,6 @@ func (mgr *ConfigManager) saveConfig() error {
 // NewModuleConfig creates a new empty module configuration
 func NewModuleConfig() ModuleConfig {
 	return ModuleConfig{
-		Extra:  make(map[string]string), // Will be deprecated in the future
 		Fields: make(map[string]FieldDefinition),
 	}
 }
@@ -181,16 +179,18 @@ func (c ModuleConfig) Get(key string, defaultValue string) string {
 	if field, exists := c.Fields[key]; exists {
 		return field.Value
 	}
-	// For backward compatibility. Will be deprecated in the future.
-	if value, exists := c.Extra[key]; exists {
-		return value
-	}
 	return defaultValue
 }
 
-// Set stores a string value in the module configuration. Will be deprecated in the future
+// Set stores a string value in the module configuration
 func (c *ModuleConfig) Set(key string, value string) {
-	c.Extra[key] = value
+	if c.Fields == nil {
+		c.Fields = make(map[string]FieldDefinition)
+	}
+	c.Fields[key] = FieldDefinition{
+		FieldType: "folder",
+		Value:     value,
+	}
 }
 
 func (c *ModuleConfig) SetWithDefinition(key string, value string, fieldType string, required bool, validationType string) {
@@ -218,51 +218,42 @@ func (c *ModuleConfig) SetWithDependency(key string, value string, fieldType str
 
 // SetWithDefinitionAndActions stores a string value in the module configuration with field definition and validation actions
 func (cfg *ModuleConfig) SetWithDefinitionAndActions(key string, value string, fieldType string, required bool, validationType string, validateOnActions []string) {
-    if cfg.Fields == nil {
-        cfg.Fields = make(map[string]FieldDefinition)
-    }
-    cfg.Fields[key] = FieldDefinition{
-        FieldType:         fieldType,
-        Required:         required,
-        ValidationType:   validationType,
-        Value:           value,
-        ValidateOnActions: validateOnActions,
-    }
+	if cfg.Fields == nil {
+		cfg.Fields = make(map[string]FieldDefinition)
+	}
+	cfg.Fields[key] = FieldDefinition{
+		FieldType:         fieldType,
+		Required:          required,
+		ValidationType:    validationType,
+		Value:             value,
+		ValidateOnActions: validateOnActions,
+	}
 }
 
 // SetWithDependencyAndActions stores a string value in the module configuration with dependency and validation actions
 func (cfg *ModuleConfig) SetWithDependencyAndActions(key string, value string, fieldType string, required bool, dependsOn string, activeWhen string, validationType string, validateOnActions []string) {
-    if cfg.Fields == nil {
-        cfg.Fields = make(map[string]FieldDefinition)
-    }
-    cfg.Fields[key] = FieldDefinition{
-        FieldType:         fieldType,
-        Required:         required,
-        DependsOn:       dependsOn,
-        ActiveWhen:      activeWhen,
-        ValidationType:   validationType,
-        Value:           value,
-        ValidateOnActions: validateOnActions,
-    }
+	if cfg.Fields == nil {
+		cfg.Fields = make(map[string]FieldDefinition)
+	}
+	cfg.Fields[key] = FieldDefinition{
+		FieldType:         fieldType,
+		Required:          required,
+		DependsOn:         dependsOn,
+		ActiveWhen:        activeWhen,
+		ValidationType:    validationType,
+		Value:             value,
+		ValidateOnActions: validateOnActions,
+	}
 }
-
 
 // GetBool retrieves a boolean value from the module configuration
 func (c ModuleConfig) GetBool(key string, defaultValue bool) bool {
 	if field, exists := c.Fields[key]; exists {
 		return field.Value == "true"
 	}
-	// For backward compatibility. Will be deprecated in the future
-	if value, exists := c.Extra[key]; exists {
-		return value == "true"
-	}
 	return defaultValue
 }
 
-// SetBool stores a boolean value in the module configuration. Will be deprecated in the future
-func (c *ModuleConfig) SetBool(key string, value bool) {
-	c.Extra[key] = fmt.Sprintf("%t", value)
-}
 func (c *ModuleConfig) SetBoolWithDefinition(key string, value bool, required bool, validationType string) {
 	if c.Fields == nil {
 		c.Fields = make(map[string]FieldDefinition)
@@ -284,11 +275,6 @@ func (c *ModuleConfig) SetBoolWithDependency(key string, value bool, required bo
 	}
 }
 
-// SetInt stores an integer value in the module configuration. Will be deprecated in the future
-func (c *ModuleConfig) SetInt(key string, value int) {
-	c.Extra[key] = fmt.Sprintf("%d", value)
-}
-
 // SetIntWithDefinition stores an integer value in the module configuration
 func (c *ModuleConfig) SetIntWithDefinition(key string, value int, required bool) {
 	if c.Fields == nil {
@@ -308,11 +294,6 @@ func (c *ModuleConfig) SetIntWithDependency(key string, value int, required bool
 		field.ActiveWhen = activeWhen
 		c.Fields[key] = field
 	}
-}
-
-// SetFloat stores a float value in the module configuration
-func (c *ModuleConfig) SetFloat(key string, value float64) {
-	c.Extra[key] = fmt.Sprintf("%f", value)
 }
 
 // IsNilConfig checks if a given configuration is nil

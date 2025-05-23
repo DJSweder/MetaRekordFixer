@@ -13,7 +13,7 @@
     "common.db.backupdone": "Datenbanksicherung erfolgreich erstellt",
     "common.db.conn": "Verbindung zur Datenbank wird hergestellt …",
     "common.db.dbcloseerr": "fehler dbcloseerr  %s: %v",
-    "common.db.dbconnecterr": "",
+    "common.db.connecterr": "",
     "common.db.dbnotconnectederr": "fehler dbnotconnected  %s: %v",
     "common.db.dbopenerr": "fehler dbopenerr  %s: %v",
     "common.db.dirensureerr": "fehler dirensureerr %s %w  %s: %v",
@@ -47,6 +47,7 @@
     "common.err.nodbpath": "Datenbank nicht gefunden. Ist der Pfad zur Datenbankdatei richtig eingestellt?",
     "common.err.noentryfound": "Es wurden keine zu aktualisierenden Datensätze gefunden.",
     "common.err.nofiles": "Am angegebenen Speicherort wurden keine Dateien zum Aktualisieren der Datenbank gefunden.",
+    "common.err.noreadaccess": "",
     "common.err.nosrcfolder": "Quellordner existiert nicht",
     "common.err.nosrcfolderpath": "Quellordner „%s“ existiert nicht.",
     "common.err.notargetfolder": "",
@@ -226,5 +227,6 @@
     "validator.err.required": "",
     "validator.status.dbconnect": "Prüfung der Datenbankeinstellungen erfolgreich.",
     "validator.status.entries": "Prüfung der Eingabeparameter erfolgreich.",
-    "validator.status.start": "Erste Prüfung gestartet."
+    "validator.status.start": "Erste Prüfung gestartet.",
+    "common.db.playlistsloaderr": ""
 }

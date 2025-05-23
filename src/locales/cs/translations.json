@@ -13,7 +13,7 @@
     "common.db.backupdone": "Záloha databáze úspěšně vytvořena.",
     "common.db.conn": "Připojování k databázi…",
     "common.db.dbcloseerr": "Nepodařilo se zavřít spojení s databází.: %s: %w.",
-    "common.db.dbconnecterr": "Nejsou práva k zápisu do složky s databází nebo je databáze pouze pro čtení.: %v",
+    "common.db.connecterr": "Nejsou práva k zápisu do složky s databází nebo je databáze pouze pro čtení.: %v",
     "common.db.dbnotconnectederr": "chyba dbnotconnected  %s: %v",
     "common.db.dbopenerr": "chyba dbopenerr  %s: %v",
     "common.db.dirensureerr": "chyba dirensureerr %s %w  %s: %v",
@@ -47,10 +47,11 @@
     "common.err.nodbpath": "Databáze nenalezena. Je správně nastavená cesta k souboru s databází?",
     "common.err.noentryfound": "Nebyly nalezeny žádné záznamy k aktualizaci.",
     "common.err.nofiles": "V zadaném umístění nebyly nalezeny žádné soubory pro aktualizaci databáze.",
+    "common.err.noreadaccess": "Zadaná složka není přístupná ani pro čtení.",
     "common.err.nosrcfolder": "Zdrojová složka neexistuje.",
     "common.err.nosrcfolderpath": "Zdrojová složka '%s' neexistuje.",
     "common.err.notargetfolder": "Cílová složka neexistuje.",
-    "common.err.playlistload": "Nepodařilo se načíst seznam playlistů.",
+    "common.err.playlistload": "Nepodařilo se načíst seznam playlistů.:%s",
     "common.err.statusfinal": "Vyskytla se chyba, není možné pokračovat.",
     "common.log.cancelled": "Zrušeno uživatelem",
     "common.log.dbclosing": "Zavírání spojení s databází před zálohou.",
@@ -226,5 +227,6 @@
     "validator.err.required": "Není vyplněný nějaký povinný údaj.",
     "validator.status.dbconnect": "Kontrola nastavení databáze úspěšná.",
     "validator.status.entries": "Kontrola vstupních parametrů úspěšná.",
-    "validator.status.start": "Spuštěna úvodní kontrola."
+    "validator.status.start": "Spuštěna úvodní kontrola.",
+    "common.db.playlistsloaderr": ""
 }

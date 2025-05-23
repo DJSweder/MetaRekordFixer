@@ -13,7 +13,7 @@
     "common.db.backupdone": "Database backup created successfully",
     "common.db.conn": "Connecting to database…",
     "common.db.dbcloseerr": "error dbcloseerr  %s: %v",
-    "common.db.dbconnecterr": "",
+    "common.db.connecterr": "",
     "common.db.dbnotconnectederr": "error dbnotconnected  %s: %v",
     "common.db.dbopenerr": "error dbopenerr  %s: %v",
     "common.db.dirensureerr": "error dirensureerr %s %w  %s: %v",
@@ -47,6 +47,7 @@
     "common.err.nodbpath": "Database not found. Is the path to the database file set correctly?",
     "common.err.noentryfound": "No records found to update.",
     "common.err.nofiles": "No files were found in the specified location to update the database.",
+    "common.err.noreadaccess": "",
     "common.err.nosrcfolder": "Source folder does not exist",
     "common.err.nosrcfolderpath": "Source folder '%s' does not exist.",
     "common.err.notargetfolder": "Target folder does not exist.",
@@ -226,5 +227,6 @@
     "validator.err.required": "Some required field is missing.",
     "validator.status.dbconnect": "Database settings check successful.",
     "validator.status.entries": "Input parameters check successful.",
-    "validator.status.start": "Initial check started."
+    "validator.status.start": "Initial check started.",
+    "common.db.playlistsloaderr": ""
 }
