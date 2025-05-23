@@ -142,7 +142,7 @@ func (mgr *ConfigManager) saveConfig() error {
 		mgr.globalConfig.DatabasePath = "" // Set default value
 	}
 	if mgr.globalConfig.Language == "" {
-		mgr.globalConfig.Language = "en" // Default language
+		mgr.globalConfig.Language = "" // Default language
 	}
 
 	config := struct {

@@ -15,6 +15,7 @@ type LanguageItem struct {
 }
 
 // DetectAndSetLanguage sets the application language based on the following priorities:
+// DetectAndSetLanguage sets the application language based on the following priorities:
 func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 	globalConfig := configMgr.GetGlobalConfig()
 	configLang := strings.ToLower(globalConfig.Language)
@@ -23,10 +24,10 @@ func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 	logger.Info("Supported languages: %v", supportedLangs)
 	logger.Info("Current configuration language: %s", configLang)
 
-	// 1. Try loading from configuration
+	// 1. Check if language is configured
 	if configLang != "" {
 		for _, lang := range supportedLangs {
-			if configLang == lang {
+			if strings.EqualFold(configLang, lang) {
 				logger.Info("Loading configured language: %s", lang)
 				if err := locales.LoadTranslations(lang); err != nil {
 					logger.Error("Failed to load translations for %s: %v", lang, err)
@@ -36,10 +37,9 @@ func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 				}
 			}
 		}
-		logger.Warning("Configured language %s not supported", configLang)
 	}
 
-	// 2. Try system language
+	// 2. Try system language if no configuration exists
 	systemLang := getSystemLanguage()
 	if len(systemLang) >= 2 {
 		systemLang = systemLang[:2]
@@ -47,7 +47,7 @@ func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 	logger.Info("Detected system language: %s", systemLang)
 
 	for _, lang := range supportedLangs {
-		if systemLang == lang {
+		if strings.EqualFold(systemLang, lang) {
 			logger.Info("Using system language: %s", lang)
 			if err := locales.LoadTranslations(lang); err != nil {
 				logger.Error("Failed to load system language translations: %v", err)
@@ -61,7 +61,7 @@ func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 		}
 	}
 
-	// 3. Fallback to English
+	// 3. Fallback to English if system language is not supported
 	logger.Info("Using fallback language: en")
 	if err := locales.LoadTranslations("en"); err != nil {
 		logger.Error("Failed to load fallback translations: %v", err)
