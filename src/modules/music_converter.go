@@ -257,47 +257,59 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	}
 
 	// Load format-specific settings
-	// MP3
+	// Load MP3 settings
 	if m.MP3BitrateSelect != nil {
-		if mp3Bitrate := cfg.Get("mp3_bitrate", ""); mp3Bitrate != "" {
-			m.MP3BitrateSelect.SetSelected(mp3Bitrate)
+		mp3Bitrate := cfg.Get("mp3_bitrate", "320") // Výchozí hodnota 320 pokud není nastaveno
+		if mp3Bitrate != "" {
+			// Konverze technické hodnoty na lokalizovaný text pro UI
+			localizedValue := mp3BitrateParams.GetLocalizedValue(mp3Bitrate)
+			m.MP3BitrateSelect.SetSelected(localizedValue)
 		}
 	}
-
 	if m.MP3SampleRateSelect != nil {
-		if mp3SampleRate := cfg.Get("mp3_samplerate", ""); mp3SampleRate != "" {
-			m.MP3SampleRateSelect.SetSelected(mp3SampleRate)
+		mp3SampleRate := cfg.Get("mp3_samplerate", "copy") // Výchozí hodnota copy pokud není nastaveno
+		if mp3SampleRate != "" {
+			localizedValue := sampleRateParams.GetLocalizedValue(mp3SampleRate)
+			m.MP3SampleRateSelect.SetSelected(localizedValue)
 		}
 	}
 
-	// FLAC
+	// Load FLAC settings
 	if m.FLACCompressionSelect != nil {
-		if flacCompression := cfg.Get("flac_compression", ""); flacCompression != "" {
-			m.FLACCompressionSelect.SetSelected(flacCompression)
+		flacCompression := cfg.Get("flac_compression", "12") // Výchozí hodnota 5 (medium) pokud není nastaveno
+		if flacCompression != "" {
+			localizedValue := flacCompressionParams.GetLocalizedValue(flacCompression)
+			m.FLACCompressionSelect.SetSelected(localizedValue)
 		}
 	}
-
 	if m.FLACSampleRateSelect != nil {
-		if flacSampleRate := cfg.Get("flac_samplerate", ""); flacSampleRate != "" {
-			m.FLACSampleRateSelect.SetSelected(flacSampleRate)
+		flacSampleRate := cfg.Get("flac_samplerate", "copy") // Výchozí hodnota copy pokud není nastaveno
+		if flacSampleRate != "" {
+			localizedValue := sampleRateParams.GetLocalizedValue(flacSampleRate)
+			m.FLACSampleRateSelect.SetSelected(localizedValue)
 		}
 	}
-
 	if m.FLACBitDepthSelect != nil {
-		if flacBitDepth := cfg.Get("flac_bitdepth", ""); flacBitDepth != "" {
-			m.FLACBitDepthSelect.SetSelected(flacBitDepth)
+		flacBitDepth := cfg.Get("flac_bitdepth", "copy") // Výchozí hodnota copy pokud není nastaveno
+		if flacBitDepth != "" {
+			localizedValue := bitDepthParams.GetLocalizedValue(flacBitDepth)
+			m.FLACBitDepthSelect.SetSelected(localizedValue)
 		}
 	}
 
-	// WAV
+	// Load WAV settings
 	if m.WAVSampleRateSelect != nil {
-		if wavSampleRate := cfg.Get("wav_samplerate", ""); wavSampleRate != "" {
-			m.WAVSampleRateSelect.SetSelected(wavSampleRate)
+		wavSampleRate := cfg.Get("wav_samplerate", "copy") // Výchozí hodnota copy pokud není nastaveno
+		if wavSampleRate != "" {
+			localizedValue := sampleRateParams.GetLocalizedValue(wavSampleRate)
+			m.WAVSampleRateSelect.SetSelected(localizedValue)
 		}
 	}
 	if m.WAVBitDepthSelect != nil {
-		if wavBitDepth := cfg.Get("wav_bitdepth", ""); wavBitDepth != "" {
-			m.WAVBitDepthSelect.SetSelected(wavBitDepth)
+		wavBitDepth := cfg.Get("wav_bitdepth", "copy") // Výchozí hodnota copy pokud není nastaveno
+		if wavBitDepth != "" {
+			localizedValue := bitDepthParams.GetLocalizedValue(wavBitDepth)
+			m.WAVBitDepthSelect.SetSelected(localizedValue)
 		}
 	}
 
@@ -337,34 +349,39 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 	}
 
 	// Save format-specific settings with dependencies
-	// MP3
-	if m.MP3BitrateSelect != nil {
-		cfg.SetWithDependencyAndActions("mp3_bitrate", m.MP3BitrateSelect.Selected, "select", true, "target_format", "MP3", "none", []string{"start"})
+	// Save MP3 settings
+	if m.MP3BitrateSelect.Selected != "" {
+		// Convert localized text to technical value for configuration
+		configValue := mp3BitrateParams.GetConfigValue(m.MP3BitrateSelect.Selected)
+		cfg.SetWithDependencyAndActions("mp3_bitrate", configValue, "select", true, "target_format", "MP3", "none", []string{"start"})
+	}
+	if m.MP3SampleRateSelect.Selected != "" {
+		configValue := sampleRateParams.GetConfigValue(m.MP3SampleRateSelect.Selected)
+		cfg.SetWithDependencyAndActions("mp3_samplerate", configValue, "select", true, "target_format", "MP3", "none", []string{"start"})
 	}
 
-	if m.MP3SampleRateSelect != nil {
-		cfg.SetWithDependencyAndActions("mp3_samplerate", m.MP3SampleRateSelect.Selected, "select", true, "target_format", "MP3", "none", []string{"start"})
+	// Save FLAC settings
+	if m.FLACCompressionSelect.Selected != "" {
+		configValue := flacCompressionParams.GetConfigValue(m.FLACCompressionSelect.Selected)
+		cfg.SetWithDependencyAndActions("flac_compression", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
+	}
+	if m.FLACSampleRateSelect.Selected != "" {
+		configValue := sampleRateParams.GetConfigValue(m.FLACSampleRateSelect.Selected)
+		cfg.SetWithDependencyAndActions("flac_samplerate", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
+	}
+	if m.FLACBitDepthSelect.Selected != "" {
+		configValue := bitDepthParams.GetConfigValue(m.FLACBitDepthSelect.Selected)
+		cfg.SetWithDependencyAndActions("flac_bitdepth", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
 	}
 
-	// FLAC
-	if m.FLACCompressionSelect != nil {
-		cfg.SetWithDependencyAndActions("flac_compression", m.FLACCompressionSelect.Selected, "select", true, "target_format", "FLAC", "none", []string{"start"})
+	// Save WAV settings
+	if m.WAVSampleRateSelect.Selected != "" {
+		configValue := sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
+		cfg.SetWithDependencyAndActions("wav_samplerate", configValue, "select", true, "target_format", "WAV", "none", []string{"start"})
 	}
-
-	if m.FLACSampleRateSelect != nil {
-		cfg.SetWithDependencyAndActions("flac_samplerate", m.FLACSampleRateSelect.Selected, "select", true, "target_format", "FLAC", "none", []string{"start"})
-	}
-
-	if m.FLACBitDepthSelect != nil {
-		cfg.SetWithDependencyAndActions("flac_bitdepth", m.FLACBitDepthSelect.Selected, "select", true, "target_format", "FLAC", "none", []string{"start"})
-	}
-
-	// WAV
-	if m.WAVSampleRateSelect != nil {
-		cfg.SetWithDependencyAndActions("wav_samplerate", m.WAVSampleRateSelect.Selected, "select", true, "target_format", "WAV", "none", []string{"start"})
-	}
-	if m.WAVBitDepthSelect != nil {
-		cfg.SetWithDependencyAndActions("wav_bitdepth", m.WAVBitDepthSelect.Selected, "select", true, "target_format", "WAV", "none", []string{"start"})
+	if m.WAVBitDepthSelect.Selected != "" {
+		configValue := bitDepthParams.GetConfigValue(m.WAVBitDepthSelect.Selected)
+		cfg.SetWithDependencyAndActions("wav_bitdepth", configValue, "select", true, "target_format", "WAV", "none", []string{"start"})
 	}
 
 	// Store to config manager
@@ -413,37 +430,33 @@ func (m *MusicConverterModule) initializeUI() {
 
 	// Initialize format-specific settings
 	// MP3 settings
-	mp3BitrateOptions := []string{"320 kbps", "256 kbps", "192 kbps", "128 kbps"}
+	mp3BitrateOptions := mp3BitrateParams.GetLocalizedValues()
 	m.MP3BitrateSelect = widget.NewSelect(mp3BitrateOptions, nil)
 	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
-	mp3SampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
+	mp3SampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.MP3SampleRateSelect = widget.NewSelect(mp3SampleRateOptions, nil)
 	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	// FLAC settings
-	flacCompressionOptions := []string{
-		locales.Translate("convert.configpar.compressfull"),
-		locales.Translate("convert.configpar.compressmed"),
-		locales.Translate("convert.configpar.nocompress"),
-	}
+	flacCompressionOptions := flacCompressionParams.GetLocalizedValues()
 	m.FLACCompressionSelect = widget.NewSelect(flacCompressionOptions, nil)
 	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
-	flacSampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
+	flacSampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.FLACSampleRateSelect = widget.NewSelect(flacSampleRateOptions, nil)
 	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
-	flacBitDepthOptions := []string{locales.Translate("convert.configpar.copypar"), "32", "24", "16"}
+	flacBitDepthOptions := bitDepthParams.GetLocalizedValues()
 	m.FLACBitDepthSelect = widget.NewSelect(flacBitDepthOptions, nil)
 	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
 	// WAV settings
-	wavSampleRateOptions := []string{locales.Translate("convert.configpar.copypar"), "44.1 kHz", "48 kHz", "96 kHz", "192 kHz"}
+	wavSampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.WAVSampleRateSelect = widget.NewSelect(wavSampleRateOptions, nil)
 	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
-	wavBitDepthOptions := []string{locales.Translate("convert.configpar.copypar"), "32", "24", "16"}
+	wavBitDepthOptions := bitDepthParams.GetLocalizedValues()
 	m.WAVBitDepthSelect = widget.NewSelect(wavBitDepthOptions, nil)
 	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
 
@@ -884,155 +897,106 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	switch targetFormat {
 	case "MP3":
 		// MP3 settings
-		bitrate := formatSettings["bitrate"]
-		sampleRateSetting := formatSettings["sample_rate"]
+		bitrateConfig := formatSettings["bitrate"]
+		sampleRateConfig := formatSettings["sample_rate"]
 
 		args = append(args, "-c:a", "libmp3lame")
-		if bitrate != "" && bitrate != locales.Translate("convert.configpar.copypar") {
-			// Extract numeric part from bitrate (e.g. "320" from "320 kbps")
-			bitrateValue := strings.Split(bitrate, " ")[0]
-			args = append(args, "-b:a", bitrateValue+"k")
-		}
-		if sampleRateSetting != "" && sampleRateSetting != locales.Translate("convert.configpar.copypar") {
-			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
-			sampleRateValue := strings.Split(sampleRateSetting, " ")[0]
-			// Convert to proper Hz value
-			if strings.Contains(sampleRateValue, ".") {
-				// For 44.1, convert to 44100
-				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-				args = append(args, "-ar", sampleRateValue+"00")
-			} else {
-				// For 48, convert to 48000
-				args = append(args, "-ar", sampleRateValue+"000")
+
+		// Use value for ffmpeg based on configuration
+		if bitrateConfig != "" {
+			bitrateValue := mp3BitrateParams.GetFFmpegValue(bitrateConfig, "")
+			if bitrateValue != "-" {
+				args = append(args, "-b:a", bitrateValue)
 			}
-		} else {
-			// Use sample rate from source file
-			args = append(args, "-ar", sampleRate)
+		}
+		
+		// Use value for ffmpeg based on configuration and source file
+		if sampleRateConfig != "" {
+			sampleRateValue := sampleRateParams.GetFFmpegValue(sampleRateConfig, sampleRate)
+			if sampleRateValue != "-" {
+				args = append(args, "-ar", sampleRateValue)
+			}
 		}
 
 		// Set ID3v2.4 version
 		args = append(args, "-id3v2_version", "4")
 	case "FLAC":
 		// Add FLAC specific settings
-		compression := formatSettings["compression"]
-		sampleRateSetting := formatSettings["sample_rate"]
-		bitDepthSetting := formatSettings["bit_depth"]
+		compressionConfig := formatSettings["compression"]
+		sampleRateConfig := formatSettings["sample_rate"]
+		bitDepthConfig := formatSettings["bit_depth"]
 
 		args = append(args, "-c:a", "flac")
-		if compression != "" {
-			var compressionLevel string
-			switch compression {
-			case locales.Translate("convert.configpar.nocompress"):
-				compressionLevel = "0"
-			case locales.Translate("convert.configpar.compressmed"):
-				compressionLevel = "5"
-			case locales.Translate("convert.configpar.compressfull"):
-				compressionLevel = "12"
-			default:
-				compressionLevel = "5" // Default to medium compression
+
+		// Use value for ffmpeg based on configuration
+		if compressionConfig != "" {
+			compressionValue := flacCompressionParams.GetFFmpegValue(compressionConfig, "")
+			if compressionValue != "-" {
+				args = append(args, "-compression_level", compressionValue)
 			}
-			args = append(args, "-compression_level", compressionLevel)
 		}
 
-		if sampleRateSetting != "" && sampleRateSetting != locales.Translate("convert.configpar.copypar") {
-			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
-			sampleRateValue := strings.Split(sampleRateSetting, " ")[0]
-			// Convert to proper Hz value
-			if strings.Contains(sampleRateValue, ".") {
-				// For 44.1, convert to 44100
-				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-				args = append(args, "-ar", sampleRateValue+"00")
-			} else {
-				// For 48, convert to 48000
-				args = append(args, "-ar", sampleRateValue+"000")
+		// Use value for ffmpeg based on configuration and source file
+		if sampleRateConfig != "" {
+			sampleRateValue := sampleRateParams.GetFFmpegValue(sampleRateConfig, sampleRate)
+			if sampleRateValue != "-" {
+				args = append(args, "-ar", sampleRateValue)
 			}
-		} else {
-			// Use sample rate from source file
-
-			args = append(args, "-ar", sampleRate)
 		}
 
-		if bitDepthSetting != "" && bitDepthSetting != locales.Translate("convert.configpar.copypar") {
-			// Convert bit depth to sample format
-			var sampleFormat string
-			switch bitDepthSetting {
-			case "16":
-				sampleFormat = "s16"
-			case "24":
-				sampleFormat = "s24"
-			case "32":
-				sampleFormat = "s32"
-			default:
-				sampleFormat = "s16" // Default to 16-bit
+		// Use value for ffmpeg based on configuration and source file
+		if bitDepthConfig != "" {
+			// For FLAC we need to convert bit depth to sample format
+			bitDepthValue := bitDepthParams.GetFFmpegValue(bitDepthConfig, bitDepth)
+			if bitDepthValue != "-" {
+				// Convert to sample format for FLAC
+				var sampleFormat string
+				switch bitDepthValue {
+				case "16":
+					sampleFormat = "s16"
+				case "24":
+					sampleFormat = "s24"
+				case "32":
+					sampleFormat = "s32"
+				default:
+					sampleFormat = "s16" // Default to 16-bit
+				}
+				args = append(args, "-sample_fmt", sampleFormat)
 			}
-			args = append(args, "-sample_fmt", sampleFormat)
-		} else {
-			// Use bit depth from source file
-			var sampleFormat string
-			switch bitDepth {
-			case "16":
-				sampleFormat = "s16"
-			case "24":
-				sampleFormat = "s24"
-			case "32":
-				sampleFormat = "s32"
-			default:
-				sampleFormat = "s16" // Default to 16-bit
-			}
-			args = append(args, "-sample_fmt", sampleFormat)
 		}
 
 	case "WAV":
 		// Add WAV specific settings
-		sampleRate := formatSettings["sample_rate"]
-		bitDepth := formatSettings["bit_depth"]
+		sampleRateConfig := formatSettings["sample_rate"]
+		bitDepthConfig := formatSettings["bit_depth"]
 
-		// If bit depth is not set or set to "copy", use bit depth from source file
-		if bitDepth == "" || bitDepth == locales.Translate("convert.configpar.copypar") {
-			// Use bit depth from source file
-			var sampleFormat string
-			switch bitDepth {
-			case "16":
-				sampleFormat = "pcm_s16le"
-			case "24":
-				sampleFormat = "pcm_s24le"
-			case "32":
-				sampleFormat = "pcm_s32le"
-			default:
-				sampleFormat = "pcm_s24le" // Default to 24-bit
+		// Use value for ffmpeg based on configuration and source file
+		// For WAV we need to convert bit depth to codec format
+		if bitDepthConfig != "" {
+			bitDepthValue := bitDepthParams.GetFFmpegValue(bitDepthConfig, bitDepth)
+			if bitDepthValue != "-" {
+				// Convert to codec format for WAV
+				var sampleFormat string
+				switch bitDepthValue {
+				case "16":
+					sampleFormat = "pcm_s16le"
+				case "24":
+					sampleFormat = "pcm_s24le"
+				case "32":
+					sampleFormat = "pcm_s32le"
+				default:
+					sampleFormat = "pcm_s24le" // Default to 24-bit
+				}
+				args = append(args, "-c:a", sampleFormat)
 			}
-			args = append(args, "-c:a", sampleFormat)
-		} else {
-			// Set codec based on bit depth
-			var sampleFormat string
-			switch bitDepth {
-			case "16":
-				sampleFormat = "pcm_s16le"
-			case "24":
-				sampleFormat = "pcm_s24le"
-			case "32":
-				sampleFormat = "pcm_s32le"
-			default:
-				sampleFormat = "pcm_s24le" // Default to 24-bit
-			}
-			args = append(args, "-c:a", sampleFormat)
 		}
 
-		if sampleRate != "" && sampleRate != locales.Translate("convert.configpar.copypar") {
-			// Extract numeric part from sample rate (e.g. "44.1" from "44.1 kHz")
-			sampleRateValue := strings.Split(sampleRate, " ")[0]
-			// Convert to proper Hz value
-			if strings.Contains(sampleRateValue, ".") {
-				// For 44.1, convert to 44100
-				sampleRateValue = strings.ReplaceAll(sampleRateValue, ".", "")
-				args = append(args, "-ar", sampleRateValue+"00")
-			} else {
-				// For 48, convert to 48000
-				args = append(args, "-ar", sampleRateValue+"000")
+		// Použij hodnotu pro ffmpeg na základě konfigurace a zdrojového souboru
+		if sampleRateConfig != "" {
+			sampleRateValue := sampleRateParams.GetFFmpegValue(sampleRateConfig, sampleRate)
+			if sampleRateValue != "-" {
+				args = append(args, "-ar", sampleRateValue)
 			}
-		} else {
-			// Use sample rate from source file
-			args = append(args, "-ar", sampleRate)
 		}
 	}
 
@@ -1138,6 +1102,105 @@ type MetadataMap struct {
 	InternalToFLAC map[string]string
 	InternalToWAV  map[string]string
 }
+
+// ConversionParameter represents a single parameter option for conversion
+type ConversionParameter struct {
+	ConfigValue string // value stored in configuration (e.g. "5", "copy")
+	FFmpegValue string // value for ffmpeg (e.g. "5", "-")
+	LocaleKey   string // localization key (e.g. "convert.compression.medium")
+	IsCopy      bool   // indicates if this is a "copy" parameter
+}
+
+// ConversionParameterSet represents a set of parameters for a specific setting
+type ConversionParameterSet struct {
+	Parameters []ConversionParameter
+}
+
+// GetLocalizedValues returns a list of localized values for GUI
+func (ps *ConversionParameterSet) GetLocalizedValues() []string {
+	values := make([]string, len(ps.Parameters))
+	for i, p := range ps.Parameters {
+		values[i] = locales.Translate(p.LocaleKey)
+	}
+	return values
+}
+
+// GetConfigValue returns a configuration value based on localized text
+func (ps *ConversionParameterSet) GetConfigValue(localizedValue string) string {
+	for _, p := range ps.Parameters {
+		if locales.Translate(p.LocaleKey) == localizedValue {
+			return p.ConfigValue
+		}
+	}
+	return "copy" // fallback to copy if no match found
+}
+
+// GetFFmpegValue returns a value for ffmpeg based on configuration value and optionally source properties
+func (ps *ConversionParameterSet) GetFFmpegValue(configValue string, sourceValue string) string {
+	for _, p := range ps.Parameters {
+		if p.ConfigValue == configValue {
+			if p.IsCopy && sourceValue != "" {
+				return sourceValue // use value from source file
+			}
+			return p.FFmpegValue
+		}
+	}
+	return "-" // fallback to copy
+}
+
+// GetLocalizedValue returns localized text based on configuration value
+func (ps *ConversionParameterSet) GetLocalizedValue(configValue string) string {
+	for _, p := range ps.Parameters {
+		if p.ConfigValue == configValue {
+			return locales.Translate(p.LocaleKey)
+		}
+	}
+	return locales.Translate("convert.configpar.copypar") // fallback to copy
+}
+
+// Parameter definitions for conversion
+var (
+	// FLAC compression parameters
+	flacCompressionParams = ConversionParameterSet{
+		Parameters: []ConversionParameter{
+			{ConfigValue: "5", FFmpegValue: "5", LocaleKey: "convert.configpar.compressmed", IsCopy: false},
+			{ConfigValue: "12", FFmpegValue: "12", LocaleKey: "convert.configpar.compressfull", IsCopy: false},
+			{ConfigValue: "0", FFmpegValue: "0", LocaleKey: "convert.configpar.nocompress", IsCopy: false},
+		},
+	}
+
+	// MP3 bitrate parameters
+	mp3BitrateParams = ConversionParameterSet{
+		Parameters: []ConversionParameter{
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
+			{ConfigValue: "128", FFmpegValue: "128k", LocaleKey: "convert.bitrate.128", IsCopy: false},
+			{ConfigValue: "192", FFmpegValue: "192k", LocaleKey: "convert.bitrate.192", IsCopy: false},
+			{ConfigValue: "256", FFmpegValue: "256k", LocaleKey: "convert.bitrate.256", IsCopy: false},
+			{ConfigValue: "320", FFmpegValue: "320k", LocaleKey: "convert.bitrate.320", IsCopy: false},
+		},
+	}
+
+	// Sample rate parameters
+	sampleRateParams = ConversionParameterSet{
+		Parameters: []ConversionParameter{
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
+			{ConfigValue: "44100", FFmpegValue: "44100", LocaleKey: "convert.samplerate.44", IsCopy: false},
+			{ConfigValue: "48000", FFmpegValue: "48000", LocaleKey: "convert.samplerate.48", IsCopy: false},
+			{ConfigValue: "96000", FFmpegValue: "96000", LocaleKey: "convert.samplerate.96", IsCopy: false},
+			{ConfigValue: "192000", FFmpegValue: "192000", LocaleKey: "convert.samplerate.192", IsCopy: false},
+		},
+	}
+
+	// Bit depth parameters
+	bitDepthParams = ConversionParameterSet{
+		Parameters: []ConversionParameter{
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
+			{ConfigValue: "16", FFmpegValue: "16", LocaleKey: "convert.bitdepth.16", IsCopy: false},
+			{ConfigValue: "24", FFmpegValue: "24", LocaleKey: "convert.bitdepth.24", IsCopy: false},
+			{ConfigValue: "32", FFmpegValue: "32", LocaleKey: "convert.bitdepth.32", IsCopy: false},
+		},
+	}
+)
 
 // loadMetadataMap loads the metadata mapping from the CSV file
 func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
@@ -1358,18 +1421,19 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	cfg.SetBoolWithDefinition("rewrite_existing", false, false, "none")
 	cfg.SetBoolWithDefinition("make_target_folder", false, false, "none")
 
-	// Set default MP3 settings
-	cfg.SetWithDependencyAndActions("mp3_bitrate", "320 kbps", "select", true, "target_format", "MP3", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("mp3_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "MP3", "none", []string{"start"})
+	// Set default MP3 settings - using technical values instead of localized texts
+	cfg.SetWithDependencyAndActions("mp3_bitrate", "320", "select", true, "target_format", "MP3", "none", []string{"start"})
+	cfg.SetWithDependencyAndActions("mp3_samplerate", "copy", "select", true, "target_format", "MP3", "none", []string{"start"})
 
-	// Set default FLAC settings
-	cfg.SetWithDependencyAndActions("flac_compression", locales.Translate("convert.configpar.compressfull"), "select", true, "target_format", "FLAC", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("flac_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "FLAC", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("flac_bitdepth", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "FLAC", "none", []string{"start"})
+	// Set default FLAC settings - using technical values instead of localized texts
+	// For compression we use default value 12 (maximum), since "copy" is not relevant for compression
+	cfg.SetWithDependencyAndActions("flac_compression", "12", "select", true, "target_format", "FLAC", "none", []string{"start"})
+	cfg.SetWithDependencyAndActions("flac_samplerate", "copy", "select", true, "target_format", "FLAC", "none", []string{"start"})
+	cfg.SetWithDependencyAndActions("flac_bitdepth", "copy", "select", true, "target_format", "FLAC", "none", []string{"start"})
 
-	// Set default WAV settings
-	cfg.SetWithDependencyAndActions("wav_samplerate", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "WAV", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("wav_bitdepth", locales.Translate("convert.configpar.copypar"), "select", true, "target_format", "WAV", "none", []string{"start"})
+	// Set default WAV settings - using technical values instead of localized texts
+	cfg.SetWithDependencyAndActions("wav_samplerate", "copy", "select", true, "target_format", "WAV", "none", []string{"start"})
+	cfg.SetWithDependencyAndActions("wav_bitdepth", "copy", "select", true, "target_format", "WAV", "none", []string{"start"})
 
 	return cfg
 }
