@@ -15,7 +15,6 @@ type LanguageItem struct {
 }
 
 // DetectAndSetLanguage sets the application language based on the following priorities:
-// DetectAndSetLanguage sets the application language based on the following priorities:
 func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 	globalConfig := configMgr.GetGlobalConfig()
 	configLang := strings.ToLower(globalConfig.Language)
