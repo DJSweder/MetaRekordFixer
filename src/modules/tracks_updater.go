@@ -109,20 +109,6 @@ func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 
-	// Try to connect to database
-	//	if err := m.dbMgr.Connect(); err != nil {
-	//		context := &common.ErrorContext{
-	//			Module:      m.GetConfigName(),
-	//			Operation:   "Database Connection",
-	//			Severity:    common.SeverityWarning,
-	//			Recoverable: true,
-	//		}
-	//		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.connectdb"), err), context)
-	//		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
-	//		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
-	//	}
-	//	defer m.dbMgr.Finalize()
-
 	// Load playlists
 	if err := m.loadPlaylists(); err != nil {
 		context := &common.ErrorContext{

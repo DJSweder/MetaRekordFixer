@@ -259,7 +259,7 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	// Load format-specific settings
 	// Load MP3 settings
 	if m.MP3BitrateSelect != nil {
-		mp3Bitrate := cfg.Get("mp3_bitrate", "320") // Výchozí hodnota 320 pokud není nastaveno
+		mp3Bitrate := cfg.Get("mp3_bitrate", "320k") // Výchozí hodnota 320 pokud není nastaveno
 		if mp3Bitrate != "" {
 			// Konverze technické hodnoty na lokalizovaný text pro UI
 			localizedValue := mp3BitrateParams.GetLocalizedValue(mp3Bitrate)
@@ -658,22 +658,22 @@ func (m *MusicConverterModule) startConversion() {
 	switch targetFormat {
 	case "MP3":
 		// MP3 settings
-		bitrate := m.MP3BitrateSelect.Selected
-		sampleRateSetting := m.MP3SampleRateSelect.Selected
+		bitrate := mp3BitrateParams.GetConfigValue(m.MP3BitrateSelect.Selected)
+		sampleRateSetting := sampleRateParams.GetConfigValue(m.MP3SampleRateSelect.Selected)
 		formatSettings["bitrate"] = bitrate
 		formatSettings["sample_rate"] = sampleRateSetting
 	case "FLAC":
 		// FLAC settings
-		compression := m.FLACCompressionSelect.Selected
-		sampleRate := m.FLACSampleRateSelect.Selected
-		bitDepth := m.FLACBitDepthSelect.Selected
+		compression := flacCompressionParams.GetConfigValue(m.FLACCompressionSelect.Selected)
+		sampleRate := sampleRateParams.GetConfigValue(m.FLACSampleRateSelect.Selected)
+		bitDepth := bitDepthParams.GetConfigValue(m.FLACBitDepthSelect.Selected)
 		formatSettings["compression"] = compression
 		formatSettings["sample_rate"] = sampleRate
 		formatSettings["bit_depth"] = bitDepth
 	case "WAV":
 		// WAV settings
-		sampleRate := m.WAVSampleRateSelect.Selected
-		bitDepth := m.WAVBitDepthSelect.Selected
+		sampleRate := sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
+		bitDepth := bitDepthParams.GetConfigValue(m.WAVBitDepthSelect.Selected)
 		formatSettings["sample_rate"] = sampleRate
 		formatSettings["bit_depth"] = bitDepth
 	}
@@ -909,7 +909,7 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 				args = append(args, "-b:a", bitrateValue)
 			}
 		}
-		
+
 		// Use value for ffmpeg based on configuration and source file
 		if sampleRateConfig != "" {
 			sampleRateValue := sampleRateParams.GetFFmpegValue(sampleRateConfig, sampleRate)
@@ -1173,10 +1173,10 @@ var (
 	mp3BitrateParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
 			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
-			{ConfigValue: "128", FFmpegValue: "128k", LocaleKey: "convert.bitrate.128", IsCopy: false},
-			{ConfigValue: "192", FFmpegValue: "192k", LocaleKey: "convert.bitrate.192", IsCopy: false},
-			{ConfigValue: "256", FFmpegValue: "256k", LocaleKey: "convert.bitrate.256", IsCopy: false},
-			{ConfigValue: "320", FFmpegValue: "320k", LocaleKey: "convert.bitrate.320", IsCopy: false},
+			{ConfigValue: "128k", FFmpegValue: "128k", LocaleKey: "convert.bitrate.128", IsCopy: false},
+			{ConfigValue: "192k", FFmpegValue: "192k", LocaleKey: "convert.bitrate.192", IsCopy: false},
+			{ConfigValue: "256k", FFmpegValue: "256k", LocaleKey: "convert.bitrate.256", IsCopy: false},
+			{ConfigValue: "320k", FFmpegValue: "320k", LocaleKey: "convert.bitrate.320", IsCopy: false},
 		},
 	}
 

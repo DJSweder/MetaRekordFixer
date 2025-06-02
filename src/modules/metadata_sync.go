@@ -1,3 +1,4 @@
+// modules/metadata_sync.go
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 package modules
 
