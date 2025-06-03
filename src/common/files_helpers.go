@@ -43,7 +43,7 @@ func DirectoryExists(dirPath string) bool {
 // EnsureDirectoryExists ensures the specified directory exists
 func EnsureDirectoryExists(path string) error {
 	if IsEmptyString(path) {
-		return fmt.Errorf("path is empty")
+		return fmt.Errorf("path cannot be empty")
 	}
 
 	// Check if directory already exists
@@ -55,12 +55,13 @@ func EnsureDirectoryExists(path string) error {
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(path, 0755)
 		if err != nil {
-			return fmt.Errorf("failed to create directory %s: %v", path, err)
+			return fmt.Errorf("failed to create directory '%s': %w", path, err)
 		}
 		return nil
 	}
 
-	return err // Some other error occurred
+	// Some other error occurred with os.Stat (e.g., permission denied to stat)
+	return fmt.Errorf("failed to check existence of directory '%s': %w", path, err)
 }
 
 // ListFilesWithExtensions returns a list of files with the specified extensions
@@ -73,7 +74,8 @@ func ListFilesWithExtensions(dirPath string, extensions []string, recursive bool
 
 	walkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// This error comes from accessing file info, pass it up to filepath.Walk
+			return fmt.Errorf("error accessing path '%s': %w", path, err)
 		}
 
 		if info.IsDir() {
@@ -84,7 +86,7 @@ func ListFilesWithExtensions(dirPath string, extensions []string, recursive bool
 		}
 
 		for _, ext := range extensions {
-			if strings.HasSuffix(strings.ToLower(path), strings.ToLower(ext)) {
+			if strings.HasSuffix(strings.ToLower(info.Name()), strings.ToLower(ext)) { // Use info.Name() for suffix check
 				result = append(result, path)
 				break
 			}
@@ -95,7 +97,7 @@ func ListFilesWithExtensions(dirPath string, extensions []string, recursive bool
 
 	err := filepath.Walk(dirPath, walkFn)
 	if err != nil {
-		return nil, fmt.Errorf("error listing files: %v", err)
+		return nil, fmt.Errorf("error listing files in directory '%s': %w", dirPath, err)
 	}
 
 	return result, nil
@@ -107,7 +109,7 @@ func GetFileInfo(filePath string) (FileInfo, error) {
 
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return fileInfo, fmt.Errorf("failed to get file info: %v", err)
+		return fileInfo, fmt.Errorf("failed to get file info for '%s': %w", filePath, err)
 	}
 
 	fileInfo.Path = filePath
@@ -130,24 +132,24 @@ func CopyFile(sourcePath, destPath string) error {
 	destDir := filepath.Dir(destPath)
 	err := EnsureDirectoryExists(destDir)
 	if err != nil {
-		return fmt.Errorf("failed to ensure destination directory exists: %v", err)
+		return fmt.Errorf("failed to ensure destination directory for copy operation: %w", err)
 	}
 
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		return fmt.Errorf("failed to open source file %s: %v", sourcePath, err)
+		return fmt.Errorf("failed to open source file %s: %w", sourcePath, err)
 	}
 	defer sourceFile.Close()
 
 	destFile, err := os.Create(destPath)
 	if err != nil {
-		return fmt.Errorf("failed to create destination file %s: %v", destPath, err)
+		return fmt.Errorf("failed to create destination file %s: %w", destPath, err)
 	}
 	defer destFile.Close()
 
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {
-		return fmt.Errorf("failed to copy file content: %v", err)
+		return fmt.Errorf("failed to copy file content from %s to %s: %w", sourcePath, destPath, err)
 	}
 
 	return nil
@@ -162,19 +164,19 @@ func MoveFile(sourcePath, destPath string) error {
 	destDir := filepath.Dir(destPath)
 	err := EnsureDirectoryExists(destDir)
 	if err != nil {
-		return fmt.Errorf("failed to ensure destination directory exists: %v", err)
+		return fmt.Errorf("failed to ensure destination directory %s for move operation: %w", destDir, err)
 	}
 
-	err = os.Rename(sourcePath, destPath)
-	if err != nil {
-		err = CopyFile(sourcePath, destPath)
-		if err != nil {
-			return err
+	originalErr := os.Rename(sourcePath, destPath)
+	if originalErr != nil {
+		copyErr := CopyFile(sourcePath, destPath)
+		if copyErr != nil {
+			return fmt.Errorf("failed to move file %s to %s (rename failed: %v, fallback copy also failed): %w", sourcePath, destPath, originalErr, copyErr)
 		}
 
-		err = os.Remove(sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to remove source file after copy: %v", err)
+		removeErr := os.Remove(sourcePath)
+		if removeErr != nil {
+			return fmt.Errorf("file copied successfully from %s to %s, but failed to remove original source file (original rename error: %v): %w", sourcePath, destPath, originalErr, removeErr)
 		}
 	}
 
@@ -183,13 +185,19 @@ func MoveFile(sourcePath, destPath string) error {
 
 // DeleteFile deletes a file
 func DeleteFile(filePath string) error {
+	// Developer note: The current logic to check DirectoryExists first and return nil
+	// might mask os.IsNotExist errors from os.Remove if the file itself doesn't exist
+	// but the directory does. Consider if os.Remove should always be called and then
+	// its error checked (e.g., with os.IsNotExist) if specific handling for non-existence is needed.
 	if !DirectoryExists(filepath.Dir(filePath)) {
+		// If the directory doesn't exist, the file also doesn't. Silently returning nil.
 		return nil
 	}
 
 	err := os.Remove(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to delete file %s: %v", filePath, err)
+		// If os.Remove fails (e.g., file doesn't exist, permission issue), wrap and return the error.
+		return fmt.Errorf("failed to delete file '%s': %w", filePath, err)
 	}
 
 	return nil

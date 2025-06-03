@@ -47,7 +47,7 @@ func NewDBManager(dbPath string, logger *Logger, errorHandler *ErrorHandler) (*D
 	dbDir := filepath.Dir(dbPath)
 	err := EnsureDirectoryExists(dbDir)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.dirensureerr"), err)
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbdirensure"), err)
 	}
 
 	manager := &DBManager{
@@ -83,7 +83,7 @@ func (m *DBManager) Connect() error {
 	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, getDbPassword())
 	db, err := sql.Open("sqlite3", connStr)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.dbopenerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbopen"), err)
 	}
 
 	err = db.Ping()
@@ -91,25 +91,25 @@ func (m *DBManager) Connect() error {
 		db.Close()
 		// Analyze type of error
 		if strings.Contains(err.Error(), "file is not a database") {
-			return fmt.Errorf(locales.Translate("common.db.invalidformat"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("common.err.dbformat"), err)
 		}
 		if strings.Contains(err.Error(), "no such table") {
-			return fmt.Errorf(locales.Translate("common.db.missingtables"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtablesmissing"), err)
 		}
-		return fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbconnect"), err)
 	}
 
 	// Set pragmas to disable WAL mode and optimize performance
 	_, err = db.Exec("PRAGMA journal_mode=DELETE")
 	if err != nil {
 		db.Close()
-		return fmt.Errorf(locales.Translate("common.db.pragmaerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbpragma"), err)
 	}
 
 	_, err = db.Exec("PRAGMA synchronous=FULL")
 	if err != nil {
 		db.Close()
-		return fmt.Errorf("failed to set synchronous mode: %w", err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbpragmasync"), err)
 	}
 
 	m.db = db
@@ -125,7 +125,7 @@ func (m *DBManager) EnsureConnected(skipConnect bool) error {
 		return m.Connect()
 	}
 	if !m.isConnected && skipConnect {
-		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbnotconnected"), m.dbPath)
 	}
 	return nil
 }
@@ -136,16 +136,16 @@ func (m *DBManager) BeginTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.isConnected {
-		return fmt.Errorf(locales.Translate("common.db.dbnotconnectederr"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbnotconnected"), m.dbPath)
 	}
 
 	if m.activeTransaction != nil {
-		return fmt.Errorf(locales.Translate("common.db.txactiveerr"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbtxactive"), m.dbPath)
 	}
 
 	tx, err := m.db.Begin()
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.txbeginerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxbegin"), err)
 	}
 
 	m.activeTransaction = tx
@@ -161,12 +161,12 @@ func (m *DBManager) CommitTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbtxnoactive"), m.dbPath)
 	}
 
 	err := m.activeTransaction.Commit()
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.txcommiterr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxcommit"), err)
 	}
 	m.logger.Info("Committed database transaction")
 	m.activeTransaction = nil
@@ -179,12 +179,12 @@ func (m *DBManager) RollbackTransaction() error {
 	defer m.mutex.Unlock()
 
 	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.db.txnoactiveerr"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbtxnoactive"), m.dbPath)
 	}
 
 	err := m.activeTransaction.Rollback()
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.txrollbackerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxrollback"), err)
 	}
 	m.logger.Info("Rolled back database transaction")
 
@@ -204,7 +204,7 @@ func (m *DBManager) Execute(query string, args ...interface{}) error {
 
 	_, execErr := m.db.Exec(query, args...)
 	if execErr != nil {
-		return fmt.Errorf(locales.Translate("common.db.queryexecerr"), execErr)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbqueryexec"), execErr)
 	}
 
 	return nil
@@ -222,7 +222,7 @@ func (m *DBManager) Query(query string, args ...interface{}) (*sql.Rows, error) 
 
 	rows, queryErr := m.db.Query(query, args...)
 	if queryErr != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.queryfailederr"), queryErr)
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbquery"), queryErr)
 	}
 
 	return rows, nil
@@ -240,7 +240,7 @@ func (m *DBManager) QueryWithoutConnect(query string, args ...interface{}) (*sql
 
 	rows, queryErr := m.db.Query(query, args...)
 	if queryErr != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.queryfailederr"), queryErr)
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbquery"), queryErr)
 	}
 
 	return rows, nil
@@ -274,7 +274,7 @@ func (m *DBManager) TableExists(tableName string) (bool, error) {
 	if err == sql.ErrNoRows {
 		return false, nil
 	} else if err != nil {
-		return false, fmt.Errorf(locales.Translate("common.db.tablecheckerr"), tableName, err)
+		return false, fmt.Errorf("%s: %w", locales.Translate("common.err.dbtablecheck"), err)
 	}
 
 	return true, nil
@@ -284,12 +284,12 @@ func (m *DBManager) TableExists(tableName string) (bool, error) {
 func (m *DBManager) BackupDatabase() error {
 	// Check if database path is empty or not set
 	if m.dbPath == "" {
-		return fmt.Errorf(locales.Translate("common.db.nopath"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbpath"), m.dbPath)
 	}
 
 	// Check if database file exists
 	if _, err := os.Stat(m.dbPath); os.IsNotExist(err) {
-		return fmt.Errorf(locales.Translate("common.db.filenotexist"), m.dbPath)
+		return fmt.Errorf(locales.Translate("common.err.dbnotexist"), m.dbPath)
 	}
 
 	// Finalize connection if exists
@@ -306,7 +306,7 @@ func (m *DBManager) BackupDatabase() error {
 	// Copy the database file to the backup location
 	err := CopyFile(m.dbPath, backupPath)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.backupcopyerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbbackup"), err)
 	}
 
 	m.logger.Info("Database backup created: %s", backupPath)
@@ -344,7 +344,7 @@ func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 		var playlist PlaylistItem
 		err := rows.Scan(&playlist.ID, &playlist.Name, &playlist.ParentID, &playlist.Path)
 		if err != nil {
-			return nil, fmt.Errorf(locales.Translate("common.db.playlistscanerr"), err)
+			return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbplaylistscan"), err)
 		}
 		playlists = append(playlists, playlist)
 	}
@@ -384,7 +384,7 @@ func (m *DBManager) Finalize() error {
 	// Close the database connection
 	err = m.db.Close()
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.db.dbcloseerr"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbclosefinal"), err)
 	}
 
 	m.isConnected = false
@@ -398,7 +398,7 @@ func (m *DBManager) Finalize() error {
 func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.dbconnect"), err)
 	}
 
 	// Convert path to database format
@@ -420,7 +420,7 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 
 	rows, err := m.Query(query, dbPath+"%")
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.foldertrackserr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.dbfoldermatch"), err)
 	}
 	defer rows.Close()
 
@@ -437,7 +437,7 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 			&track.DJPlayCount,
 		)
 		if err != nil {
-			return nil, fmt.Errorf(locales.Translate("common.db.trackscanerr"), err)
+			return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbtrackscan"), err)
 		}
 		tracks = append(tracks, track)
 	}
@@ -449,7 +449,7 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.dbconnect"), err)
 	}
 
 	query := `
@@ -498,7 +498,7 @@ func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, er
 func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.db.connecterr"), err)
+		return nil, fmt.Errorf(locales.Translate("common.err.dbconnect"), err)
 	}
 
 	query := `
@@ -618,14 +618,14 @@ func (ni *NullInt64) Scan(value interface{}) error {
 		// Attempt to convert bytes to int64
 		i, err := strconv.ParseInt(string(v), 10, 64)
 		if err != nil {
-			return err
+			return fmt.Errorf("NullInt64.Scan: failed to parse []byte '%s' as int: %w", string(v), err)
 		}
 		ni.Int64 = i
 	case string:
 		// Attempt to convert string to int64
 		i, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return err
+			return fmt.Errorf("NullInt64.Scan: failed to parse string '%s' as int: %w", v, err)
 		}
 		ni.Int64 = i
 	default:
