@@ -4,6 +4,7 @@ package common
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func (m *DBManager) Connect() error {
 
 	// Check if database path is set
 	if m.dbPath == "" {
-		return fmt.Errorf(locales.Translate("common.err.nodbpath"), m.dbPath)
+		return errors.New(locales.Translate("common.err.dbpath"))
 	}
 
 	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, getDbPassword())
@@ -420,14 +421,14 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 
 	rows, err := m.Query(query, dbPath+"%")
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.err.dbfoldermatch"), err)
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbqueryfolderfailed"), err)
 	}
 	defer rows.Close()
 
 	var tracks []TrackItem
 	for rows.Next() {
 		var track TrackItem
-		err := rows.Scan(
+		scanErr := rows.Scan(
 			&track.ID,
 			&track.FolderPath,
 			&track.FileNameL,
@@ -436,10 +437,18 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 			&track.ColorID,
 			&track.DJPlayCount,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbtrackscan"), err)
+		if scanErr != nil {
+			return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbtrackscan"), scanErr)
 		}
 		tracks = append(tracks, track)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbrowsiteration"), err)
+	}
+
+	if len(tracks) == 0 {
+		folderName := filepath.Base(folderPath)
+		return nil, fmt.Errorf(locales.Translate("common.err.dbfoldermatch"), folderName)
 	}
 
 	return tracks, nil

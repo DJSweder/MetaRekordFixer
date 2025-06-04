@@ -257,11 +257,11 @@ func (v *Validator) validateDatabasePath() error {
 	if IsEmptyString(dbPath) {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateDatabase",
+			Operation:   "ValidateDbPath",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
-		err := errors.New(locales.Translate("common.err.nodbpath"))
+		err := errors.New(locales.Translate("common.err.dbpath"))
 		v.errorHandler.ShowStandardError(err, context)
 		return err
 	}
@@ -269,7 +269,7 @@ func (v *Validator) validateDatabasePath() error {
 	if !FileExists(dbPath) {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateDatabase",
+			Operation:   "ValidateDbFile",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
@@ -291,7 +291,7 @@ func (v *Validator) validateDatabaseAccess() error {
 	if err != nil {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateDatabase",
+			Operation:   "BackupDatabase",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
@@ -312,11 +312,11 @@ func (v *Validator) validateDatabaseConnection() error {
 	if err := v.dbMgr.Connect(); err != nil {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateDatabase",
+			Operation:   "ValidateDatabaseConnection",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
-		msg := fmt.Sprintf(locales.Translate("common.err.connectdb"), err)
+		msg := fmt.Sprintf(locales.Translate("common.err.dbconnect"), err)
 		err := errors.New(msg)
 		v.errorHandler.ShowStandardError(err, context)
 		return err
