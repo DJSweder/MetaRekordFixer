@@ -5,7 +5,6 @@ package common
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -94,7 +93,7 @@ func (v *Validator) validateFields(action string) error {
 	if IsNilConfig(cfg) {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateFields",
+			Operation:   "ValidateInputFields",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
@@ -137,7 +136,7 @@ func (v *Validator) validateFields(action string) error {
 		// Create standard error context
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
-			Operation:   "ValidateFields",
+			Operation:   "ValidateInputFields",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
@@ -189,8 +188,7 @@ func (v *Validator) validateFields(action string) error {
 				if !exists {
 					// For error dialog get only foldername instead of path
 					displayName := filepath.Base(value)
-					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), displayName)
-					err := errors.New(msg)
+					err := fmt.Errorf(locales.Translate("validator.err.foldernotexist"), displayName)
 					v.errorHandler.ShowStandardError(err, context)
 					return err
 				}
@@ -200,27 +198,18 @@ func (v *Validator) validateFields(action string) error {
 				if !DirectoryExists(value) {
 					// Get foldername only for error dialog
 					displayName := filepath.Base(value)
-					msg := fmt.Sprintf(locales.Translate("validator.err.foldernotexist"), displayName)
-					err := errors.New(msg)
+					err := fmt.Errorf(locales.Translate("validator.err.foldernotexist"), displayName)
 					v.errorHandler.ShowStandardError(err, context)
 					return err
 				}
 
 				// Check write permissions by trying to create a temporary file
-				tempFile := filepath.Join(value, ".write_test")
-				f, err := os.Create(tempFile)
-				if err != nil {
-					// Get foldername only for error dialog
+				if err := IsDirWritable(value); err != nil {
 					displayName := filepath.Base(value)
-					msg := fmt.Sprintf(locales.Translate("validator.err.nowriteaccess"), displayName)
-					err := errors.New(msg)
+					err := fmt.Errorf("%s: %w", locales.Translate("validator.err.nowriteaccess"), displayName)
 					v.errorHandler.ShowStandardError(err, context)
 					return err
 				}
-				defer func() {
-					f.Close()
-					os.Remove(tempFile)
-				}()
 			}
 		}
 	}
@@ -286,23 +275,17 @@ func (v *Validator) validateDatabaseAccess() error {
 	dbDir := filepath.Dir(v.dbMgr.GetDatabasePath())
 
 	// Try to create a temporary file to test write permissions
-	tempFile := filepath.Join(dbDir, ".write_test")
-	f, err := os.Create(tempFile)
-	if err != nil {
+	if err := IsDirWritable(dbDir); err != nil {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
 			Operation:   "BackupDatabase",
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
-		err := errors.New(locales.Translate("common.err.nodbwriteaccess"))
+		err := fmt.Errorf("%s: %w", locales.Translate("common.err.nodbwriteaccess"), err)
 		v.errorHandler.ShowStandardError(err, context)
 		return err
 	}
-	defer func() {
-		f.Close()
-		os.Remove(tempFile)
-	}()
 
 	return nil
 }

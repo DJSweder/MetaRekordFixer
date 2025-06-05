@@ -143,20 +143,6 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
 
-	// Try to connect to database
-	//	if err := m.dbMgr.Connect(); err != nil {
-	//		context := &common.ErrorContext{
-	//			Module:      m.GetConfigName(),
-	//			Operation:   "Database Connection",
-	//			Severity:    common.SeverityCritical,
-	//			Recoverable: true,
-	//		}
-	//		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.connectdb")), context)
-	//		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
-	//		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
-	//	}
-	//	defer m.dbMgr.Finalize()
-
 	// Load playlists
 	if err := m.loadPlaylists(); err != nil {
 		context := &common.ErrorContext{

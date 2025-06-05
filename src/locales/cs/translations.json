@@ -21,7 +21,7 @@
     "common.err.dbfoldermatch": "Pro skladby ve složce '%s' nejsou v databázi žádné záznamy.",
     "common.err.dbformat": "Soubor není platnou databází, nebo je databáze poškozená.",
     "common.err.dbnotconnected": "Není navázáno spojení s databází.: %s",
-    "common.err.dbnotexist": "Soubor s databází neexistuje.",
+    "common.err.dbnotexist": "V zadaném umístění nebyl nalezen žádný soubor s databází.",
     "common.err.dbopen": "Při otevírání databáze došlo k chybě.",
     "common.err.dbpath": "Databáze nenalezena. Je správně nastavená cesta k souboru s databází?",
     "common.err.dbplaylistscan": "Chyba při skenování řádku s playlistem",
@@ -204,5 +204,6 @@
     "validator.err.required": "Není vyplněný nějaký povinný údaj.",
     "validator.status.dbconnect": "Kontrola nastavení databáze úspěšná.",
     "validator.status.entries": "Kontrola vstupních parametrů úspěšná.",
-    "validator.status.start": "Spuštěna úvodní kontrola."
+    "validator.status.start": "Spuštěna úvodní kontrola.",
+    "common.err.modulecontent": "Došlo k chybě načtení funkce."
 }

@@ -104,7 +104,7 @@ func (m *ModuleBase) initBaseComponents() {
 // This method should be implemented by modules to return their specific content
 // It is used by the CreateModuleLayoutWithStatusMessages method to create the full layout with status messages
 func (m *ModuleBase) GetModuleContent() fyne.CanvasObject {
-	return container.NewVBox(widget.NewLabel("Module content not implemented"))
+	return container.NewVBox(widget.NewLabel(locales.Translate("common.err.modulecontent")))
 }
 
 // CreateModuleLayoutWithStatusMessages creates a layout with module content and status messages
@@ -378,15 +378,3 @@ func (m *ModuleBase) HandleProcessCancellation(message string, params ...interfa
 	// Complete progress dialog and update UI
 	m.CompleteProgressDialog()
 }
-
-func (m *ModuleBase) ValidateFields() error {
-	// Validate all fields
-	return nil
-}
-
-// StartModuleProcess handles the common module startup flow.
-// It saves configuration, runs validation, shows progress dialog and starts the main process.
-// Parameters:
-//   - validator: pre-configured validator instance from the module
-//   - mode: validation mode ("start", "standard", "custom")
-//   - processFunc: function containing the main module logic

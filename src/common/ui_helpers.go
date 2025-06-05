@@ -256,7 +256,7 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 	// Only use localized error message in dialog, without technical details
 	var errorMsg string
 	if err != nil {
-		// Pokud je chyba ve formátu "convert.err.nosourcefiles: %v", extrahujeme jen prvních část
+		// If localized string of error message is in format "Some text: %v", we extract first part only (because character ":" is used as separator)
 		errParts := strings.SplitN(err.Error(), ":", 2)
 		errKey := strings.TrimSpace(errParts[0])
 		errorMsg = locales.Translate(errKey)

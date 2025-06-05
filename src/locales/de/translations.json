@@ -204,5 +204,6 @@
     "validator.err.required": "Einige erforderliche Daten sind nicht eingetragen.",
     "validator.status.dbconnect": "Überprüfung der Datenbankeinstellungen erfolgreich.",
     "validator.status.entries": "Überprüfung der Eingabeparameter erfolgreich.",
-    "validator.status.start": "Anfangsprüfung gestartet."
+    "validator.status.start": "Anfangsprüfung gestartet.",
+    "common.err.modulecontent": "Beim Laden der Funktion ist ein Fehler aufgetreten."
 }

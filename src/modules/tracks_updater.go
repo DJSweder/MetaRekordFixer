@@ -254,7 +254,7 @@ func getFileType(ext string) int {
 func (m *TracksUpdaterModule) loadPlaylists() error {
 	err := m.dbMgr.Connect()
 	if err != nil {
-		return fmt.Errorf("%s %w", locales.Translate("common.err.connectdb"), err)
+		return fmt.Errorf("%s %w", locales.Translate("common.err.dbconnect"), err)
 	}
 	defer m.dbMgr.Finalize()
 

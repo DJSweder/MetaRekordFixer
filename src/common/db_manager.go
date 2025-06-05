@@ -318,7 +318,7 @@ func (m *DBManager) BackupDatabase() error {
 func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf(locales.Translate("common.err.connectdb"), err)
+		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbconnect"), err)
 	}
 
 	query := `

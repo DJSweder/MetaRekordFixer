@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"MetaRekordFixer/locales"
 )
 
 // GlobalConfig holds global application settings
@@ -107,27 +106,36 @@ func (mgr *ConfigManager) loadConfig() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	if !FileExists(mgr.configPath) {
-		return fmt.Errorf(locales.Translate("common.config.filenotfound"), mgr.configPath)
-	}
-
 	data, err := os.ReadFile(mgr.configPath)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.config.readerr"), err)
+		if os.IsNotExist(err) {
+			// Config file doesn't exist, try to create a default one
+			if errCreate := CreateConfigFile(mgr.configPath); errCreate != nil {
+				return fmt.Errorf("ConfigManager.loadConfig: failed to create default config file: %w", errCreate)
+			}
+			// Attempt to read the newly created config file
+			data, err = os.ReadFile(mgr.configPath)
+			if err != nil {
+				return fmt.Errorf("ConfigManager.loadConfig: failed to read newly created config file %s: %w", mgr.configPath, err)
+			}
+		} else {
+			// Other error while reading the config file
+			return fmt.Errorf("ConfigManager.loadConfig: failed to read config file %s: %w", mgr.configPath, err)
+		}
 	}
 
-	var config struct {
+	// Parse JSON data
+	var configData struct {
 		Global  GlobalConfig            `json:"global"`
 		Modules map[string]ModuleConfig `json:"modules"`
 	}
-
-	err = json.Unmarshal(data, &config)
+	err = json.Unmarshal(data, &configData)
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.config.parseerr"), err)
+		return fmt.Errorf("ConfigManager.loadConfig: failed to unmarshal config data from %s: %w", mgr.configPath, err)
 	}
 
-	mgr.globalConfig = config.Global
-	mgr.moduleConfigs = config.Modules
+	mgr.globalConfig = configData.Global
+	mgr.moduleConfigs = configData.Modules
 
 	return nil
 }
@@ -155,16 +163,20 @@ func (mgr *ConfigManager) saveConfig() error {
 
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.config.marshalerr"), err)
+		return fmt.Errorf("ConfigManager.saveConfig: failed to marshal config data: %w", err)
 	}
 
 	// Ensure the directory exists before writing the file
 	dir := filepath.Dir(mgr.configPath)
 	if err := EnsureDirectoryExists(dir); err != nil {
-		return fmt.Errorf("failed to ensure config directory exists: %v", err)
+		return fmt.Errorf("ConfigManager.saveConfig: failed to ensure directory %s exists: %w", dir, err)
 	}
 
-	return os.WriteFile(mgr.configPath, data, 0644)
+	if err = os.WriteFile(mgr.configPath, data, 0644); err != nil {
+		return fmt.Errorf("ConfigManager.saveConfig: failed to write config file %s: %w", mgr.configPath, err)
+	}
+
+	return nil
 }
 
 // NewModuleConfig creates a new empty module configuration
@@ -315,7 +327,7 @@ func CreateConfigFile(configPath string) error {
 	// Ensure the directory exists before creating the config file
 	dir := filepath.Dir(configPath)
 	if err := EnsureDirectoryExists(dir); err != nil {
-		return fmt.Errorf("failed to ensure directory exists: %v", err)
+		return fmt.Errorf("CreateConfigFile: failed to ensure directory %s exists: %w", dir, err)
 	}
 
 	defaultConfig := struct {
@@ -331,8 +343,12 @@ func CreateConfigFile(configPath string) error {
 
 	data, err := json.MarshalIndent(defaultConfig, "", "  ")
 	if err != nil {
-		return fmt.Errorf(locales.Translate("common.config.marshalerr"), err)
+		return fmt.Errorf("CreateConfigFile: failed to marshal default config data: %w", err)
 	}
 
-	return os.WriteFile(configPath, data, 0644)
+	if err = os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("CreateConfigFile: failed to write default config file %s: %w", configPath, err)
+	}
+
+	return nil
 }

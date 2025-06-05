@@ -204,5 +204,6 @@
     "validator.err.required": "Some required data is not filled in.",
     "validator.status.dbconnect": "Database settings check successful.",
     "validator.status.entries": "Input parameters check successful.",
-    "validator.status.start": "Initial check started."
+    "validator.status.start": "Initial check started.",
+    "common.err.modulecontent": "An error occurred while loading the function."
 }

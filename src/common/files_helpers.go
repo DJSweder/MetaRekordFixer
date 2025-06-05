@@ -221,3 +221,27 @@ func ToDbPath(path string, addTrailingSlash bool) string {
 
 	return path
 }
+
+// IsDirWritable checks if a directory is writable by attempting to create a temporary file
+func IsDirWritable(dirPath string) error {
+    if !DirectoryExists(dirPath) {
+        return fmt.Errorf("directory does not exist: %s", dirPath)
+    }
+    
+    tempFile := filepath.Join(dirPath, ".write_test")
+    f, err := os.Create(tempFile)
+    if err != nil {
+        return fmt.Errorf("failed to create test file in directory '%s': %w", dirPath, err)
+    }
+    
+    // Close and delete test file
+    if err := f.Close(); err != nil {
+        return fmt.Errorf("failed to close test file in directory '%s': %w", dirPath, err)
+    }
+    
+    if err := os.Remove(tempFile); err != nil {
+        return fmt.Errorf("failed to remove test file in directory '%s': %w", dirPath, err)
+    }
+    
+    return nil
+}
