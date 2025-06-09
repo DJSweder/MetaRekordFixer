@@ -41,14 +41,11 @@ func (v *Validator) Validate(action string) error {
 	v.module.SaveConfig()
 
 	// Get base module functionality
-	base, ok := v.module.(interface {
+	base := v.module.(interface {
 		ClearStatusMessages()
 		AddInfoMessage(string)
 		AddErrorMessage(string)
 	})
-	if !ok {
-		return fmt.Errorf("module %s must implement status message methods", v.module.GetName())
-	}
 
 	// Clear any previous status messages
 	base.ClearStatusMessages()
@@ -97,7 +94,7 @@ func (v *Validator) validateFields(action string) error {
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
-		err := fmt.Errorf("configuration not found for module %s", v.module.GetName())
+		err := fmt.Errorf(locales.Translate("common.err.confignotfound"), v.module.GetName())
 		v.errorHandler.ShowStandardError(err, context)
 		return err
 	}
@@ -144,7 +141,8 @@ func (v *Validator) validateFields(action string) error {
 		// Validate date format if needed
 		if field.FieldType == "date" {
 			if !IsEmptyString(value) && !IsValidDateFormat(value) {
-				err := errors.New(locales.Translate("validator.err.invaliddate"))
+				err := errors.New(locales.Translate("validator.err.invaliddate")) // In this case, it is intentional that the user gets a more general message about the date entered. 
+				// In the GUI, user see what entered, so "bad date" also means the case where "no date" is entered.
 				v.errorHandler.ShowStandardError(err, context)
 				return err
 			}
@@ -205,8 +203,7 @@ func (v *Validator) validateFields(action string) error {
 
 				// Check write permissions by trying to create a temporary file
 				if err := IsDirWritable(value); err != nil {
-					displayName := filepath.Base(value)
-					err := fmt.Errorf("%s: %w", locales.Translate("validator.err.nowriteaccess"), displayName)
+					err := fmt.Errorf("%s: %w", locales.Translate("validator.err.nowriteaccess"), err)
 					v.errorHandler.ShowStandardError(err, context)
 					return err
 				}
@@ -299,8 +296,6 @@ func (v *Validator) validateDatabaseConnection() error {
 			Severity:    SeverityCritical,
 			Recoverable: false,
 		}
-		msg := fmt.Sprintf(locales.Translate("common.err.dbconnect"), err)
-		err := errors.New(msg)
 		v.errorHandler.ShowStandardError(err, context)
 		return err
 	}

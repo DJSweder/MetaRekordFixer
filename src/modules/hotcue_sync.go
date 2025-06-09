@@ -138,7 +138,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.dbpath")), context)
 		common.DisableModuleControls(m.sourcePlaylistSelect, m.targetPlaylistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -147,7 +147,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 	if err := m.loadPlaylists(); err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Database Access",
+			Operation:   "LoadDataFromDatabase",
 			Severity:    common.SeverityCritical,
 			Recoverable: true,
 		}

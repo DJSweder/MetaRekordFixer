@@ -100,11 +100,11 @@ func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 	if m.dbMgr.GetDatabasePath() == "" {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Database Validation",
+			Operation:   "PathToDatabaseCheck",
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nodbpath")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.dbpath")), context)
 		common.DisableModuleControls(m.playlistSelect, m.submitBtn)
 		return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 	}
@@ -113,7 +113,7 @@ func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 	if err := m.loadPlaylists(); err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Database Access",
+			Operation:   "LoadDataFromDatabase",
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
@@ -251,10 +251,11 @@ func getFileType(ext string) int {
 	}
 }
 
+// loadPlaylists loads playlist items from the database and updates the playlist selector.
 func (m *TracksUpdaterModule) loadPlaylists() error {
 	err := m.dbMgr.Connect()
 	if err != nil {
-		return fmt.Errorf("%s %w", locales.Translate("common.err.dbconnect"), err)
+		return err // DBMgr.Connect() is expected to return a localized error.
 	}
 	defer m.dbMgr.Finalize()
 
@@ -335,7 +336,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 			m.CloseProgressDialog()
 			context := &common.ErrorContext{
 				Module:      m.GetConfigName(),
-				Operation:   "Update Process",
+				Operation:   "UpdateProcess",
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
@@ -364,7 +365,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	if selectedPlaylist == "" {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Playlist Selection",
+			Operation:   "PlaylistSelection",
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
@@ -374,7 +375,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Get the tracks from the playlist.
-	m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettracks"))
+	m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettrackspls"))
 	rows, err := m.dbMgr.Query(`
 		SELECT c.ID, c.FileNameL
 		FROM djmdContent c
@@ -384,11 +385,12 @@ func (m *TracksUpdaterModule) processUpdate() {
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetConfigName(),
-			Operation:   "Get Playlist Tracks",
+			Operation:   "GetPlaylistTracks",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbquery"), err), context)
+		m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		m.CloseProgressDialog()
 		return
 	}
@@ -406,11 +408,12 @@ func (m *TracksUpdaterModule) processUpdate() {
 		if err := rows.Scan(&t.ID, &t.FileName); err != nil {
 			context := &common.ErrorContext{
 				Module:      m.GetConfigName(),
-				Operation:   "Database Scan",
+				Operation:   "DatabaseScan",
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("updater.err.dbscan"), err), context)
+			m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			m.CloseProgressDialog()
 			return
 		}
@@ -429,17 +432,19 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Get all files in target folder
-	m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.scanfolder"))
-	files, err := filepath.Glob(filepath.Join(m.folderEntry.Text, "*.*"))
+	m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.gettracksfldr"))
+	files, err := common.ListFilesWithExtensions(m.folderEntry.Text, nil, false)
 	if err != nil {
+		m.CloseProgressDialog()
 		context := &common.ErrorContext{
-			Module:      m.GetConfigName(),
-			Operation:   "Scan Folder",
+			Module:      m.GetName(),
+			Operation:   "ScanFolder",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("updater.err.glob"), err), context)
-		m.CloseProgressDialog()
+		wrappedErr := fmt.Errorf("%s: %w", locales.Translate("common.err.noreadaccess"), err)
+		m.ErrorHandler.ShowStandardError(wrappedErr, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
 
@@ -538,7 +543,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf(locales.Translate("common.err.dbupdate"), err), context)
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.err.dbupdate"), err), context)
 			m.CloseProgressDialog()
 			return
 		}

@@ -81,6 +81,20 @@ func (m *DBManager) Connect() error {
 		return errors.New(locales.Translate("common.err.dbpath"))
 	}
 
+	fileInfo, err := GetFileInfo(m.dbPath)
+	if err != nil {
+		// Error getting file info (e.g., path does not exist, permissions)
+		// This could be considered a sub-type of "dbformat" or a specific file access error.
+		// Let's use dbformat for now, as an inaccessible or non-existent file isn't a valid DB.
+		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbformat"), err)
+	}
+
+	if fileInfo.Size == 0 {
+		// Explicitly return an error for zero-length files.
+		// No need to wrap an error here, as GetFileInfo succeeded.
+		return errors.New(locales.Translate("common.err.dbzerolength"))
+	}
+
 	connStr := fmt.Sprintf("file:%s?_pragma_key=%s&_pragma_cipher_compatibility=3&_pragma_cipher_page_size=4096", m.dbPath, getDbPassword())
 	db, err := sql.Open("sqlite3", connStr)
 	if err != nil {
@@ -318,7 +332,7 @@ func (m *DBManager) BackupDatabase() error {
 func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbconnect"), err)
+		return nil, err // EnsureConnected (and thus Connect) already provides a localized error.
 	}
 
 	query := `

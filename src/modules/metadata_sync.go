@@ -219,7 +219,8 @@ func (m *MetadataSyncModule) Start() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.noreadaccess")), context)
+		wrappedErr := fmt.Errorf("%s: %w", locales.Translate("common.err.noreadaccess"), err)
+		m.ErrorHandler.ShowStandardError(wrappedErr, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -309,7 +310,7 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context)
+		m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -343,7 +344,7 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(err, context)
+			m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
 			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
@@ -413,7 +414,7 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(err, context)
+			m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
 			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 			return
 		}
