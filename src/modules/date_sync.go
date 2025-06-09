@@ -3,7 +3,6 @@
 package modules
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -670,7 +669,6 @@ func (m *DateSyncModule) Start(mode string) {
 		// Show progress dialog with cancel support
 		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
 
-
 		// Start processing in goroutine
 		go m.processCustomUpdate()
 	}
@@ -687,7 +685,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 		m.CloseProgressDialog()
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
-			Operation:   "Date Sync",
+			Operation:   "StandardDateUpdate",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
@@ -711,20 +709,8 @@ func (m *DateSyncModule) processStandardUpdate() {
 // processCustomUpdate performs the custom date synchronization
 func (m *DateSyncModule) processCustomUpdate() {
 
-	// Parse custom date
-	customDate, err := time.Parse("2006-01-02", m.datePickerEntry.Text)
-	if err != nil {
-		m.CloseProgressDialog()
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Parse Custom Date",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("datesync.err.invaliddate")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
+	// No need to parse custom date, it's already parsed in the validator
+	customDate, _ := time.Parse("2006-01-02", m.datePickerEntry.Text)
 
 	// Collect custom date folders
 	var customDateFolders []string
@@ -742,7 +728,7 @@ func (m *DateSyncModule) processCustomUpdate() {
 		m.CloseProgressDialog()
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
-			Operation:   "Custom Date Sync",
+			Operation:   "CustomDateUpdate",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
@@ -791,7 +777,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	var totalCount int
 	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
 	if err != nil {
-		return 0, fmt.Errorf("error counting records: %w", err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbitemscount"), err)
 	}
 
 	// Add info message about number of records to update
@@ -808,7 +794,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	updateQuery := fmt.Sprintf("UPDATE djmdContent SET StockDate = ReleaseDate, DateCreated = ReleaseDate %s", whereClause)
 	err = m.dbMgr.Execute(updateQuery)
 	if err != nil {
-		return 0, fmt.Errorf("error updating dates: %w", err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbupdate"), err)
 	}
 
 	return totalCount, nil
@@ -816,9 +802,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 
 // setCustomDates sets custom dates for tracks in selected folders
 func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
-	if len(customDateFoldersEntry) == 0 {
-		return 0, errors.New(locales.Translate("datesync.err.nofolders"))
-	}
+
 
 	// Build WHERE clause for selected folders
 	whereClause := "WHERE"
@@ -834,7 +818,7 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 	var totalCount int
 	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
 	if err != nil {
-		return 0, fmt.Errorf("error counting records: %w", err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbitemscount"), err)
 	}
 
 	// Add info message about number of records to update
@@ -856,7 +840,7 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 
 	err = m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02"), customDate.Format("2006-01-02"))
 	if err != nil {
-		return 0, fmt.Errorf("error updating dates: %w", err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbupdate"), err)
 	}
 
 	return totalCount, nil

@@ -219,8 +219,7 @@ func (m *MetadataSyncModule) Start() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		wrappedErr := fmt.Errorf("%s: %w", locales.Translate("common.err.noreadaccess"), err)
-		m.ErrorHandler.ShowStandardError(wrappedErr, context)
+		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.err.noreadaccess"), err), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}

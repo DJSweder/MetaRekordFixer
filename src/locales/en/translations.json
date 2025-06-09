@@ -123,6 +123,8 @@
     "datesync.day.tue": "Tue",
     "datesync.day.wed": "Wed",
     "datesync.dialog.header": "Write dates to database",
+    "datesync.err.dbitemscount": "Database error, failed to determine the number of songs to update. Please try again.",
+    "datesync.err.dbupdate": "Database error, failed to save dates to songs. Please try again.",
     "datesync.err.invaliddate": "The date entered is not valid.",
     "datesync.chkbox.exception": "Do not make changes to these folders:",
     "datesync.label.info": "Change *StockDate* (date added) and *DateCreated* (date created).",

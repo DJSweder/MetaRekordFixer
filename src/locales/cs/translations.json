@@ -123,6 +123,8 @@
     "datesync.day.tue": "Út",
     "datesync.day.wed": "St",
     "datesync.dialog.header": "Zápis datumů do databáze",
+    "datesync.err.dbitemscount": "Chyba databáze, nepodařilo se zjistit počet skladeb k aktualizaci. Zkuste to, prosím, znovu.",
+    "datesync.err.dbupdate": "Chyba databáze, datumy se nepodařilo uložit ke skladbám. Zkuste to, prosím, znovu.",
     "datesync.err.invaliddate": "Zadané datum není platné.",
     "datesync.chkbox.exception": "U těchto složek neprovádět změny:",
     "datesync.label.info": "Změna *StockDate* (datum přidání) a *DateCreated* (datum vytvoření).",

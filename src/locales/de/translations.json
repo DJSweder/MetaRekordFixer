@@ -123,6 +123,8 @@
     "datesync.day.tue": "Di",
     "datesync.day.wed": "Mi",
     "datesync.dialog.header": "Datum in die Datenbank schreiben",
+    "datesync.err.dbitemscount": "Datenbankfehler. Die Anzahl der zu aktualisierenden Songs konnte nicht ermittelt werden. Bitte versuchen Sie es erneut.",
+    "datesync.err.dbupdate": "Datenbankfehler. Die Daten konnten nicht in den Songs gespeichert werden. Bitte versuchen Sie es erneut.",
     "datesync.err.invaliddate": "Das eingegebene Datum ist ungültig.",
     "datesync.chkbox.exception": "Nehmen Sie keine Änderungen an diesen Ordnern vor:",
     "datesync.label.info": "Ändern Sie *StockDate* (Hinzufügungsdatum) und *DateCreated* (Erstellungsdatum).",
