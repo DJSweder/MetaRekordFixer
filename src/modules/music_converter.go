@@ -214,6 +214,11 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
+	// If configuration is nil or empty, set it to default
+	if common.IsNilConfig(cfg) {
+		cfg = m.SetDefaultConfig()
+	}
+
 	// Load source and target folder paths
 	if m.sourceFolderEntry != nil {
 		if sourceFolder := cfg.Get("source_folder", ""); sourceFolder != "" {
@@ -229,11 +234,10 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 
 	// Load format selections
 	if m.sourceFormatSelect != nil {
-		if sourceFormat := cfg.Get("source_format", ""); sourceFormat != "" {
-			m.sourceFormatSelect.SetSelected(sourceFormat)
-		} else {
-			m.sourceFormatSelect.SetSelected(locales.Translate("convert.srcformats.all"))
-		}
+		// Get the technical value from config and set the localized value in the select
+		configValue := cfg.Get("source_format", "All")
+		localizedValue := sourceFormatParams.GetLocalizedValue(configValue)
+		m.sourceFormatSelect.SetSelected(localizedValue)
 	}
 
 	if m.targetFormatSelect != nil {
@@ -320,9 +324,6 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 // SaveConfig saves the current module configuration
 func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-	if cfg.Fields == nil {
-		cfg = m.SetDefaultConfig()
-	}
 
 	// Save source and target folder paths with validation
 	if m.sourceFolderEntry != nil {
@@ -334,7 +335,9 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 
 	// Save format selections with validation
 	if m.sourceFormatSelect != nil {
-		cfg.SetWithDefinitionAndActions("source_format", m.sourceFormatSelect.Selected, "select", true, "none", []string{"start"})
+		// Save technical value, not localized
+		configValue := sourceFormatParams.GetConfigValue(m.sourceFormatSelect.Selected)
+		cfg.SetWithDefinitionAndActions("source_format", configValue, "select", true, "none", []string{"start"})
 	}
 	if m.targetFormatSelect != nil {
 		cfg.SetWithDefinitionAndActions("target_format", m.targetFormatSelect.Selected, "select", true, "none", []string{"start"})
@@ -654,10 +657,6 @@ func (m *MusicConverterModule) startConversion() {
 
 	// Get values from configuration
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-	// If configuration doesn't exist, use default
-	if cfg.Fields == nil {
-		cfg = m.SetDefaultConfig()
-	}
 	sourceFolder := cfg.Get("source_folder", "")
 	targetFolder := cfg.Get("target_folder", "")
 	targetFormat := cfg.Get("target_format", "")
@@ -667,25 +666,15 @@ func (m *MusicConverterModule) startConversion() {
 
 	switch targetFormat {
 	case "MP3":
-		// MP3 settings
-		bitrate := cfg.Get("mp3_bitrate", "")
-		sampleRateSetting := cfg.Get("mp3_samplerate", "")
-		formatSettings["bitrate"] = bitrate
-		formatSettings["sample_rate"] = sampleRateSetting
+		formatSettings["bitrate"] = cfg.Get("mp3_bitrate", "320")
+		formatSettings["samplerate"] = cfg.Get("mp3_samplerate", "copy")
 	case "FLAC":
-		// FLAC settings
-		compression := cfg.Get("flac_compression", "")
-		sampleRate := cfg.Get("flac_samplerate", "")
-		bitDepth := cfg.Get("flac_bitdepth", "")
-		formatSettings["compression"] = compression
-		formatSettings["sample_rate"] = sampleRate
-		formatSettings["bit_depth"] = bitDepth
+		formatSettings["compression"] = cfg.Get("flac_compression", "5") // Default FLAC compression level
+		formatSettings["samplerate"] = cfg.Get("flac_samplerate", "copy")
+		formatSettings["bitdepth"] = cfg.Get("flac_bitdepth", "copy")
 	case "WAV":
-		// WAV settings
-		sampleRate := cfg.Get("wav_samplerate", "")
-		bitDepth := cfg.Get("wav_bitdepth", "")
-		formatSettings["sample_rate"] = sampleRate
-		formatSettings["bit_depth"] = bitDepth
+		formatSettings["samplerate"] = cfg.Get("wav_samplerate", "copy")
+		formatSettings["bitdepth"] = cfg.Get("wav_bitdepth", "copy")
 	}
 
 	// Log conversion parameters
@@ -696,14 +685,11 @@ func (m *MusicConverterModule) startConversion() {
 	// Perform the actual conversion
 	go m.convertFiles(sourceFolder, targetFolder, targetFormat, formatSettings)
 }
+
 // convertFiles performs the actual conversion of audio files using ffmpeg
 func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
 	// Get values from configuration
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-	// If configuration doesn't exist, use default
-	if cfg.Fields == nil {
-		cfg = m.SetDefaultConfig()
-	}
 	// Find all audio files in the source folder
 	sourceFormat := cfg.Get("source_format", "")
 	files, err := m.findAudioFiles(sourceFolder, sourceFormat)
@@ -1187,6 +1173,16 @@ func (ps *ConversionParameterSet) GetLocalizedValue(configValue string) string {
 
 // Parameter definitions for conversion
 var (
+	// Source format parameters
+	sourceFormatParams = ConversionParameterSet{
+		Parameters: []ConversionParameter{
+			{ConfigValue: "All", FFmpegValue: "All", LocaleKey: "convert.srcformats.all", IsCopy: false},
+			{ConfigValue: "MP3", FFmpegValue: "MP3", LocaleKey: "convert.srcformats.mp3", IsCopy: false},
+			{ConfigValue: "FLAC", FFmpegValue: "FLAC", LocaleKey: "convert.srcformats.flac", IsCopy: false},
+			{ConfigValue: "WAV", FFmpegValue: "WAV", LocaleKey: "convert.srcformats.wav", IsCopy: false},
+		},
+	}
+
 	// FLAC compression parameters
 	flacCompressionParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
@@ -1441,8 +1437,6 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
 	cfg.SetWithDefinitionAndActions("target_folder", "", "folder", true, "exists | write", []string{"start"})
 
-	// Set default formats
-	// cfg.Set("source_format", locales.Translate("convert.srcformats.all"))
 	cfg.SetWithDefinitionAndActions("source_format", locales.Translate("convert.srcformats.all"), "select", true, "none", []string{"start"})
 	cfg.SetWithDefinitionAndActions("target_format", "MP3", "select", true, "none", []string{"start"})
 
