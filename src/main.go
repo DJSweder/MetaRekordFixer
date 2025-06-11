@@ -3,7 +3,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 
 	"MetaRekordFixer/assets"
 	"MetaRekordFixer/common"
@@ -18,6 +20,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// NRT11
 // RekordboxTools is the main application structure.
 type RekordboxTools struct {
 	app          fyne.App
@@ -40,43 +43,74 @@ type moduleInfo struct {
 
 // NewRekordboxTools initializes the main application with proper logging, theme, and window setup.
 func NewRekordboxTools() *RekordboxTools {
+	//NRT01
 	// Initialize logger first
-	logPath := common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer", "log", "metarekordfixer.log")
+	var logger *common.Logger
+
+	// Try to use APPDATA first
+	appData := os.Getenv("APPDATA")
 	logMaxSizeMB := 10
 	logMaxAgeDays := 7
-	logger, err := common.NewLogger(logPath, logMaxSizeMB, logMaxAgeDays)
-	if err != nil {
-		os.Exit(1)
+
+	if appData != "" {
+		logPath := common.JoinPaths(appData, "MetaRekordFixer", "log", "metarekordfixer.log")
+		var err error
+		logger, err = common.NewLogger(logPath, logMaxSizeMB, logMaxAgeDays)
+		if err != nil {
+			fmt.Printf("Failed to initialize logger: %v\n", err)
+		}
 	}
 
+	if logger == nil {
+		logPath := "metarekordfixer.log"
+		var err error
+		logger, err = common.NewLogger(logPath, logMaxSizeMB, logMaxAgeDays)
+		if err != nil {
+			fmt.Printf("Failed to initialize logger: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	//NRT02-04
 	// Create and set up our Fyne application
 	fyneApp := app.NewWithID("com.example.metarekordfixer")
 	fyneApp.SetIcon(assets.ResourceAppLogo)
 	fyneApp.Settings().SetTheme(theme.NewCustomTheme())
 
+	//NRT05-08
 	// Setup configuration
-	configPath := getConfigPath()
-	if err := common.EnsureDirectoryExists(common.JoinPaths(os.Getenv("APPDATA"), "MetaRekordFixer")); err != nil {
-		logger.Error("Failed to create config directory: %v", err)
-		os.Exit(1)
+	configPath := getConfigPath(appData)
+	if appData != "" {
+		if err := common.EnsureDirectoryExists(common.JoinPaths(appData, "MetaRekordFixer")); err != nil {
+			context := &common.ErrorContext{
+				Module:      "Initialization",
+				Operation:   "CreateConfigDir",
+				Severity:    common.SeverityWarning,
+				Recoverable: true,
+			}
+			logger.Warning(fmt.Sprintf("Failed to ensure config directory exists during %s in %s (Severity: %s, Recoverable: %t): %s - %v", context.Operation, context.Module, context.Severity, context.Recoverable, locales.Translate("common.err.confdircreate"), err))
+			// Try local fallback
+			configPath = "settings.conf"
+		}
 	}
 
 	configMgr, err := common.NewConfigManager(configPath)
 	if err != nil {
 		if err := common.CreateConfigFile(configPath); err != nil {
-			logger.Error("Failed to create config file: %v", err)
+			logger.Error("%s: %v", locales.Translate("common.err.configcreate"), err)
 			os.Exit(1)
 		}
 		configMgr, err = common.NewConfigManager(configPath)
 		if err != nil {
-			logger.Error("Failed to initialize config manager: %v", err)
+			logger.Error("%s: %v", locales.Translate("common.err.confmgrinit"), err)
 			os.Exit(1)
 		}
 	}
 
+	//NRT12
 	// Initialize localization
 	common.DetectAndSetLanguage(configMgr, logger)
 
+	//NRT13
 	// Create the main window with localized title
 	mainWindow := fyneApp.NewWindow(locales.Translate("main.app.title"))
 	mainWindow.Resize(fyne.NewSize(1000, 700))
@@ -84,6 +118,8 @@ func NewRekordboxTools() *RekordboxTools {
 	// Log application startup
 	logger.Info("%s", locales.Translate("main.log.appstart"))
 
+	//NRT10
+	//NRT14
 	// Initialize error handler
 	errorHandler := common.NewErrorHandler(logger, mainWindow)
 
@@ -99,17 +135,39 @@ func NewRekordboxTools() *RekordboxTools {
 
 // Run starts the application, initializes modules, builds the GUI, and runs the main event loop.
 func (rt *RekordboxTools) Run() {
+	//M01
+	// Setup panic recovery for the main application loop
+	defer func() {
+		if r := recover(); r != nil {
+			// Log the error
+			rt.logger.Error("Panic in application: %v\n%s", r, string(debug.Stack()))
+
+			// Create error context
+			context := &common.ErrorContext{
+				Module:     "Main",
+				Operation:  "ApplicationRun",
+				Severity:   common.SeverityCritical,
+				StackTrace: string(debug.Stack()),
+			}
+
+			// Show error dialog to user
+			err := fmt.Errorf("%s: %v", locales.Translate("common.err.unexpected"), r)
+			rt.errorHandler.ShowStandardError(err, context)
+		}
+	}()
 	rt.initModules()
 	rt.createMainContent()
+	//M03
 	rt.mainWindow.ShowAndRun()
 	// Ensure database connections are properly closed
 	if rt.dbManager != nil {
 		if err := rt.dbManager.Finalize(); err != nil {
-			rt.logger.Error("Error finalizing database: %v", err)
+			rt.logger.Error("%s: %v", locales.Translate("common.err.dbclosing"), err)
 		}
 	}
 }
 
+// NRT15
 // initModules prepares module definitions without initializing them
 func (rt *RekordboxTools) initModules() {
 	rt.modules = []*moduleInfo{
@@ -151,6 +209,7 @@ func (rt *RekordboxTools) initModules() {
 	}
 }
 
+// NRT17-25
 // createModuleTabItem creates a tab item for a module
 func (rt *RekordboxTools) createModuleTabItem(info *moduleInfo) *container.TabItem {
 	if !info.isLoaded {
@@ -237,12 +296,13 @@ func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 }
 
 // getDBManager returns the dbManager instance, initializing it if necessary.
+// NRT09
 func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	if rt.dbManager == nil {
 		// Create a new DBManager instance without connecting to the database
 		dbManager, err := common.NewDBManager(rt.configMgr.GetGlobalConfig().DatabasePath, rt.logger, rt.errorHandler)
 		if err != nil {
-			rt.logger.Error("Failed to initialize DBManager: %v", err)
+			rt.logger.Error("%s: %v", locales.Translate("common.err.dbmgrinit"), err)
 		}
 		rt.dbManager = dbManager
 	}
@@ -251,8 +311,7 @@ func (rt *RekordboxTools) getDBManager() *common.DBManager {
 
 // getConfigPath returns the path to the configuration file (settings.conf) in the user's AppData,
 // or uses a local fallback if APPDATA is not set.
-func getConfigPath() string {
-	appData := os.Getenv("APPDATA")
+func getConfigPath(appData string) string {
 	if appData == "" {
 		// Fallback to local directory if APPDATA is not available
 		return "settings.conf"
@@ -262,6 +321,8 @@ func getConfigPath() string {
 
 // main is the entry point. It ensures config and language, then starts the RekordboxTools app.
 func main() {
+	//M02
 	rt := NewRekordboxTools()
+	//M04
 	rt.Run()
 }
