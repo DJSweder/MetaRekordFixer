@@ -1437,7 +1437,7 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
 	cfg.SetWithDefinitionAndActions("target_folder", "", "folder", true, "exists | write", []string{"start"})
 
-	cfg.SetWithDefinitionAndActions("source_format", locales.Translate("convert.srcformats.all"), "select", true, "none", []string{"start"})
+	cfg.SetWithDefinitionAndActions("source_format", "All", "select", true, "none", []string{"start"})
 	cfg.SetWithDefinitionAndActions("target_format", "MP3", "select", true, "none", []string{"start"})
 
 	// Set default checkboxes

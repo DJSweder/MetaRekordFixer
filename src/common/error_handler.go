@@ -3,11 +3,13 @@
 package common
 
 import (
+	"MetaRekordFixer/locales"
 	"fmt"
 	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
 )
 
 // Severity represents the severity level of a message or error.
@@ -110,6 +112,47 @@ func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
 // FormatError creates a standardized error message
 func (h *ErrorHandler) FormatError(operation string, err error) error {
 	return fmt.Errorf("%s: %v", operation, err)
+}
+
+// ShowPanicError displays a critical error dialog and logs the error
+func (h *ErrorHandler) ShowPanicError(r interface{}, stackTrace string) {
+	title := locales.Translate("err.panic.title")
+	content := fmt.Sprintf("%s\n\n%s:\n%v\n\n%s:\n%s",
+		locales.Translate("err.panic.message"),
+		locales.Translate("err.panic.details"),
+		r,
+		locales.Translate("err.panic.stacktrace"),
+		stackTrace)
+
+	h.logger.Error("PANIC RECOVERED: %v\n%s", r, stackTrace)
+
+	if h.window != nil {
+		ShowPanicDialog(h.window, title, content)
+	}
+}
+
+// ShowInitializationErrorDialog displays a specific dialog for errors that occur during application startup (e.g., config loading).
+// It informs the user that the application will continue in a limited capacity.
+func (h *ErrorHandler) ShowInitializationErrorDialog(initError error) {
+	if initError == nil {
+		return
+	}
+
+	// Log the initialization error
+	h.logger.Error("Initialization Error: %v", initError)
+
+	if h.window != nil {
+		// This dialog is intentionally simple, as it's shown on startup before full context is available.
+		title := locales.Translate("common.err.inittitle")
+		message := fmt.Sprintf("%s\n\n%s:\n%v",
+			locales.Translate("common.err.initmessage"),
+			locales.Translate("common.err.details"),
+			initError)
+
+		// We use ShowInformation because it allows a custom title, which is better for this context
+		// than the generic "Error" title from ShowError.
+		dialog.ShowInformation(title, message, h.window)
+	}
 }
 
 // ShowStandardError displays an error with standard formatting and context

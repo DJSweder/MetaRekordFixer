@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
 )
 
 // GlobalConfig holds global application settings
@@ -336,7 +335,7 @@ func CreateConfigFile(configPath string) error {
 	}{
 		Global: GlobalConfig{
 			DatabasePath: "",
-			Language:     "en",
+			Language:     "", // Set to empty string to force system language detection on first run
 		},
 		Modules: make(map[string]ModuleConfig),
 	}

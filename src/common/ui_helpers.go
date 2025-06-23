@@ -487,3 +487,10 @@ func loadLogContent(logPath string, logText *widget.Entry, scrollContainer *cont
 		}()
 	}
 }
+
+// ShowPanicDialog creates and shows a custom dialog for panic errors, allowing a custom title.
+func ShowPanicDialog(window fyne.Window, title, content string) {
+	dismissText := locales.Translate("common.action.ok")
+	panicDialog := dialog.NewCustom(title, dismissText, widget.NewLabel(content), window)
+	panicDialog.Show()
+}
