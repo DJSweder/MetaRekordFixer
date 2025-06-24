@@ -6,9 +6,57 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
+
+// earlyLogBuffer stores log messages before logger is initialized
+var earlyLogBuffer []string
+var earlyLogMutex sync.Mutex
+
+// CaptureEarlyLog captures a log message before the logger is initialized
+func CaptureEarlyLog(level Severity, format string, args ...interface{}) {
+	earlyLogMutex.Lock()
+	defer earlyLogMutex.Unlock()
+	
+	// Format log message with timestamp and level
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	message := fmt.Sprintf("%s [%s] %s", timestamp, level, fmt.Sprintf(format, args...))
+	
+	earlyLogBuffer = append(earlyLogBuffer, message)
+}
+
+// FlushEarlyLogs writes all captured early logs to the logger
+func FlushEarlyLogs(logger *Logger) {
+	earlyLogMutex.Lock()
+	defer earlyLogMutex.Unlock()
+	
+	if logger == nil || len(earlyLogBuffer) == 0 {
+		return
+	}
+	
+	logger.Info("--- Flushing %d early log messages ---", len(earlyLogBuffer))
+	
+	for _, message := range earlyLogBuffer {
+		// Extract severity from the message
+		parts := strings.SplitN(message, "]", 2)
+		if len(parts) != 2 {
+			// Fallback if message format is unexpected
+			logger.Info("Early log: %s", message)
+			continue
+		}
+		
+		// Write directly to log file to preserve original timestamp
+		logger.mutex.Lock()
+		logger.logFile.WriteString(message + "\n")
+		logger.mutex.Unlock()
+	}
+	
+	// Clear the buffer after flushing
+	earlyLogBuffer = nil
+	logger.Info("--- End of early logs ---")
+}
 
 type Logger struct {
 	logPath     string
@@ -41,14 +89,14 @@ func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) {
 		logger.logPath = rootLogPath
 
 		// Log the fallback attempt
-		fmt.Printf("WARNING: Failed to create log directory at '%s': %v\n", filepath.Dir(logPath), err)
-		fmt.Printf("Attempting fallback to root directory: %s\n", rootLogPath)
+		CaptureEarlyLog(SeverityWarning, "Failed to create log directory at '%s': %v", filepath.Dir(logPath), err)
+		CaptureEarlyLog(SeverityWarning, "Attempting fallback to root directory: %s", rootLogPath)
 	}
 
 	// Check if rotation is needed on startup
 	if err := logger.checkRotation(); err != nil {
 		// Non-critical error, just log it
-		fmt.Printf("WARNING: Failed to check log rotation: %v\n", err)
+		CaptureEarlyLog(SeverityWarning, "Failed to check log rotation: %v", err)
 	}
 
 	// Try to open log file
@@ -60,8 +108,8 @@ func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) {
 			logger.logPath = rootLogPath
 
 			// Log the fallback attempt
-			fmt.Printf("WARNING: Failed to open log file at '%s': %v\n", logPath, err)
-			fmt.Printf("Attempting fallback to root directory: %s\n", rootLogPath)
+			CaptureEarlyLog(SeverityWarning, "Failed to open log file at '%s': %v", logPath, err)
+			CaptureEarlyLog(SeverityWarning, "Attempting fallback to root directory: %s", rootLogPath)
 
 			// Try to open the file in the root directory
 			file, err = os.OpenFile(rootLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

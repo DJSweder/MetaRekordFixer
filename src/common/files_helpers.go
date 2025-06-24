@@ -159,16 +159,19 @@ func LocateOrCreatePath(fileName, subDir string) (string, error) {
 
 		// Try to create directory if it doesn't exist
 		if err := EnsureDirectoryExists(dirPath); err == nil {
-			// Test if directory is writable using existing IsDirWritable function
+			// Even if directory exists or was created, we need to verify it's actually writable
 			if err := IsDirWritable(dirPath); err == nil {
+				// Directory is writable, we can use it
 				return appDataPath, nil
 			} else {
-				fmt.Printf("WARNING: Directory in APPDATA '%s' is not writable: %v\n", dirPath, err)
-				fmt.Printf("Attempting fallback to root directory: %s\n", rootPath)
+				// Directory exists but is not writable
+				CaptureEarlyLog(SeverityWarning, "User's folder ('%s') exists but is not writable: %v", dirPath, err)
+				CaptureEarlyLog(SeverityWarning, "Attempt to write to the application installation folder: %s", rootPath)
 			}
 		} else {
-			fmt.Printf("WARNING: Failed to create directory in APPDATA '%s': %v\n", dirPath, err)
-			fmt.Printf("Attempting fallback to root directory: %s\n", rootPath)
+			// If the directory creation failed, we log a message and switch to fallback
+			CaptureEarlyLog(SeverityWarning, "User's folder ('%s') is not writable: %v", dirPath, err)
+			CaptureEarlyLog(SeverityWarning, "Attempt to write to the application installation folder: %s", rootPath)
 		}
 	}
 

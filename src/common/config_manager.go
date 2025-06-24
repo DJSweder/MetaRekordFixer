@@ -58,7 +58,7 @@ func NewConfigManager(configPath string) (*ConfigManager, error) {
 	if err := mgr.loadConfig(); err != nil {
 		// If the file doesn't exist, it means LocateOrCreatePath failed, which is a critical error.
 		// For other errors like malformed JSON, we log it but continue, as a new config will be saved.
-		fmt.Printf("INFO: Could not load config from '%s' (file may be new or corrupt): %v\n", configPath, err)
+		CaptureEarlyLog(SeverityInfo, "Creating a new configuration file '%s' is necessary because it does not exist in the usual location.: %v", configPath, err)
 	}
 
 	return mgr, nil

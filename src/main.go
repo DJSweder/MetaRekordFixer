@@ -50,13 +50,13 @@ func NewRekordboxTools() *RekordboxTools {
 	logPath, err := common.LocateOrCreatePath("metarekordfixer.log", "log")
 	if err != nil {
 		// This is a critical failure, as we cannot log anything without a logger.
-		// We print to stdout and exit.
-		fmt.Printf("CRITICAL: Could not determine or create path for log file: %v\n", err)
+		// We capture the error in early log buffer and exit.
+		common.CaptureEarlyLog(common.SeverityCritical, "Could not determine or create path for log file: %v", err)
 		os.Exit(1)
 	}
 	logger, err := common.NewLogger(logPath, 10, 7) // 10MB max size, 7 days max age
 	if err != nil {
-		fmt.Printf("CRITICAL: Could not initialize logger at '%s': %v\n", logPath, err)
+		common.CaptureEarlyLog(common.SeverityCritical, "Could not initialize logger at '%s': %v", logPath, err)
 		os.Exit(1)
 	}
 	logger.Info("Logger initialized successfully at: %s", logPath)
@@ -86,7 +86,9 @@ func NewRekordboxTools() *RekordboxTools {
 			logger.Error(rt.configInitError.Error())
 		} else {
 			rt.configMgr = configMgr
-			logger.Info("ConfigManager initialized successfully at: %s", configPath)
+			// Flush any early logs captured during initialization (after ConfigManager is initialized)
+			common.FlushEarlyLogs(logger)
+			logger.Info("Configuration initialized successfully at: %s", configPath)
 		}
 	}
 
@@ -136,8 +138,8 @@ func (rt *RekordboxTools) Run() {
 
 	// Handle any errors that occurred during initialization, now that the window is visible.
 	if rt.configInitError != nil {
-		rt.logger.Info("Displaying initialization error dialog for: %v", rt.configInitError)
-		rt.errorHandler.ShowInitializationErrorDialog(rt.configInitError)
+		rt.logger.Info("Initialization error occurred: %v", rt.configInitError)
+		// We don't show a dialog for initialization errors anymore, just log them
 	}
 
 	// Run the application event loop.
