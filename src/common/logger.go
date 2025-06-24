@@ -36,18 +36,42 @@ func NewLogger(logPath string, maxSizeMB int, maxAgeDays int) (*Logger, error) {
 
 	// Create log directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
+		// If we can't create the directory, try fallback to root directory
+		rootLogPath := filepath.Join(".", filepath.Base(logPath))
+		logger.logPath = rootLogPath
+
+		// Log the fallback attempt
+		fmt.Printf("WARNING: Failed to create log directory at '%s': %v\n", filepath.Dir(logPath), err)
+		fmt.Printf("Attempting fallback to root directory: %s\n", rootLogPath)
 	}
 
 	// Check if rotation is needed on startup
 	if err := logger.checkRotation(); err != nil {
-		return nil, fmt.Errorf("failed to check log rotation: %w", err)
+		// Non-critical error, just log it
+		fmt.Printf("WARNING: Failed to check log rotation: %v\n", err)
 	}
 
-	// Open log file
-	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Try to open log file
+	file, err := os.OpenFile(logger.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+		// If we can't open the file and we're not already using the root directory, try fallback
+		if logger.logPath != filepath.Join(".", filepath.Base(logPath)) {
+			rootLogPath := filepath.Join(".", filepath.Base(logPath))
+			logger.logPath = rootLogPath
+
+			// Log the fallback attempt
+			fmt.Printf("WARNING: Failed to open log file at '%s': %v\n", logPath, err)
+			fmt.Printf("Attempting fallback to root directory: %s\n", rootLogPath)
+
+			// Try to open the file in the root directory
+			file, err = os.OpenFile(rootLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open log file at primary and fallback locations: %w", err)
+			}
+		} else {
+			// We're already using the root directory and still can't open the file
+			return nil, fmt.Errorf("failed to open log file: %w", err)
+		}
 	}
 
 	logger.logFile = file

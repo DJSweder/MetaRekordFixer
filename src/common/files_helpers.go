@@ -40,6 +40,15 @@ func DirectoryExists(dirPath string) bool {
 	return info.IsDir()
 }
 
+// FileExists checks if a file exists and is not a directory.
+func FileExists(filePath string) bool {
+	info, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
 // EnsureDirectoryExists ensures the specified directory exists
 func EnsureDirectoryExists(path string) error {
 	if IsEmptyString(path) {
@@ -101,6 +110,80 @@ func ListFilesWithExtensions(dirPath string, extensions []string, recursive bool
 	}
 
 	return result, nil
+}
+
+// GetAppDataPath returns the full path to the application's data directory
+func GetAppDataPath(subDir string) (string, error) {
+	appData := os.Getenv("APPDATA")
+	if appData == "" {
+		return "", fmt.Errorf("APPDATA environment variable not set")
+	}
+
+	path := filepath.Join(appData, "MetaRekordFixer")
+	if subDir != "" {
+		path = filepath.Join(path, subDir)
+	}
+
+	return path, nil
+}
+
+// LocateOrCreatePath determines the optimal path for a given file (e.g., log or config)
+// based on a defined search order and creates necessary directories.
+// Search Order:
+// 1. Root directory (next to the executable)
+// 2. APPDATA directory
+// If not found in either, it attempts to create necessary directories:
+// 3. APPDATA directory (with write test)
+// 4. Root directory (with write test)
+// Returns an error if no writable path can be found.
+func LocateOrCreatePath(fileName, subDir string) (string, error) {
+	// 1. Check if file exists in the root directory
+	rootPath := filepath.Join(".", fileName)
+	if FileExists(rootPath) {
+		return rootPath, nil
+	}
+
+	// 2. Check if file exists in the APPDATA directory
+	appDataPath := ""
+	appData, err := GetAppDataPath(subDir)
+	if err == nil {
+		appDataPath = filepath.Join(appData, fileName)
+		if FileExists(appDataPath) {
+			return appDataPath, nil
+		}
+	}
+
+	// 3. Try to create the directory in APPDATA and test if it's writable
+	if appData != "" {
+		dirPath := filepath.Dir(appDataPath)
+
+		// Try to create directory if it doesn't exist
+		if err := EnsureDirectoryExists(dirPath); err == nil {
+			// Test if directory is writable using existing IsDirWritable function
+			if err := IsDirWritable(dirPath); err == nil {
+				return appDataPath, nil
+			} else {
+				fmt.Printf("WARNING: Directory in APPDATA '%s' is not writable: %v\n", dirPath, err)
+				fmt.Printf("Attempting fallback to root directory: %s\n", rootPath)
+			}
+		} else {
+			fmt.Printf("WARNING: Failed to create directory in APPDATA '%s': %v\n", dirPath, err)
+			fmt.Printf("Attempting fallback to root directory: %s\n", rootPath)
+		}
+	}
+
+	// 4. Fallback: Create directory in root and test if it's writable
+	rootDir := filepath.Dir(rootPath)
+	if err := EnsureDirectoryExists(rootDir); err != nil {
+		return "", fmt.Errorf("failed to create root directory for %s: %w", fileName, err)
+	}
+
+	// Test if root directory is writable using existing IsDirWritable function
+	if err := IsDirWritable(rootDir); err != nil {
+		return "", fmt.Errorf("root directory '%s' is not writable: %w", rootDir, err)
+	}
+
+	return rootPath, nil
 }
 
 // GetFileInfo returns extended information about a file
@@ -224,24 +307,24 @@ func ToDbPath(path string, addTrailingSlash bool) string {
 
 // IsDirWritable checks if a directory is writable by attempting to create a temporary file
 func IsDirWritable(dirPath string) error {
-    if !DirectoryExists(dirPath) {
-        return fmt.Errorf("directory does not exist: %s", dirPath)
-    }
-    
-    tempFile := filepath.Join(dirPath, ".write_test")
-    f, err := os.Create(tempFile)
-    if err != nil {
-        return fmt.Errorf("failed to create test file in directory '%s': %w", dirPath, err)
-    }
-    
-    // Close and delete test file
-    if err := f.Close(); err != nil {
-        return fmt.Errorf("failed to close test file in directory '%s': %w", dirPath, err)
-    }
-    
-    if err := os.Remove(tempFile); err != nil {
-        return fmt.Errorf("failed to remove test file in directory '%s': %w", dirPath, err)
-    }
-    
-    return nil
+	if !DirectoryExists(dirPath) {
+		return fmt.Errorf("directory does not exist: %s", dirPath)
+	}
+
+	tempFile := filepath.Join(dirPath, ".write_test")
+	f, err := os.Create(tempFile)
+	if err != nil {
+		return fmt.Errorf("failed to create test file in directory '%s': %w", dirPath, err)
+	}
+
+	// Close and delete test file
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close test file in directory '%s': %w", dirPath, err)
+	}
+
+	if err := os.Remove(tempFile); err != nil {
+		return fmt.Errorf("failed to remove test file in directory '%s': %w", dirPath, err)
+	}
+
+	return nil
 }

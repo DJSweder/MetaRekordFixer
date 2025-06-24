@@ -53,10 +53,14 @@ func NewConfigManager(configPath string) (*ConfigManager, error) {
 		moduleConfigs: make(map[string]ModuleConfig),
 	}
 
-	err := mgr.loadConfig()
-	if err != nil {
-		mgr.saveConfig()
+	// Try to load the configuration. An error is not critical here if the file is simply new and empty.
+	// A default config will be created on the first save if necessary.
+	if err := mgr.loadConfig(); err != nil {
+		// If the file doesn't exist, it means LocateOrCreatePath failed, which is a critical error.
+		// For other errors like malformed JSON, we log it but continue, as a new config will be saved.
+		fmt.Printf("INFO: Could not load config from '%s' (file may be new or corrupt): %v\n", configPath, err)
 	}
+
 	return mgr, nil
 }
 
@@ -107,20 +111,12 @@ func (mgr *ConfigManager) loadConfig() error {
 
 	data, err := os.ReadFile(mgr.configPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			// Config file doesn't exist, try to create a default one
-			if errCreate := CreateConfigFile(mgr.configPath); errCreate != nil {
-				return fmt.Errorf("ConfigManager.loadConfig: failed to create default config file: %w", errCreate)
-			}
-			// Attempt to read the newly created config file
-			data, err = os.ReadFile(mgr.configPath)
-			if err != nil {
-				return fmt.Errorf("ConfigManager.loadConfig: failed to read newly created config file %s: %w", mgr.configPath, err)
-			}
-		} else {
-			// Other error while reading the config file
-			return fmt.Errorf("ConfigManager.loadConfig: failed to read config file %s: %w", mgr.configPath, err)
-		}
+		return err // The file should exist thanks to LocateOrCreatePath
+	}
+
+	// If the file is empty, it's a new config, so we just return.
+	if len(data) == 0 {
+		return nil
 	}
 
 	// Parse JSON data
@@ -165,12 +161,7 @@ func (mgr *ConfigManager) saveConfig() error {
 		return fmt.Errorf("ConfigManager.saveConfig: failed to marshal config data: %w", err)
 	}
 
-	// Ensure the directory exists before writing the file
-	dir := filepath.Dir(mgr.configPath)
-	if err := EnsureDirectoryExists(dir); err != nil {
-		return fmt.Errorf("ConfigManager.saveConfig: failed to ensure directory %s exists: %w", dir, err)
-	}
-
+	// The directory and file should already exist, so we just write to it.
 	if err = os.WriteFile(mgr.configPath, data, 0644); err != nil {
 		return fmt.Errorf("ConfigManager.saveConfig: failed to write config file %s: %w", mgr.configPath, err)
 	}
@@ -310,15 +301,6 @@ func (c *ModuleConfig) SetIntWithDependency(key string, value int, required bool
 // IsNilConfig checks if a given configuration is nil
 func IsNilConfig(cfg ModuleConfig) bool {
 	return cfg.Fields == nil
-}
-
-// FileExists checks if a file exists
-func FileExists(filePath string) bool {
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }
 
 // CreateConfigFile creates a configuration file with default settings.

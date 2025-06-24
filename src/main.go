@@ -42,172 +42,68 @@ type moduleInfo struct {
 	createFn func() common.Module
 }
 
-// NewRekordboxTools initializes the main application with proper logging, theme, and window setup.
-// ID_M02_CALL_NEWREKORDBOXTOOLS: Volání funkce NewRekordboxTools, která obsahuje většinu inicializační logiky
+// NewRekordboxTools initializes the main application.
+// It sets up logging, configuration, error handling, and the main window.
+// Any critical errors during initialization are stored and displayed after the UI is ready.
 func NewRekordboxTools() *RekordboxTools {
-	// ID_NRT01_INIT_LOGGER: Inicializace logovacího systému s fallbackem
-	// Initialize logger first
-	var logger *common.Logger
-	var err error
-	logMaxSizeMB := 10
-	logMaxAgeDays := 7
-	
-	// Získání cesty k APPDATA pro pozdější použití
-	appData := os.Getenv("APPDATA")
-	
-	// 1. Nejprve zkontrolovat root adresář pro log soubor
-	rootLogPath := "metarekordfixer.log"
-	if common.FileExists(rootLogPath) {
-		// Log soubor existuje v root adresáři, použijeme ho
-		logger, err = common.NewLogger(rootLogPath, logMaxSizeMB, logMaxAgeDays)
-		if err == nil {
-			// Úspěšně inicializován logger v root adresáři
-			fmt.Printf("Using existing log file in root directory\n")
-		}
+	// Phase 1: Initialize Logger
+	logPath, err := common.LocateOrCreatePath("metarekordfixer.log", "log")
+	if err != nil {
+		// This is a critical failure, as we cannot log anything without a logger.
+		// We print to stdout and exit.
+		fmt.Printf("CRITICAL: Could not determine or create path for log file: %v\n", err)
+		os.Exit(1)
 	}
+	logger, err := common.NewLogger(logPath, 10, 7) // 10MB max size, 7 days max age
+	if err != nil {
+		fmt.Printf("CRITICAL: Could not initialize logger at '%s': %v\n", logPath, err)
+		os.Exit(1)
+	}
+	logger.Info("Logger initialized successfully at: %s", logPath)
 
-	// 2. Pokud není v root, zkontrolovat APPDATA
-	if logger == nil && appData != "" {
-		appDataLogPath := common.JoinPaths(appData, "MetaRekordFixer", "log", "metarekordfixer.log")
-		
-		// Kontrola, zda log soubor existuje v APPDATA
-		if common.FileExists(appDataLogPath) {
-			logger, err = common.NewLogger(appDataLogPath, logMaxSizeMB, logMaxAgeDays)
-			if err == nil {
-				// Úspěšně inicializován logger v APPDATA
-				fmt.Printf("Using existing log file in APPDATA\n")
-			}
-		} else {
-			// Pokus o vytvoření log souboru v APPDATA
-			if err := common.EnsureDirectoryExists(common.JoinPaths(appData, "MetaRekordFixer", "log")); err == nil {
-				logger, err = common.NewLogger(appDataLogPath, logMaxSizeMB, logMaxAgeDays)
-				if err == nil {
-					// Úspěšně vytvořen a inicializován logger v APPDATA
-					fmt.Printf("Created new log file in APPDATA\n")
-				}
-			}
-		}
-	}
-
-	// 3. Pokud stále nemáme logger, fallback do root adresáře
-	if logger == nil {
-		logger, err = common.NewLogger(rootLogPath, logMaxSizeMB, logMaxAgeDays)
-		if err != nil {
-			// Kritická chyba - nelze vytvořit logger ani v root adresáři
-			fmt.Printf("CRITICAL ERROR: Failed to initialize logger in any location: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Created new log file in root directory as fallback\n")
-	}
-	// ID_NRT02_INIT_FYNE_APP: Vytvoření instance Fyne aplikace
-	// ID_NRT03_SET_APP_ICON: Nastavení ikony aplikace
-	// ID_NRT04_SET_APP_THEME: Nastavení vizuálního tématu aplikace
+	// Phase 2: Initialize Core Application Components
 	// Create and set up our Fyne application
 	fyneApp := app.NewWithID("com.example.metarekordfixer")
 	fyneApp.SetIcon(assets.ResourceAppLogo)
 	fyneApp.Settings().SetTheme(theme.NewCustomTheme())
 
-	// ID_NRT09_EARLY_RT_STRUCT: Vytvoření hlavní struktury RekordboxTools s loggerem a fyneApp
-	// Phase 1 Refactor: Create RekordboxTools instance early with logger and fyneApp.
-	// Other managers (configMgr, dbManager, errorHandler) will be initialized later.
+	// Create the main application struct early with the logger and fyneApp.
 	rt := &RekordboxTools{
 		app:    fyneApp,
 		logger: logger,
 	}
 
-	// ID_NRT05_INIT_CONFIG_MGR_WITH_FALLBACK: Inicializace ConfigManager s fallbackem
-	var configMgr *common.ConfigManager
-	var configInitError error
-
-	// 1. Nejprve zkontrolovat root adresář pro konfigurační soubor
-	rootConfigPath := "settings.conf"
-	if common.FileExists(rootConfigPath) {
-		// Konfigurační soubor existuje v root adresáři, použijeme ho
-		configMgr, configInitError = common.NewConfigManager(rootConfigPath)
-		if configInitError == nil {
-			// Úspěšně inicializován ConfigManager v root adresáři
-			rt.logger.Info("Using existing config file in root directory")
-		}
-	}
-
-	// 2. Pokud není v root, zkontrolovat APPDATA
-	if configMgr == nil && appData != "" {
-		appDataConfigPath := common.JoinPaths(appData, "MetaRekordFixer", "settings.conf")
-		
-		// Kontrola, zda konfigurační soubor existuje v APPDATA
-		if common.FileExists(appDataConfigPath) {
-			configMgr, configInitError = common.NewConfigManager(appDataConfigPath)
-			if configInitError == nil {
-				// Úspěšně inicializován ConfigManager v APPDATA
-				rt.logger.Info("Using existing config file in APPDATA")
-			}
+	// Phase 3: Initialize Configuration Manager
+	configPath, configInitError := common.LocateOrCreatePath("settings.conf", "") // Empty subDir for config at MetaRekordFixer/settings.conf
+	if configInitError != nil {
+		rt.configInitError = fmt.Errorf("failed to determine path for config file: %w", configInitError)
+		logger.Error(rt.configInitError.Error())
+		// We proceed without a config manager, the error will be shown to the user in Run().
+	} else {
+		configMgr, err := common.NewConfigManager(configPath)
+		if err != nil {
+			rt.configInitError = fmt.Errorf("failed to initialize config manager at '%s': %w", configPath, err)
+			logger.Error(rt.configInitError.Error())
 		} else {
-			// Pokus o vytvoření konfiguračního souboru v APPDATA
-			if err := common.EnsureDirectoryExists(common.JoinPaths(appData, "MetaRekordFixer")); err == nil {
-				if createErr := common.CreateConfigFile(appDataConfigPath); createErr == nil {
-					rt.logger.Info("Created new config file in APPDATA. Attempting to load it.")
-					configMgr, configInitError = common.NewConfigManager(appDataConfigPath)
-					if configInitError == nil {
-						rt.logger.Info("Successfully loaded newly created config from APPDATA")
-					} else {
-						rt.logger.Warning("Failed to load newly created config from APPDATA: %v", configInitError)
-						configMgr = nil // Ensure we fallback
-					}
-				} else {
-					rt.logger.Warning("Failed to create config file in APPDATA: %v", createErr)
-				}
-			} else {
-				rt.logger.Warning("Failed to ensure config directory exists in APPDATA: %v", err)
-			}
+			rt.configMgr = configMgr
+			logger.Info("ConfigManager initialized successfully at: %s", configPath)
 		}
 	}
 
-	// 3. Pokud stále nemáme konfiguraci, fallback do root adresáře
-	if configMgr == nil {
-		rt.logger.Info("Using local path for configuration as fallback")
-		if createErr := common.CreateConfigFile(rootConfigPath); createErr == nil {
-			rt.logger.Info("Created new config file in root directory. Attempting to load it.")
-			configMgr, configInitError = common.NewConfigManager(rootConfigPath)
-			if configInitError != nil {
-				rt.logger.Error("Failed to load newly created config from root directory: %v", configInitError)
-			} else {
-				rt.logger.Info("Successfully loaded newly created config from root directory")
-			}
-		} else {
-			rt.logger.Error("CRITICAL: Failed to create config file in root directory: %v", createErr)
-			configInitError = fmt.Errorf("failed to create config file in root directory: %w", createErr)
-		}
-	}
-
-	rt.configMgr = configMgr
-	rt.configInitError = configInitError
-
-	// ID_NRT10_DETECT_SET_LANGUAGE: Detekce a nastavení jazyka aplikace
-	// Initialize localization
+	// Phase 4: Initialize Localization
 	if rt.configMgr != nil {
 		common.DetectAndSetLanguage(rt.configMgr, rt.logger)
 	} else {
-		rt.logger.Warning("ConfigManager is not available. Skipping language detection from config. Default language will be used.")
-		// Attempt to set a default language (e.g., English) or rely on Fyne's default if common.DetectAndSetLanguage cannot be called with nil configMgr.
-		// For now, we assume DetectAndSetLanguage handles nil configMgr gracefully or we'll adjust it in Phase 2.
-		// If DetectAndSetLanguage requires a configMgr, we might need a separate call here for a default.
-		// For simplicity in Phase 1, we'll just log and rely on Phase 2 to make DetectAndSetLanguage robust.
+		rt.logger.Warning("ConfigManager not available. Skipping language detection. Default language will be used.")
 	}
 
-	// ID_NRT11_CREATE_MAIN_WINDOW: Vytvoření hlavního okna aplikace
-	// Create the main window with localized title
+	// Phase 5: Create Main Window but do not show it yet
 	mainWindow := fyneApp.NewWindow(locales.Translate("main.app.title"))
 	mainWindow.Resize(fyne.NewSize(1000, 700))
+	rt.mainWindow = mainWindow
 
-	// Log application startup - moved after rt.errorHandler is set for consistency
-	// logger.Info("%s", locales.Translate("main.log.appstart"))
-
-	// ID_NRT12_INIT_ERROR_HANDLER: Inicializace ErrorHandler s přiřazeným oknem
-	// Initialize error handler and assign to rt instance
-	rt.errorHandler = common.NewErrorHandler(rt.logger, mainWindow) // Use rt.logger
-	rt.mainWindow = mainWindow                                      // Assign mainWindow to rt instance
-
-	// Log application startup now that all essential rt components (logger, window, errorHandler) are set.
+	// Phase 6: Initialize ErrorHandler and log application start
+	rt.errorHandler = common.NewErrorHandler(rt.logger, rt.mainWindow)
 	rt.logger.Info("%s", locales.Translate("main.log.appstart"))
 
 	// rt.dbManager is already nil by default (from early struct init) or will be set by getDBManager if needed.
@@ -216,11 +112,9 @@ func NewRekordboxTools() *RekordboxTools {
 	return rt
 }
 
-// ID_M03_SHOW_MAIN_WINDOW: Zobrazení hlavního okna uživateli (v `main`)
 // Run starts the application, initializes modules, builds the GUI, and runs the main event loop.
 func (rt *RekordboxTools) Run() {
-	// ID_M01_SETUP_PANIC_RECOVERY: Nastavení záchranného handleru pro neočekávané chyby
-	// Setup panic recovery for the main application loop
+	// Setup panic recovery for the main application loop.
 	defer func() {
 		if r := recover(); r != nil {
 			stackTrace := string(debug.Stack())
@@ -232,33 +126,24 @@ func (rt *RekordboxTools) Run() {
 			}
 		}
 	}()
-	// ID_RUN01_INIT_MODULES: Inicializace definic modulů
+
+	// Initialize modules and create the main window content.
 	rt.initModules()
-	// ID_RUN02_CREATE_MAIN_CONTENT: Vytvoření hlavního obsahu okna
 	rt.createMainContent()
 
-	// ID_RUN03_SHOW_WINDOW: Zobrazení hlavního okna
-	// Show the main window
+	// Show the main window.
 	rt.mainWindow.Show()
 
-	// ID_NEW_M03A_SHOW_CONFIG_ERROR_DIALOG: Kontrola inicializačních chyb a zobrazení dialogu
-	// Phase 3 Refactor: Check for initialization errors after showing the window
+	// Handle any errors that occurred during initialization, now that the window is visible.
 	if rt.configInitError != nil {
-		if rt.errorHandler != nil {
-			rt.logger.Info("Displaying initialization error dialog for: %v", rt.configInitError) // Log before showing dialog
-			rt.errorHandler.ShowInitializationErrorDialog(rt.configInitError)
-		} else if rt.logger != nil {
-			// Fallback if errorHandler is somehow nil (should not happen in normal operation)
-			rt.logger.Error("Initialization error occurred but ErrorHandler is not available to show dialog: %v", rt.configInitError)
-		}
+		rt.logger.Info("Displaying initialization error dialog for: %v", rt.configInitError)
+		rt.errorHandler.ShowInitializationErrorDialog(rt.configInitError)
 	}
 
-	// ID_M04_RUN_FYNE_APP: Spuštění hlavní smyčky Fyne aplikace
-	// Run the application event loop
-	rt.app.Run() // This blocks until the app exits
+	// Run the application event loop.
+	rt.app.Run() // This blocks until the app exits.
 
-	// ID_RUN06_CLEANUP: Úklid zdrojů při ukončení aplikace
-	// Ensure database connections are properly closed
+	// Cleanup on exit.
 	if rt.dbManager != nil {
 		if err := rt.dbManager.Finalize(); err != nil {
 			rt.logger.Error("%s: %v", locales.Translate("common.err.dbclosing"), err)
@@ -392,26 +277,19 @@ func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 	return container.NewHBox(settingsButton, helpButton)
 }
 
-// ID_M04_LAZY_DB_MANAGER: Lazy inicializace DBManager při prvním použití
 // getDBManager returns the dbManager instance, initializing it if necessary.
 func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	if rt.dbManager == nil {
-		// Phase 1 Refactor: Make DBManager initialization non-fatal and handle nil configMgr.
+		// DBManager initialization is non-fatal and handles nil configMgr.
 		if rt.configMgr == nil {
 			rt.logger.Warning("DBManager: Configuration manager is not available. Cannot get database path.")
-			return nil // rt.dbManager remains nil
+			return nil
 		}
 
 		dbPath := rt.configMgr.GetGlobalConfig().DatabasePath
-		//		if dbPath == "" {
-		//			rt.logger.Warning("DBManager: Database path is not configured. DBManager will not be initialized.")
-		//			return nil // rt.dbManager remains nil
-		//		}
-
 		dbManagerInstance, err := common.NewDBManager(dbPath, rt.logger, rt.errorHandler)
 		if err != nil {
-			rt.logger.Error("DBManager: Failed to initialize DBManager for path '%s': %v", dbPath, err)
-			// rt.dbManager remains nil
+			rt.logger.Error("DBManager: Failed to initialize for path '%s': %v", dbPath, err)
 		} else {
 			rt.dbManager = dbManagerInstance
 			rt.logger.Info("DBManager: Initialized for path: %s", dbPath)
@@ -420,14 +298,8 @@ func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	return rt.dbManager
 }
 
-// Funkce getConfigPath byla odstraněna a nahrazena přímou implementací algoritmu
-// v NewRekordboxTools(), který nejprve kontroluje root adresář, pak APPDATA
-// a nakonec fallback do root adresáře.
-
-// main is the entry point. It ensures config and language, then starts the RekordboxTools app.
+// main is the entry point. It initializes and runs the RekordboxTools application.
 func main() {
-	// ID_M02_CALL_NEWREKORDBOXTOOLS: Volání funkce NewRekordboxTools
 	rt := NewRekordboxTools()
-	// ID_M03_CALL_RT_RUN: Volání metody Run
 	rt.Run()
 }
