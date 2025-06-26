@@ -40,12 +40,6 @@ type FieldDefinition struct {
 	ValidateOnActions []string // list of actions for selected validation (eg. for modules with more functions with separated starting)
 }
 
-// Empty function moved and extended to common/validator.go
-// ValidateField validates a single field based on its definition and value
-// func (f *FieldDefinition) ValidateField(value string) error {
-//	return nil
-//}
-
 // NewConfigManager initializes a new configuration manager
 func NewConfigManager(configPath string) (*ConfigManager, error) {
 	mgr := &ConfigManager{

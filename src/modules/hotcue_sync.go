@@ -617,7 +617,7 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 // loadPlaylists loads playlist items from the database and updates the playlist selectors.
 func (m *HotCueSyncModule) loadPlaylists() error {
 	// Update UI to show loading state
-	m.UpdateProgressStatus(0, locales.Translate("hotcuesync.status.playlistload"))
+	m.UpdateProgressStatus(0, locales.Translate("common.status.playlistload"))
 
 	// Get playlists from database
 	playlists, err := m.dbMgr.GetPlaylists()

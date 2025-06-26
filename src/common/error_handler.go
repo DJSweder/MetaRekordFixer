@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-
 )
 
 // Severity represents the severity level of a message or error.
@@ -116,12 +115,12 @@ func (h *ErrorHandler) FormatError(operation string, err error) error {
 
 // ShowPanicError displays a critical error dialog and logs the error
 func (h *ErrorHandler) ShowPanicError(r interface{}, stackTrace string) {
-	title := locales.Translate("err.panic.title")
+	title := locales.Translate("common.dialog.criticalheader")
 	content := fmt.Sprintf("%s\n\n%s:\n%v\n\n%s:\n%s",
-		locales.Translate("err.panic.message"),
-		locales.Translate("err.panic.details"),
+		locales.Translate("common.err.panic"),
+		locales.Translate("common.err.panicdetails"),
 		r,
-		locales.Translate("err.panic.stacktrace"),
+		locales.Translate("common.err.panicstack"),
 		stackTrace)
 
 	h.logger.Error("PANIC RECOVERED: %v\n%s", r, stackTrace)
@@ -130,10 +129,6 @@ func (h *ErrorHandler) ShowPanicError(r interface{}, stackTrace string) {
 		ShowPanicDialog(h.window, title, content)
 	}
 }
-
-// Note: ShowInitializationErrorDialog has been removed in favor of early log capture mechanism.
-// Initialization errors are now captured with CaptureEarlyLog and flushed to the log file
-// after logger initialization.
 
 // ShowStandardError displays an error with standard formatting and context
 func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {

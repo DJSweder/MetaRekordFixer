@@ -1262,7 +1262,7 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 	}
 
 	if mpIndex == -1 || flacIndex == -1 || wavIndex == -1 {
-		return nil, errors.New(locales.Translate("convert.err.missingcolumns"))
+		return nil, errors.New(locales.Translate("convert.err.metamapheader"))
 	}
 
 	// Read and process each row

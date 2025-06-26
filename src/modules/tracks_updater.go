@@ -341,7 +341,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 				Recoverable: false,
 			}
 			m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
-			m.AddErrorMessage(locales.Translate("common.status.failed"))
+			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 
 		}
 	}()
@@ -354,7 +354,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Get the selected playlist.
-	m.UpdateProgressStatus(0.3, locales.Translate("updater.tracks.getplaylist"))
+	m.UpdateProgressStatus(0.3, locales.Translate("common.status.playlistload"))
 	selectedPlaylist := ""
 	for _, p := range m.playlists {
 		if p.Path == m.playlistSelect.Selected {

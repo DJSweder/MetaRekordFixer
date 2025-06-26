@@ -402,7 +402,7 @@ func (m *DateSyncModule) initializeUI() {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
 		})
-		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesync.dialog.calendar"), calendar, m.Window)
+		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesync.datepicker.header"), calendar, m.Window)
 		calendar.onSelected = func(selectedDate time.Time) {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
@@ -802,7 +802,6 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 
 // setCustomDates sets custom dates for tracks in selected folders
 func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
-
 
 	// Build WHERE clause for selected folders
 	whereClause := "WHERE"

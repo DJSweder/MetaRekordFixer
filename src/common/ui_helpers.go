@@ -106,7 +106,7 @@ func (pd *ProgressDialog) ShowError(err error) {
 // ShowSuccess displays a success message and hides the progress dialog
 func (pd *ProgressDialog) ShowSuccess(message string) {
 	pd.Hide()
-	dialog.ShowInformation(locales.Translate("common.diag.success"), message, pd.window)
+	dialog.ShowInformation(locales.Translate("common.dialog.success"), message, pd.window)
 }
 
 // CreateNativeFolderBrowseButton creates a standardized folder browse button using native OS dialog
@@ -261,7 +261,7 @@ func ShowStandardError(window fyne.Window, err error, context *ErrorContext) *di
 		errKey := strings.TrimSpace(errParts[0])
 		errorMsg = locales.Translate(errKey)
 	} else {
-		errorMsg = locales.Translate("common.dialog.unknownerror")
+		errorMsg = locales.Translate("common.err.unknown")
 	}
 
 	// Message label with word wrap
@@ -490,7 +490,7 @@ func loadLogContent(logPath string, logText *widget.Entry, scrollContainer *cont
 
 // ShowPanicDialog creates and shows a custom dialog for panic errors, allowing a custom title.
 func ShowPanicDialog(window fyne.Window, title, content string) {
-	dismissText := locales.Translate("common.action.ok")
+	dismissText := locales.Translate("common.button.ok")
 	panicDialog := dialog.NewCustom(title, dismissText, widget.NewLabel(content), window)
 	panicDialog.Show()
 }
