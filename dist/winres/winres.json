@@ -1,0 +1,74 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": [
+        "applogo.png"        
+      ]
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "MetaRekordFixer",
+          "version": "1.0.0"
+        },
+        "description": "A DJ tool with features not possible in Rekordbox.",
+        "minimum-os": "win7",
+        "execution-level": "as invoker",
+        "ui-access": false,
+        "auto-elevate": false,
+        "dpi-awareness": "system",
+        "disable-theming": false,
+        "disable-window-filtering": false,
+        "high-resolution-scrolling-aware": false,
+        "ultra-high-resolution-scrolling-aware": false,
+        "long-path-aware": false,
+        "printer-driver-isolation": false,
+        "gdi-scaling": false,
+        "segment-heap": false,
+        "use-common-controls-v6": false
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "1.0.0",
+          "product_version": "1.0.0"
+        },
+        "info": {
+          "0409": {
+            "Comments": "",
+            "CompanyName": "DJ Sweder",
+            "FileDescription": "A DJ tool with features not possible in Rekordbox.",
+            "FileVersion": "1.0.0",
+            "InternalName": "metarekordfixer",
+            "LegalCopyright": "© DJ Sweder",
+            "LegalTrademarks": "",
+            "OriginalFilename": "metarekordfixer.exe",
+            "PrivateBuild": "",
+            "ProductName": "MetaRekordFixer",
+            "ProductVersion": "1.0.0",
+            "SpecialBuild": ""
+          },
+		  "405": {
+            "Comments": "",
+            "CompanyName": "DJ Sweder",
+            "FileDescription": "Nástroj pro DJe s funkcemi, které v Rekordboxu nejsou možné.",
+            "FileVersion": "1.0.0",
+            "InternalName": "metarekordfixer",
+            "LegalCopyright": "© DJ Sweder",
+            "LegalTrademarks": "",
+            "OriginalFilename": "metarekordfixer.exe",
+            "PrivateBuild": "",
+            "ProductName": "MetaRekordFixer",
+            "ProductVersion": "1.0.0",
+            "SpecialBuild": ""
+          }
+        }
+      }
+    }
+  }
+}
