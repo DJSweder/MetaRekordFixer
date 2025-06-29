@@ -17,5 +17,5 @@ jobs:
       - name: Install UPX
         run: choco install upx -y
       - name: Run build script
-        run: dist\build_win.bat
+        run: dist/build_win.bat
         working-directory: .
