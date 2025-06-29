@@ -1,11 +1,21 @@
 name: Build and Release
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: List files (just for debugging)
-        run: dir
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 'latest'
+      - name: Install go-winres
+        run: go install github.com/tc-hib/go-winres@latest
+      - name: Install UPX
+        run: choco install upx -y
+      - name: Run build script
+        run: dist\build.bat
+        working-directory: .
