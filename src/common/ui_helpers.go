@@ -494,3 +494,73 @@ func ShowPanicDialog(window fyne.Window, title, content string) {
 	panicDialog := dialog.NewCustom(title, dismissText, widget.NewLabel(content), window)
 	panicDialog.Show()
 }
+
+// CreateDynamicEntryList creates a dynamic list of folder entry fields with add/remove functionality.
+// It abstracts the common pattern of adding and removing folder entry rows used in modules.
+// Parameters:
+//   - container: The container where the entry fields will be added
+//   - entries: Slice of entry widgets to manage
+//   - addEntryFunc: Function to call when a new entry needs to be added
+//   - maxEntries: Maximum number of entries allowed (default 6)
+//   - title: Title for the folder selection dialog
+//   - placeholderText: Placeholder text for entry fields
+//   - onChange: Function to call when an entry value changes
+//   - onDelete: Function to call when an entry is deleted
+// Returns:
+//   - The newly created entry widget that was added to the entries slice
+func CreateDynamicEntryList(
+	container *fyne.Container,
+	entries []*widget.Entry,
+	addEntryFunc func(),
+	maxEntries int,
+	title string,
+	placeholderText string,
+	onChange func(entry *widget.Entry, value string),
+	onDelete func(entry *widget.Entry),
+) *widget.Entry {
+	// Check if we've reached the maximum number of entries
+	if len(entries) >= maxEntries {
+		return nil
+	}
+
+	// Create a new entry
+	entry := widget.NewEntry()
+	if placeholderText != "" {
+		entry.SetPlaceHolder(placeholderText)
+	}
+
+	// Create the folder selection field with delete button
+	folderField := CreateFolderSelectionFieldWithDelete(
+		title,
+		entry,
+		func(path string) {
+			entry.SetText(path)
+			
+			// Call the onChange handler if provided
+			if onChange != nil {
+				onChange(entry, path)
+			}
+			
+			// Add new field if this is the last non-empty one and we haven't reached the limit
+			// Bezpečnostní kontrola proti prázdnému poli
+			if entry.Text != "" && len(entries) > 0 && len(entries) < maxEntries {
+				// Kontrola, zda je tento entry poslední v poli
+				if entry == entries[len(entries)-1] {
+					addEntryFunc()
+				}
+			}
+		},
+		func() {
+			// Call the onDelete handler if provided
+			if onDelete != nil {
+				onDelete(entry)
+			}
+		},
+	)
+
+	// Add the entry to the container
+	container.Add(folderField)
+	
+	// Return the created entry so it can be added to the entries slice
+	return entry
+}

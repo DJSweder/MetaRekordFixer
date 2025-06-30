@@ -432,58 +432,68 @@ func (m *DateSyncModule) initializeUI() {
 
 // addCustomDateFolderEntry adds a new entry for custom date folder selection
 func (m *DateSyncModule) addCustomDateFolderEntry() {
+	// Check if we've reached the maximum number of entries
 	if len(m.customDateFoldersEntry) >= 6 {
 		return
 	}
 
-	// Initialize entry field for custom date folder selection
-	entry := widget.NewEntry()
-	customDateFolderField := common.CreateFolderSelectionFieldWithDelete(
+	// Use CreateDynamicEntryList to add a new entry for custom date folder selection
+	entry := common.CreateDynamicEntryList(
+		m.customDateContainer,
+		m.customDateFoldersEntry,
+		m.addCustomDateFolderEntry,
+		6,
 		locales.Translate("common.entry.placeholderpath"),
-		entry,
-		func(path string) {
-			entry.SetText(path)
+		locales.Translate("common.entry.placeholderpath"),
+		func(entry *widget.Entry, value string) {
 			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
+			if value != "" && len(m.customDateFoldersEntry) < 6 && entry == m.customDateFoldersEntry[len(m.customDateFoldersEntry)-1] {
 				m.addCustomDateFolderEntry()
 			}
 			m.SaveConfig()
 		},
-		func() {
+		func(entry *widget.Entry) {
 			m.removeCustomDateFolderEntry(entry)
 		},
 	)
 
-	m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
-	m.customDateContainer.Add(customDateFolderField)
+	// Add the entry to the slice if it was created
+	if entry != nil {
+		m.customDateFoldersEntry = append(m.customDateFoldersEntry, entry)
+	}
 }
 
 // addExcludedFolderEntry adds a new entry for excluded folder selection
 func (m *DateSyncModule) addExcludedFolderEntry() {
+	// Check if we've reached the maximum number of entries
 	if len(m.excludedFoldersEntry) >= 6 {
 		return
 	}
 
-	// Initialize entry field for folder selection
-	entry := widget.NewEntry()
-	folderField := common.CreateFolderSelectionFieldWithDelete(
+	// Use CreateDynamicEntryList to add a new entry for excluded folder selection
+	entry := common.CreateDynamicEntryList(
+		m.foldersContainer,
+		m.excludedFoldersEntry,
+		m.addExcludedFolderEntry,
+		6,
 		locales.Translate("common.entry.placeholderpath"),
-		entry,
-		func(path string) {
-			entry.SetText(path)
+		locales.Translate("common.entry.placeholderpath"),
+		func(entry *widget.Entry, value string) {
 			// Add new field if this is the last non-empty one and we haven't reached the limit
-			if entry.Text != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
+			if value != "" && len(m.excludedFoldersEntry) < 6 && entry == m.excludedFoldersEntry[len(m.excludedFoldersEntry)-1] {
 				m.addExcludedFolderEntry()
 			}
 			m.SaveConfig()
 		},
-		func() {
+		func(entry *widget.Entry) {
 			m.removeExcludedFolderEntry(entry)
 		},
 	)
 
-	m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
-	m.foldersContainer.Add(folderField)
+	// Add the entry to the slice if it was created
+	if entry != nil {
+		m.excludedFoldersEntry = append(m.excludedFoldersEntry, entry)
+	}
 }
 
 // addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add
@@ -557,6 +567,8 @@ func (m *DateSyncModule) removeCustomDateFolderEntry(entryToRemove *widget.Entry
 
 	// Clear and rebuild the container
 	m.customDateContainer.Objects = nil
+	
+	// Rebuild the container with all entries
 	for _, entry := range m.customDateFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
 			locales.Translate("common.entry.placeholderpath"),
@@ -607,6 +619,8 @@ func (m *DateSyncModule) removeExcludedFolderEntry(entryToRemove *widget.Entry) 
 
 	// Clear and rebuild the container
 	m.foldersContainer.Objects = nil
+	
+	// Rebuild the container with all entries
 	for _, entry := range m.excludedFoldersEntry {
 		folderField := common.CreateFolderSelectionFieldWithDelete(
 			locales.Translate("common.entry.placeholderpath"),
