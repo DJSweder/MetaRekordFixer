@@ -95,6 +95,5 @@ jobs:
             "$env:PACKAGE_ID" `
             --version '${{ steps.ver.outputs.version }}' `
             --urls    '${{ steps.url.outputs.url }}' `
-            --sha256  '${{ steps.sha.outputs.sha256 }}' `
             --token   $env:WINGET_TOKEN `
             --submit
