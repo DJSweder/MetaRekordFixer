@@ -181,7 +181,9 @@ func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 	}
 
 	// Create and show progress dialog
+	m.mutex.Lock()
 	m.ProgressDialog = NewProgressDialog(m.Window, title, "", cancelHandler)
+	m.mutex.Unlock()
 	m.ProgressDialog.Show()
 }
 
@@ -254,6 +256,9 @@ func (m *ModuleBase) ShowError(err error) {
 
 // AddInfoMessage adds an information message to the status messages container and logs it
 func (m *ModuleBase) AddInfoMessage(message string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageInfo, message)
 	}
@@ -264,6 +269,9 @@ func (m *ModuleBase) AddInfoMessage(message string) {
 
 // AddWarningMessage adds a warning message to the status messages container and logs it
 func (m *ModuleBase) AddWarningMessage(message string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageWarning, message)
 	}
@@ -274,6 +282,9 @@ func (m *ModuleBase) AddWarningMessage(message string) {
 
 // AddErrorMessage adds an error message to the status messages container and logs it
 func (m *ModuleBase) AddErrorMessage(message string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	if m.StatusMessages != nil {
 		m.StatusMessages.AddMessage(MessageError, message)
 	}

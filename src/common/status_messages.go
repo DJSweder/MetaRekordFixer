@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	"sync"
 
 	"MetaRekordFixer/theme"
 )
@@ -35,6 +36,7 @@ type StatusMessagesContainer struct {
 	messages  []StatusMessage
 	container *fyne.Container
 	scroll    *container.Scroll
+	mutex     sync.Mutex
 }
 
 // NewStatusMessagesContainer creates a new status messages container
@@ -58,6 +60,8 @@ func (smc *StatusMessagesContainer) CreateRenderer() fyne.WidgetRenderer {
 
 // AddMessage adds a new message to the container
 func (smc *StatusMessagesContainer) AddMessage(messageType MessageType, content string) {
+	smc.mutex.Lock()
+	defer smc.mutex.Unlock()
 	// Add message to the internal slice
 	smc.messages = append(smc.messages, StatusMessage{Type: messageType, Content: content})
 
@@ -122,6 +126,8 @@ func (smc *StatusMessagesContainer) AddCriticalMessage(content string) {
 
 // ClearMessages removes all messages from the container
 func (smc *StatusMessagesContainer) ClearMessages() {
+	smc.mutex.Lock()
+	defer smc.mutex.Unlock()
 	smc.messages = []StatusMessage{}
 	smc.container.RemoveAll()
 	smc.Refresh()

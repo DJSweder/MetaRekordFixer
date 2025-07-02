@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 )
 
 //go:embed en/translations.json
@@ -15,10 +16,16 @@ var translationsFS embed.FS
 // translations stores the loaded translations in memory
 var translations map[string]string
 
+// translationsMutex ensures thread safety when working with translations
+var translationsMutex sync.RWMutex
+
 // LoadTranslations loads the translation file for the specified language.
+// This function is thread-safe due to the use of translationsMutex.
 // It reads the JSON translation file and stores the translations in memory.
 // Returns an error if the file cannot be loaded or parsed.
 func LoadTranslations(lang string) error {
+	translationsMutex.Lock()
+	defer translationsMutex.Unlock()
 	// Log language being loaded
 	// log.Printf("Loading translations for language: %s", lang)
 
@@ -47,8 +54,11 @@ func LoadTranslations(lang string) error {
 }
 
 // Translate returns the translated string for the given key.
+// This function is thread-safe due to the use of translationsMutex.
 // If the translation is not found, returns the key itself.
 func Translate(key string) string {
+	translationsMutex.RLock()
+	defer translationsMutex.RUnlock()
 	if translation, ok := translations[key]; ok {
 		return translation
 	}

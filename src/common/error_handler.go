@@ -6,6 +6,7 @@ import (
 	"MetaRekordFixer/locales"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -58,6 +59,7 @@ func NewErrorContext(module, operation string) ErrorContext {
 type ErrorHandler struct {
 	logger *Logger
 	window fyne.Window
+	mutex  sync.Mutex
 }
 
 // NewErrorHandler creates a new error handler instance
@@ -132,6 +134,8 @@ func (h *ErrorHandler) ShowPanicError(r interface{}, stackTrace string) {
 
 // ShowStandardError displays an error with standard formatting and context
 func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	if err == nil {
 		return
 	}

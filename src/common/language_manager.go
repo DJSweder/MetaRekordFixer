@@ -5,6 +5,7 @@ package common
 import (
 	"MetaRekordFixer/locales"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 )
@@ -14,12 +15,18 @@ type LanguageItem struct {
 	Name string
 }
 
+// languageMutex ensures thread safety when setting the application language
+var languageMutex sync.Mutex
+
 // DetectAndSetLanguage sets the application language based on the following priorities:
+// This function is thread-safe due to the use of languageMutex
 // 1. Configured language (if configMgr is available and language is set and valid).
 // 2. System language (if configMgr is available and system lang is supported, then save to config).
 // 3. Fallback to English (if configMgr is available, save to config).
 // If configMgr is nil, it attempts system language then fallback to English, without saving.
 func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
+	languageMutex.Lock()
+	defer languageMutex.Unlock()
 	supportedLangs := locales.GetAvailableLanguages()
 	logger.Info("Supported languages: %v", supportedLangs)
 
@@ -118,7 +125,7 @@ func DetectAndSetLanguage(configMgr *ConfigManager, logger *Logger) string {
 	return "en"
 }
 
-// GetAvailableLanguages vrací seznam dostupných jazyků
+// GetAvailableLanguages returns a list of available languages
 func GetAvailableLanguages() []LanguageItem {
 	langs := locales.GetAvailableLanguages()
 	var items []LanguageItem
