@@ -4,7 +4,6 @@ echo Setting the number of processor cores for compilation...
 set GOMAXPROCS=8
 
 cd /d "%~dp0..\src"
-if not exist "..\dist\compilated" mkdir "..\dist\compilated"
 
 echo Cleaning old resource files...
 del /q *.syso
@@ -20,15 +19,23 @@ cd
 echo Compiling the application...
 set CGO_ENABLED=1
 set CGO_CFLAGS=-w
-go build -trimpath -buildvcs=false -ldflags "-w -s -H windowsgui" -o "../dist/compilated/metarekordfixer.exe"
+go build -trimpath -buildvcs=false -ldflags "-w -s -H windowsgui" -o "../dist/installer/sources/metarekordfixer.exe"
 if errorlevel 1 (
     echo BUILD FAILED!
     exit /b 1
 )
-dir ..\dist\compilated
 
-REM echo Compressing the final binary file...
-REM cd /d "%~dp0.."
-REM upx --best "dist/compilated/metarekordfixer.exe"
+cd /d "%~dp0installer"
+echo Creating installer...
+iscc make_install_metarekordfixer-v1.0.0_inn_test.iss
 
-echo Compilation completed successfully.
+if errorlevel 1 (
+    echo INNO SETUP BUILD FAILED!
+    exit /b 1
+)
+
+cd /d "%~dp0"
+echo --- Release folder content ---
+dir release
+
+echo Compilation and installer creation completed successfully.

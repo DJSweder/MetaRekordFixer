@@ -6,9 +6,8 @@
 #define MyAppPublisher "DJ Sweder"
 #define MyAppExeName "metarekordfixer.exe"
 #define MyAppCopyright "© DJ Sweder"
-#define MyResources "C:\Users\Sweder\OneDrive\Dokumenty\DevProjects\GIT\MetaRekordFixer\dist\installer\sources"
-#define MyAppSourceDir "C:\Users\Sweder\OneDrive\Dokumenty\DevProjects\GIT\MetaRekordFixer\dist\compilated"
-#define MyOutputDir "C:\Users\Sweder\OneDrive\Dokumenty\DevProjects\GIT\MetaRekordFixer\dist\release"
+#define MyResources "sources"
+#define MyOutputDir "..\\..\\release"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -60,7 +59,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce
 
 [Files]
-Source: "{#MyAppSourceDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "7z.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
