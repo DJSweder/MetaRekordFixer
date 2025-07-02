@@ -1,23 +1,33 @@
 # .github/workflows/publish_winget.yml
-name: Publish MetaRekordFixer to winget
+name: Publish MetaRekordFixer to WinGet
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:        # run manually from the Actions tab
+
+permissions:
+  contents: read            # PAT will handle all write operations
 
 jobs:
   publish:
     runs-on: windows-latest
 
     env:
-      PACKAGE_ID: DJSweder.MetaRekordFixer   # 1.
-      INSTALLER_PREFIX: metarekordfixer      # 2.
+      PACKAGE_ID: DJSweder.MetaRekordFixer     # Winget PackageIdentifier
+      INSTALLER_PREFIX: metarekordfixer        # beginning of the installer filename
 
     steps:
-      # 1) repo
-      - name: Checkout repo
+      # Checkout so gh CLI works in the correct repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) latest release (tagname eg. "MetaRekordFixer-v1.0.0")[2]
+      # gh CLI is pre-installed; give it a token for read access
+      - name: Authenticate gh cli
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh auth status
+
+      # Get the latest release tag (e.g. "MetaRekordFixer-v1.2.3")
       - name: Get latest release tag
         id: tag
         shell: bash
@@ -25,61 +35,66 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG=$(gh release view --json tagName -q .tagName)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # 3) version = cut prefixes "MetaRekordFixer-" and/or "v"
+      # Strip prefixes to obtain pure SemVer
       - name: Derive version
         id: ver
         shell: bash
         run: |
           RAW="${{ steps.tag.outputs.tag }}"
-          VER=${RAW#MetaRekordFixer-}; VER=${VER#v}
-          echo "version=$VER" >> $GITHUB_OUTPUT
-          echo "rawtag=$RAW"   >> $GITHUB_OUTPUT
+          VER=${RAW#MetaRekordFixer-}   # drop custom prefix
+          VER=${VER#v}                  # drop leading "v"
+          VER=${VER%.}                  # drop trailing dot if present
+          echo "rawtag=$RAW"  >> "$GITHUB_OUTPUT"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-      # 4) construct URL to installer
+      # Build installer filename + URL
       - name: Compose installer URL
         id: url
         shell: bash
         run: |
           FILE="${{ env.INSTALLER_PREFIX }}-${{ steps.ver.outputs.version }}-win64-setup.exe"
           URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.rawtag }}/$FILE"
-          echo "file=$FILE" >> $GITHUB_OUTPUT
-          echo "url=$URL"  >> $GITHUB_OUTPUT
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "url=$URL"  >> "$GITHUB_OUTPUT"
 
-      # 5) download installer
+      # Download installer
       - name: Download installer
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri '${{ steps.url.outputs.url }}' -OutFile '${{ steps.url.outputs.file }}'
 
-      # 6) SHA-256
+      # Calculate SHA-256
       - name: Calculate SHA256
         id: sha
         shell: pwsh
         run: |
           $hash = (Get-FileHash '${{ steps.url.outputs.file }}' -Algorithm SHA256).Hash.ToLower()
-          Write-Output "sha256=$hash" >> $env:GITHUB_OUTPUT
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      # 7) .NET + wingetcreate CLI
+      # Ensure .NET SDK is available
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '7.0.x'
 
+      # Install WingetCreate and add it to PATH
       - name: Install wingetcreate
         shell: pwsh
-        run: dotnet tool install --global wingetcreate --version 1.4.2
+        run: |
+          dotnet tool install --global wingetcreate --version 1.4.2
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      # 8) create manifest and pull PR (auto)
-      - name: Publish to winget
+      # Generate manifests + open PR to microsoft/winget-pkgs
+      - name: Publish to WinGet
         shell: pwsh
         env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}   # PAT with "repo" scope
         run: |
           wingetcreate update `
-            $env:PACKAGE_ID `
-            --version '${{ steps.ver.outputs.version }}' `
+            "$env:PACKAGE_ID" `
+            --version  '${{ steps.ver.outputs.version }}' `
             --url      '${{ steps.url.outputs.url }}' `
             --sha256   '${{ steps.sha.outputs.sha256 }}' `
             --token    $env:WINGET_TOKEN `
