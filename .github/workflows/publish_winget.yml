@@ -91,10 +91,10 @@ jobs:
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}   # PAT with "repo" scope
         run: |
-          wingetcreate update `
+          .\wingetcreate.exe update `
             "$env:PACKAGE_ID" `
-            --version  '${{ steps.ver.outputs.version }}' `
-            --url      '${{ steps.url.outputs.url }}' `
-            --sha256   '${{ steps.sha.outputs.sha256 }}' `
-            --token    $env:WINGET_TOKEN `
+            --version '${{ steps.ver.outputs.version }}' `
+            --urls    '${{ steps.url.outputs.url }}' `
+            --sha256  '${{ steps.sha.outputs.sha256 }}' `
+            --token   $env:WINGET_TOKEN `
             --submit
