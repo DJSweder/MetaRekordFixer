@@ -23,4 +23,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload v1.0.0 "dist/release/1.0.0/metarekordfixer-1.0.0-win64-setup.exe" --clobber
+          gh release upload MetaRekordFixer-v1.0.0 "dist/release/1.0.0/metarekordfixer-1.0.0-win64-setup.exe" --clobber
