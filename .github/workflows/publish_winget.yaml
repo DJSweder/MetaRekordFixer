@@ -1,0 +1,86 @@
+# .github/workflows/publish_winget.yml
+name: Publish MetaRekordFixer to winget
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    env:
+      PACKAGE_ID: DJSweder.MetaRekordFixer   # 1.
+      INSTALLER_PREFIX: metarekordfixer      # 2.
+
+    steps:
+      # 1) repo
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2) latest release (tagname eg. "MetaRekordFixer-v1.0.0")[2]
+      - name: Get latest release tag
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release view --json tagName -q .tagName)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # 3) version = cut prefixes "MetaRekordFixer-" and/or "v"
+      - name: Derive version
+        id: ver
+        shell: bash
+        run: |
+          RAW="${{ steps.tag.outputs.tag }}"
+          VER=${RAW#MetaRekordFixer-}; VER=${VER#v}
+          echo "version=$VER" >> $GITHUB_OUTPUT
+          echo "rawtag=$RAW"   >> $GITHUB_OUTPUT
+
+      # 4) construct URL to installer
+      - name: Compose installer URL
+        id: url
+        shell: bash
+        run: |
+          FILE="${{ env.INSTALLER_PREFIX }}-${{ steps.ver.outputs.version }}-win64-setup.exe"
+          URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.rawtag }}/$FILE"
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "url=$URL"  >> $GITHUB_OUTPUT
+
+      # 5) download installer
+      - name: Download installer
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri '${{ steps.url.outputs.url }}' -OutFile '${{ steps.url.outputs.file }}'
+
+      # 6) SHA-256
+      - name: Calculate SHA256
+        id: sha
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash '${{ steps.url.outputs.file }}' -Algorithm SHA256).Hash.ToLower()
+          Write-Output "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+      # 7) .NET + wingetcreate CLI
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Install wingetcreate
+        shell: pwsh
+        run: dotnet tool install --global wingetcreate --version 1.4.2
+
+      # 8) create manifest and pull PR (auto)
+      - name: Publish to winget
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          wingetcreate update `
+            $env:PACKAGE_ID `
+            --version '${{ steps.ver.outputs.version }}' `
+            --url      '${{ steps.url.outputs.url }}' `
+            --sha256   '${{ steps.sha.outputs.sha256 }}' `
+            --token    $env:WINGET_TOKEN `
+            --submit
