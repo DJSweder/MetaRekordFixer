@@ -53,13 +53,6 @@ jobs:
           # Build the application using fyne package (creates .app and .dmg)
           fyne package -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
         
-#      - name: Rename and prepare release files
-#        run: |
-#          cd src
-#          # Rename the created files to include architecture info
-#          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-amd64.app
-#          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-amd64.dmg
-
       - name: Manually create DMG and verify build
         run: |
           cd src
@@ -126,15 +119,8 @@ jobs:
           export CGO_CFLAGS="-mmacosx-version-min=10.12"
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
-          fyne package -os darwin -target arm64 -name "MetaRekordFixer" -icon assets/applogo.png
+          fyne package -target darwin/arm64 -name "MetaRekordFixer" -icon assets/applogo.png
         
-#      - name: Rename and prepare release files
-#        run: |
-#          cd src
-#          # Rename the created files to include architecture info
-#          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-arm64.app
-#          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-arm64.dmg
-
       - name: Manually create DMG and verify build
         run: |
          cd src
