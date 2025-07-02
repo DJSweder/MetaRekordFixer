@@ -22,28 +22,18 @@ jobs:
       - name: Install Fyne CLI
         run: go install fyne.io/tools/cmd/fyne@latest
       
-      - name: Download FFmpeg for macOS Intel
+      - name: Download FFmpeg (includes FFprobe) for macOS Intel
         run: |
           mkdir -p tools
-          # Download FFmpeg Intel binary (works on both Intel and ARM via Rosetta)
+          # Download combined FFmpeg + FFprobe archive (works on both Intel and ARM via Rosetta)
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
-          # Install p7zip for extracting .7z files
-          brew install p7zip
-          # Remove any old binaries so 7-Zip won't ask to overwrite
-          rm -f tools/ffmpeg
-          # Extract FFmpeg (-y = assume Yes, -aoa = overwrite all)
+          # Ensure 7-Zip is available
+          brew install --quiet p7zip
+          # Remove any old binaries so 7-Zip won’t prompt
+          rm -f tools/ffmpeg tools/ffprobe
+          # Extract binaries (-y = assume Yes, -aoa = overwrite all)
           7z x ffmpeg.7z -otools/ -y -aoa
-          chmod +x tools/ffmpeg
-          
-      - name: Download FFprobe for macOS Intel  
-        run: |
-          # Download FFprobe Intel binary
-          curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          # Remove any old binaries so 7-Zip won't ask to overwrite
-          rm -f tools/ffprobe
-          # Extract FFprobe (-y = assume Yes, -aoa = overwrite all)
-          7z x ffprobe.7z -otools/ -y -aoa
-          chmod +x tools/ffprobe
+          chmod +x tools/ffmpeg tools/ffprobe
           
       - name: Build and Package Application
         run: |
@@ -83,28 +73,18 @@ jobs:
       - name: Install Fyne CLI
         run: go install fyne.io/tools/cmd/fyne@latest
       
-      - name: Download FFmpeg for macOS ARM
+      - name: Download FFmpeg (includes FFprobe) for macOS ARM
         run: |
           mkdir -p tools
-          # Download FFmpeg Intel binary (works on ARM via Rosetta 2)
+          # Download combined FFmpeg + FFprobe archive (Intel build runs on ARM via Rosetta 2)
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
-          # Install p7zip for extracting .7z files
-          brew install p7zip
-          # Remove any old binaries so 7-Zip won't ask to overwrite
-          rm -f tools/ffmpeg
-          # Extract FFmpeg (-y = assume Yes, -aoa = overwrite all)
+          # Ensure 7-Zip is available
+          brew install --quiet p7zip
+          # Remove any old binaries so 7-Zip won’t prompt
+          rm -f tools/ffmpeg tools/ffprobe
+          # Extract binaries (-y = assume Yes, -aoa = overwrite all)
           7z x ffmpeg.7z -otools/ -y -aoa
-          chmod +x tools/ffmpeg
-          
-      - name: Download FFprobe for macOS ARM
-        run: |
-          # Download FFprobe Intel binary (works on ARM via Rosetta 2)
-          curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          # Remove any old binaries so 7-Zip won't ask to overwrite
-          rm -f tools/ffprobe
-          # Extract FFprobe (-y = assume Yes, -aoa = overwrite all)
-          7z x ffprobe.7z -otools/ -y -aoa
-          chmod +x tools/ffprobe
+          chmod +x tools/ffmpeg tools/ffprobe
           
       - name: Build and Package Application
         run: |
