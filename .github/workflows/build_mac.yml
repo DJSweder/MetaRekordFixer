@@ -113,13 +113,15 @@ jobs:
           chmod +x tools/ffmpeg tools/ffprobe
           
       - name: Build and Package Application
+        env:
+          GOARCH: arm64
         run: |
           cd src
           # Set CGO flags for macOS compatibility
           export CGO_CFLAGS="-mmacosx-version-min=10.12"
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
-          fyne package -target darwin/arm64 -name "MetaRekordFixer" -icon assets/applogo.png
+          fyne package -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
         
       - name: Manually create DMG and verify build
         run: |
