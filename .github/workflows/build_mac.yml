@@ -21,6 +21,11 @@ jobs:
       
       - name: Install Fyne CLI
         run: go install fyne.io/tools/cmd/fyne@latest
+  
+      - name: Install macOS dependencies
+        run: |
+          echo "Installing Xcode Command Line Tools..."
+          sudo xcode-select --install
       
       - name: Download FFmpeg and FFprobe for macOS Intel
         run: |
