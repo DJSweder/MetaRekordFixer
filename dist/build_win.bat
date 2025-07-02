@@ -4,6 +4,7 @@ echo Setting the number of processor cores for compilation...
 set GOMAXPROCS=8
 
 cd /d "%~dp0..\src"
+if not exist "..\dist\compilated" mkdir "..\dist\compilated"
 
 echo Cleaning old resource files...
 del /q *.syso
