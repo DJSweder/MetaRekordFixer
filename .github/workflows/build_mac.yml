@@ -29,16 +29,20 @@ jobs:
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
           # Install p7zip for extracting .7z files
           brew install p7zip
-          # Extract FFmpeg
-          7z x ffmpeg.7z -otools/
+          # Remove any old binaries so 7-Zip won't ask to overwrite
+          rm -f tools/ffmpeg
+          # Extract FFmpeg (-y = assume Yes, -aoa = overwrite all)
+          7z x ffmpeg.7z -otools/ -y -aoa
           chmod +x tools/ffmpeg
           
       - name: Download FFprobe for macOS Intel  
         run: |
           # Download FFprobe Intel binary
           curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          # Extract FFprobe
-          7z x ffprobe.7z -otools/
+          # Remove any old binaries so 7-Zip won't ask to overwrite
+          rm -f tools/ffprobe
+          # Extract FFprobe (-y = assume Yes, -aoa = overwrite all)
+          7z x ffprobe.7z -otools/ -y -aoa
           chmod +x tools/ffprobe
           
       - name: Build and Package Application
@@ -86,16 +90,20 @@ jobs:
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
           # Install p7zip for extracting .7z files
           brew install p7zip
-          # Extract FFmpeg
-          7z x ffmpeg.7z -otools/
+          # Remove any old binaries so 7-Zip won't ask to overwrite
+          rm -f tools/ffmpeg
+          # Extract FFmpeg (-y = assume Yes, -aoa = overwrite all)
+          7z x ffmpeg.7z -otools/ -y -aoa
           chmod +x tools/ffmpeg
           
       - name: Download FFprobe for macOS ARM
         run: |
           # Download FFprobe Intel binary (works on ARM via Rosetta 2)
           curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          # Extract FFprobe
-          7z x ffprobe.7z -otools/
+          # Remove any old binaries so 7-Zip won't ask to overwrite
+          rm -f tools/ffprobe
+          # Extract FFprobe (-y = assume Yes, -aoa = overwrite all)
+          7z x ffprobe.7z -otools/ -y -aoa
           chmod +x tools/ffprobe
           
       - name: Build and Package Application
