@@ -28,18 +28,16 @@ jobs:
           # Ensure 7-Zip is available
           brew install --quiet p7zip
           
-          # ---- FFmpeg (Intel build; runs on both Intel & ARM via Rosetta) ----
+          # Download FFmpeg binary (works on both Intel and ARM via Rosetta)
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
-          # Exit code 1 = “warnings” (e.g. file overwrite); treat as success
-          7z x ffmpeg.7z -otools/ -y -aoa || [ $? -eq 1 ]
+          7z x ffmpeg.7z -otools/ -y
           
-          # ---- FFprobe (separate archive) ----
-          curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          7z x ffprobe.7z -otools/ -y -aoa || [ $? -eq 1 ]
+          # Download FFprobe binary from its correct, separate archive
+          curl -L -o ffprobe.7z https://evermeet.cx/ffmpeg/getrelease/ffprobe/7z
+          7z x ffprobe.7z -otools/ -y
           
-          # Make binaries executable if they exist
-          [ -f tools/ffmpeg ]  && chmod +x tools/ffmpeg
-          [ -f tools/ffprobe ] && chmod +x tools/ffprobe
+          # Set executable permissions
+          chmod +x tools/ffmpeg tools/ffprobe
           
       - name: Build and Package Application
         run: |
@@ -84,18 +82,17 @@ jobs:
           mkdir -p tools
           # Ensure 7-Zip is available
           brew install --quiet p7zip
-          
-          # ---- FFmpeg (Intel build; runs on ARM via Rosetta 2) ----
+
+          # Download FFmpeg binary (Intel build runs on ARM via Rosetta 2)
           curl -L -o ffmpeg.7z https://evermeet.cx/ffmpeg/getrelease/7z
-          7z x ffmpeg.7z -otools/ -y -aoa || [ $? -eq 1 ]
+          7z x ffmpeg.7z -otools/ -y
           
-          # ---- FFprobe (separate archive) ----
-          curl -L -o ffprobe.7z https://evermeet.cx/ffprobe/getrelease/7z
-          7z x ffprobe.7z -otools/ -y -aoa || [ $? -eq 1 ]
+          # Download FFprobe binary from its correct, separate archive
+          curl -L -o ffprobe.7z https://evermeet.cx/ffmpeg/getrelease/ffprobe/7z
+          7z x ffprobe.7z -otools/ -y
           
-          # Make binaries executable if they exist
-          [ -f tools/ffmpeg ]  && chmod +x tools/ffmpeg
-          [ -f tools/ffprobe ] && chmod +x tools/ffprobe
+          # Set executable permissions
+          chmod +x tools/ffmpeg tools/ffprobe
           
       - name: Build and Package Application
         run: |
