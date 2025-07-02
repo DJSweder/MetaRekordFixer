@@ -53,12 +53,22 @@ jobs:
           # Build the application using fyne package (creates .app and .dmg)
           fyne package -v -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
         
-      - name: Rename and prepare release files
+#      - name: Rename and prepare release files
+#        run: |
+#          cd src
+#          # Rename the created files to include architecture info
+#          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-amd64.app
+#          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-amd64.dmg
+
+      - name: Manually create DMG and verify build
         run: |
           cd src
-          # Rename the created files to include architecture info
-          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-amd64.app
-          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-amd64.dmg
+          if [ ! -d "MetaRekordFixer.app" ]; then
+            echo "Build failed: MetaRekordFixer.app was not created."
+            exit 1
+          fi
+          echo "MetaRekordFixer.app found. Creating DMG manually..."
+          hdiutil create -verbose -volname "MetaRekordFixer" -srcfolder "MetaRekordFixer.app" -ov -format UDZO "MetaRekordFixer.dmg"
           
       - name: Upload installer to GitHub Release
         env:
@@ -113,13 +123,24 @@ jobs:
           # Build the application using fyne package (creates .app and .dmg)
           fyne package -v -os darwin -target arm64 -name "MetaRekordFixer" -icon assets/applogo.png
         
-      - name: Rename and prepare release files
+#      - name: Rename and prepare release files
+#        run: |
+#          cd src
+#          # Rename the created files to include architecture info
+#          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-arm64.app
+#          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-arm64.dmg
+
+      - name: Manually create DMG and verify build
         run: |
-          cd src
-          # Rename the created files to include architecture info
-          mv MetaRekordFixer.app MetaRekordFixer-1.0.0-darwin-arm64.app
-          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-arm64.dmg
-          
+         cd src
+         if [ ! -d "MetaRekordFixer.app" ]; then
+           echo "Build failed: MetaRekordFixer.app was not created."
+           exit 1
+          fi
+         echo "MetaRekordFixer.app found. Creating DMG manually..."
+         hdiutil create -verbose -volname "MetaRekordFixer" -srcfolder "MetaRekordFixer.app" -ov -format UDZO "MetaRekordFixer.dmg"
+
+
       - name: Upload installer to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
