@@ -1,3 +1,5 @@
+// assets/assets.go
+
 package assets
 
 import "fyne.io/fyne/v2"
