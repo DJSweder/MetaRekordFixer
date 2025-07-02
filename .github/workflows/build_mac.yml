@@ -69,7 +69,12 @@ jobs:
           fi
           echo "MetaRekordFixer.app found. Creating DMG manually..."
           hdiutil create -verbose -volname "MetaRekordFixer" -srcfolder "MetaRekordFixer.app" -ov -format UDZO "MetaRekordFixer.dmg"
-          
+      
+      - name: Rename Artifacts for Release
+        run: |
+          cd src
+          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-amd64.dmg     
+
       - name: Upload installer to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -140,6 +145,10 @@ jobs:
          echo "MetaRekordFixer.app found. Creating DMG manually..."
          hdiutil create -verbose -volname "MetaRekordFixer" -srcfolder "MetaRekordFixer.app" -ov -format UDZO "MetaRekordFixer.dmg"
 
+      - name: Rename Artifacts for Release
+        run: |
+          cd src
+          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-arm64.dmg
 
       - name: Upload installer to GitHub Release
         env:
