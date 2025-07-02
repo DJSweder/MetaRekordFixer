@@ -51,7 +51,7 @@ jobs:
           export CGO_CFLAGS="-mmacosx-version-min=10.12"
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
-          fyne package -v -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
+          fyne package -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
         
 #      - name: Rename and prepare release files
 #        run: |
@@ -121,7 +121,7 @@ jobs:
           export CGO_CFLAGS="-mmacosx-version-min=10.12"
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
-          fyne package -v -os darwin -target arm64 -name "MetaRekordFixer" -icon assets/applogo.png
+          fyne package -os darwin -target arm64 -name "MetaRekordFixer" -icon assets/applogo.png
         
 #      - name: Rename and prepare release files
 #        run: |
