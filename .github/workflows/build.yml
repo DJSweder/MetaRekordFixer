@@ -16,8 +16,6 @@ jobs:
           cache-dependency-path: src/go.sum
       - name: Install go-winres
         run: go install github.com/tc-hib/go-winres@latest
-      - name: Install UPX
-        run: choco install upx -y
       - name: Run build script
         run: dist/build_win.bat
         working-directory: .
