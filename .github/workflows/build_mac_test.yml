@@ -19,8 +19,8 @@ jobs:
           cache: true
           cache-dependency-path: srcguitest/go.sum
       
-      - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@latest
+      - name: Install NuxUI
+        run: go install nuxui.org/nuxui/cmd/nux@latest
   
       - name: Install macOS dependencies
         run: |
@@ -77,8 +77,8 @@ jobs:
           cache: true
           cache-dependency-path: srcguitest/go.sum
       
-      - name: Install Fyne CLI
-        run: go install fyne.io/tools/cmd/fyne@latest
+      - name: Install NuxUI
+        run: go install nuxui.org/nuxui/cmd/nux@latest
 
       - name: Install macOS dependencies
         run: |
