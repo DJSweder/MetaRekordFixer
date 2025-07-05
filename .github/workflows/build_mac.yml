@@ -54,6 +54,23 @@ jobs:
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
           fyne package -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
+      
+      - name: Apply Free macOS Fixes
+        run: |
+          cd src
+          if [ ! -d "MetaRekordFixer.app" ]; then
+            echo "Build failed: MetaRekordFixer.app was not created."
+            exit 1
+          fi
+
+          echo "Applying ad-hoc code signing..."
+          codesign --force --deep --sign - MetaRekordFixer.app
+
+          echo "Removing quarantine attributes..."
+          xattr -cr MetaRekordFixer.app
+
+          echo "Verifying signature..."
+          codesign -dv MetaRekordFixer.app || echo "Ad-hoc signature applied"
         
       - name: Manually create DMG and verify build
         run: |
@@ -68,14 +85,14 @@ jobs:
       - name: Rename Artifacts for Release
         run: |
           cd src
-          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-amd64.dmg     
+          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-macos-intel.dmg     
 
       - name: Upload installer to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd src
-          gh release upload v1.0.0 "metarekordfixer-1.0.0-darwin-amd64.dmg" --clobber
+          gh release upload v1.0.0 "metarekordfixer-1.0.0-macos-intel.dmg" --clobber
 
   build-macos-arm:
     runs-on: macos-14
@@ -124,7 +141,24 @@ jobs:
           export CGO_LDFLAGS="-mmacosx-version-min=10.12"
           # Build the application using fyne package (creates .app and .dmg)
           fyne package -os darwin -name "MetaRekordFixer" -icon assets/applogo.png
-        
+
+      - name: Apply Free macOS Fixes
+        run: |
+           cd src
+            if [ ! -d "MetaRekordFixer.app" ]; then
+              echo "Build failed: MetaRekordFixer.app was not created."
+              exit 1
+           fi
+    
+           echo "Applying ad-hoc code signing..."
+           codesign --force --deep --sign - MetaRekordFixer.app
+    
+           echo "Removing quarantine attributes..."
+           xattr -cr MetaRekordFixer.app
+    
+           echo "Verifying signature..."
+           codesign -dv MetaRekordFixer.app || echo "Ad-hoc signature applied"
+          
       - name: Manually create DMG and verify build
         run: |
          cd src
@@ -138,11 +172,11 @@ jobs:
       - name: Rename Artifacts for Release
         run: |
           cd src
-          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-darwin-arm64.dmg
+          mv MetaRekordFixer.dmg metarekordfixer-1.0.0-macos-arm.dmg
 
       - name: Upload installer to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd src
-          gh release upload v1.0.0 "metarekordfixer-1.0.0-darwin-arm64.dmg" --clobber
+          gh release upload v1.0.0 "metarekordfixer-1.0.0-macos-arm.dmg" --clobber
