@@ -32,11 +32,16 @@ jobs:
           GOARCH: amd64
         run: |
           cd srcguitest
-          # Set CGO flags for macOS compatibility
-          export CGO_CFLAGS="-mmacosx-version-min=10.12"
-          export CGO_LDFLAGS="-mmacosx-version-min=10.12"
-          # Build the application using fyne package (creates .app and .dmg)
-          fyne package -os darwin -name "GUITest" -icon applogo.png
+          # Build the Go application
+          go build -o GUITest
+          # Create the .app bundle structure
+          mkdir -p GUITest.app/Contents/MacOS
+          mkdir -p GUITest.app/Contents/Resources
+          # Move the binary and icon into the bundle
+          mv GUITest GUITest.app/Contents/MacOS/
+          cp applogo.png GUITest.app/Contents/Resources/icon.png
+          # Create a minimal Info.plist
+          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>GUITest</string><key>CFBundleIconFile</key><string>icon.png</string><key>CFBundleIdentifier</key><string>com.example.guitest</string></dict></plist>' > GUITest.app/Contents/Info.plist
         
       - name: Manually create DMG and verify build
         run: |
@@ -85,11 +90,16 @@ jobs:
           GOARCH: arm64
         run: |
           cd srcguitest
-          # Set CGO flags for macOS compatibility
-          export CGO_CFLAGS="-mmacosx-version-min=10.12"
-          export CGO_LDFLAGS="-mmacosx-version-min=10.12"
-          # Build the application using fyne package (creates .app and .dmg)
-          fyne package -os darwin -name "GUITest" -icon applogo.png
+          # Build the Go application
+          go build -o GUITest
+          # Create the .app bundle structure
+          mkdir -p GUITest.app/Contents/MacOS
+          mkdir -p GUITest.app/Contents/Resources
+          # Move the binary and icon into the bundle
+          mv GUITest GUITest.app/Contents/MacOS/
+          cp applogo.png GUITest.app/Contents/Resources/icon.png
+          # Create a minimal Info.plist
+          echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>GUITest</string><key>CFBundleIconFile</key><string>icon.png</string><key>CFBundleIdentifier</key><string>com.example.guitest</string></dict></plist>' > GUITest.app/Contents/Info.plist
         
       - name: Manually create DMG and verify build
         run: |

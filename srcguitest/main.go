@@ -1,15 +1,23 @@
 package main
 
 import (
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/widget"
+	"nuxui.org/nuxui/nux"
+	"nuxui.org/nuxui/ui"
 )
 
 func main() {
-	myApp := app.New()
-	myWindow := myApp.NewWindow("Testovací Aplikace")
+	nux.Main(func(app nux.App) {
+		w := app.NewWindow(nux.Attr{
+			"title":  "NuxUI Test",
+			"width":  400,
+			"height": 300,
+		})
 
-	myWindow.SetContent(widget.NewLabel("Ahoj, jestli mě vidíš, Fyne funguje!"))
+		label := ui.NewText(nux.Attr{
+			"text": "Ahoj, jestli mě vidíš, NuxUI funguje!",
+		})
 
-	myWindow.ShowAndRun()
+		w.SetContent(label)
+		w.Show()
+	})
 }
