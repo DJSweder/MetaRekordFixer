@@ -1,4 +1,4 @@
-name: Build and Release for macOS
+name: Build and Release for macOS (TEST)
 
 on:
   workflow_dispatch:
