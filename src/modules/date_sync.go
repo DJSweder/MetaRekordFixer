@@ -1,4 +1,5 @@
-// modules/date_sync.go
+// Package modules provides functionality for different modules in the MetaRekordFixer application.
+// This file contains the DateSyncModule implementation for synchronizing dates in the Rekordbox database.
 
 package modules
 
@@ -18,7 +19,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// FolderEntryType defines the type of folder entry list
+// FolderEntryType defines the type of folder entry list used in the dynamic UI components.
+// It distinguishes between custom date folders and excluded folders.
 type FolderEntryType int
 
 const (
@@ -31,7 +33,8 @@ const (
 	maxFolderEntries = 6
 )
 
-// DateSyncModule implements a module for synchronizing dates in the Rekordbox database
+// DateSyncModule implements a module for synchronizing dates in the Rekordbox database.
+// It provides functionality to set standard dates based on release dates or custom dates for specific folders.
 type DateSyncModule struct {
 	*common.ModuleBase
 	dbMgr                  *common.DBManager
@@ -47,7 +50,8 @@ type DateSyncModule struct {
 	standardUpdateBtn      *widget.Button
 }
 
-// CustomCalendar implements a custom calendar widget for date selection
+// CustomCalendar implements a custom calendar widget for date selection.
+// It provides a user-friendly interface for selecting dates with month and year navigation.
 type CustomCalendar struct {
 	widget.BaseWidget
 	currentYear  int
@@ -58,7 +62,9 @@ type CustomCalendar struct {
 	yearSelect   *widget.Select
 }
 
-// NewCustomCalendar creates a new custom calendar widget
+// NewCustomCalendar creates a new custom calendar widget with the specified callback function.
+// The callback function is called when a date is selected.
+// Returns a new CustomCalendar instance initialized with the current date.
 func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
 	c := &CustomCalendar{
 		onSelected: callback,
@@ -122,14 +128,16 @@ func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
 	return c
 }
 
-// CreateRenderer implements the fyne.Widget interface
+// CreateRenderer implements the fyne.Widget interface.
+// It creates and returns a widget renderer for the custom calendar.
 func (c *CustomCalendar) CreateRenderer() fyne.WidgetRenderer {
 	header := container.NewHBox(c.monthSelect, c.yearSelect)
 	content := container.NewVBox(header, c.daysGrid)
 	return widget.NewSimpleRenderer(content)
 }
 
-// updateDays updates the day grid in the calendar
+// updateDays updates the day grid in the calendar based on the current year and month.
+// It creates day buttons for each day in the month and handles proper layout with weekday alignment.
 func (c *CustomCalendar) updateDays() {
 	if c.daysGrid == nil {
 		return
@@ -177,6 +185,14 @@ func (c *CustomCalendar) updateDays() {
 }
 
 // NewDateSyncModule creates a new instance of DateSyncModule.
+// It initializes the UI components and loads the configuration.
+// Parameters:
+//   - window: The main application window
+//   - configMgr: Configuration manager for module settings
+//   - dbMgr: Database manager for database operations
+//   - errorHandler: Error handler for error management
+//
+// Returns a new DateSyncModule instance.
 func NewDateSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *DateSyncModule {
 	m := &DateSyncModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
@@ -192,23 +208,27 @@ func NewDateSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMg
 	return m
 }
 
-// GetName returns the localized name of the module
+// GetName returns the localized name of the module.
+// This implements the Module interface method.
 func (m *DateSyncModule) GetName() string {
 	return locales.Translate("datesync.mod.name")
 }
 
-// GetConfigName returns the configuration identifier for the module
+// GetConfigName returns the configuration identifier for the module.
+// This implements the Module interface method and is used for configuration storage.
 func (m *DateSyncModule) GetConfigName() string {
 	return "datesync"
 }
 
-// GetIcon returns the module's icon
+// GetIcon returns the module's icon resource.
+// This implements the Module interface method.
 func (m *DateSyncModule) GetIcon() fyne.Resource {
 	return theme.StorageIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
-// This implements the method from ModuleBase to provide the module-specific UI
+// GetModuleContent returns the module's specific content without status messages.
+// This implements the method from ModuleBase to provide the module-specific UI.
+// Returns a canvas object containing the module's UI components.
 func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 	// Left section - excluded folders
 	leftHeader := widget.NewLabel(locales.Translate("datesync.label.leftpanel"))
@@ -255,13 +275,20 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 	return moduleContent
 }
 
-// GetContent returns the module's main UI content.
+// GetContent returns the module's main UI content including status messages.
+// This implements the Module interface method.
+// Returns a canvas object containing the complete module layout.
 func (m *DateSyncModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig loads module configuration
+// LoadConfig loads module configuration from the provided ModuleConfig.
+// It initializes UI components with the stored values and creates default configuration if needed.
+// Parameter:
+//   - cfg: The module configuration to load
+//
+// The method sets IsLoadingConfig flag during loading to prevent triggering save operations.
 func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
@@ -325,6 +352,9 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
+// It collects values from all UI components and stores them in the configuration manager.
+// Returns the newly created and saved ModuleConfig.
+// The method checks IsLoadingConfig flag to prevent saving during configuration loading.
 func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
@@ -380,7 +410,9 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 	return cfg
 }
 
-// initializeUI sets up the user interface components
+// initializeUI sets up the user interface components for the module.
+// It creates all UI elements, sets up event handlers, and initializes containers.
+// This method is called during module creation.
 func (m *DateSyncModule) initializeUI() {
 	// Create excluded folders checkbox
 	m.excludeFoldersCheck = widget.NewCheck(locales.Translate("datesync.chkbox.exception"),
@@ -443,8 +475,12 @@ func (m *DateSyncModule) initializeUI() {
 	m.addFolderEntry(CustomDateFolder)
 }
 
-// addFolderEntry adds a new folder entry to the appropriate container
-// Returns the newly created entry widget that was added to the entries slice
+// addFolderEntry adds a new folder entry to the appropriate container.
+// It creates a folder selection field with delete button and handles dynamic entry addition.
+// Parameters:
+//   - folderType: The type of folder entry to add (CustomDateFolder or ExcludedFolder)
+//
+// Returns the newly created entry widget that was added to the entries slice, or nil if maximum entries reached.
 func (m *DateSyncModule) addFolderEntry(folderType FolderEntryType) *widget.Entry {
 	// Determine which container and entries to use based on folder type
 	var container *fyne.Container
@@ -553,7 +589,11 @@ func (m *DateSyncModule) addFolderEntry(folderType FolderEntryType) *widget.Entr
 	return newEntry
 }
 
-// removeFolderEntry removes a folder entry from the appropriate list
+// removeFolderEntry removes a folder entry from the appropriate list and updates the UI.
+// It rebuilds the container after removal and ensures at least one empty entry remains.
+// Parameters:
+//   - entryToRemove: The entry widget to remove
+//   - folderType: The type of folder entry (CustomDateFolder or ExcludedFolder)
 func (m *DateSyncModule) removeFolderEntry(entryToRemove *widget.Entry, folderType FolderEntryType) {
 	// Determine which container and entries to use based on folder type
 	var container *fyne.Container
@@ -645,7 +685,11 @@ func (m *DateSyncModule) removeFolderEntry(entryToRemove *widget.Entry, folderTy
 	m.SaveConfig()
 }
 
-// addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add
+// addFolderEntryForConfig adds a folder entry during config loading without triggering auto-add.
+// This method is used specifically during configuration loading to prevent cascading UI updates.
+// Parameters:
+//   - folderPath: The folder path to set in the entry
+//   - isExcluded: Whether this is an excluded folder (true) or custom date folder (false)
 func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded bool) {
 	// Determine folder type based on isExcluded parameter
 	folderType := CustomDateFolder
@@ -707,12 +751,15 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 	}
 }
 
-// Start performs the necessary steps before starting the main process
+// Start performs the necessary steps before starting the main process.
 // It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
-// and starts the main process based on specific mode:
-// - "standard" for date synchronization over music library
-// - "custom" to set specific date for songs stored in the selected location
-// Input validation also includes a test of the connection to the database and creating a backup of it.
+// and starts the main process based on specific mode.
+// Parameters:
+//   - mode: The operation mode, either "standard" for date synchronization over music library
+//     or "custom" to set specific date for songs stored in the selected location
+//
+// Input validation includes testing the database connection and creating a backup.
+// The actual processing is started in a goroutine to keep the UI responsive.
 func (m *DateSyncModule) Start(mode string) {
 
 	if mode == "standard" {
@@ -745,7 +792,10 @@ func (m *DateSyncModule) Start(mode string) {
 	}
 }
 
-// processStandardUpdate performs the standard date synchronization
+// processStandardUpdate performs the standard date synchronization.
+// It updates the progress dialog, calls setStandardDates to perform the database update,
+// handles errors and cancellation, and updates the UI with results.
+// This method runs in a separate goroutine.
 func (m *DateSyncModule) processStandardUpdate() {
 
 	// Execute standard date sync
@@ -777,7 +827,10 @@ func (m *DateSyncModule) processStandardUpdate() {
 	common.UpdateButtonToCompleted(m.standardUpdateBtn)
 }
 
-// processCustomUpdate performs the custom date synchronization
+// processCustomUpdate performs the custom date synchronization.
+// It collects custom date folders, calls setCustomDates to perform the database update,
+// handles errors and cancellation, and updates the UI with results.
+// This method runs in a separate goroutine.
 func (m *DateSyncModule) processCustomUpdate() {
 
 	// No need to parse custom date, it's already parsed in the validator
@@ -825,7 +878,14 @@ func (m *DateSyncModule) processCustomUpdate() {
 	common.UpdateButtonToCompleted(m.customDateUpdateBtn)
 }
 
-// setStandardDates updates the dates in the Rekordbox database
+// setStandardDates updates the dates in the Rekordbox database based on release dates.
+// It builds a WHERE clause to exclude specified folders if needed, counts affected records,
+// and executes the update query.
+// Returns:
+//   - int: The number of records updated
+//   - error: Any error that occurred during the operation
+//
+// The method handles cancellation during processing.
 func (m *DateSyncModule) setStandardDates() (int, error) {
 	// Build WHERE clause for excluded folders
 	whereClause := "WHERE ReleaseDate IS NOT NULL"
@@ -871,7 +931,18 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	return totalCount, nil
 }
 
-// setCustomDates sets custom dates for tracks in selected folders
+// setCustomDates sets custom dates for tracks in selected folders.
+// It builds a WHERE clause to include only specified folders, counts affected records,
+// and executes the update query with the provided custom date.
+// Parameters:
+//   - customDateFoldersEntry: List of folder paths to include in the update
+//   - customDate: The date to set for all matching tracks
+//
+// Returns:
+//   - int: The number of records updated
+//   - error: Any error that occurred during the operation
+//
+// The method handles cancellation during processing.
 func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
 
 	// Build WHERE clause for selected folders

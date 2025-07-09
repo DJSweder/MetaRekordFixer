@@ -1,5 +1,8 @@
 // main.go
 
+// Package main implements MetaRekordFixer DJ tool application.
+// It serves as the entry point for the application and handles initialization,
+// module management, and the main application lifecycle.
 package main
 
 import (
@@ -20,8 +23,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// NRT11
-// RekordboxTools is the main application structure.
+// RekordboxTools is the main application structure that manages the application lifecycle.
+// It handles initialization of all components, module loading, and UI creation.
 type RekordboxTools struct {
 	app             fyne.App
 	mainWindow      fyne.Window
@@ -34,7 +37,8 @@ type RekordboxTools struct {
 	configInitError error // Store any error that occurs during config initialization (Phase 1 Refactor)
 }
 
-// moduleInfo holds information about a module.
+// moduleInfo holds information about a module and its UI representation.
+// It supports lazy loading of modules that require database access.
 type moduleInfo struct {
 	module   common.Module
 	tabItem  *container.TabItem
@@ -153,7 +157,9 @@ func (rt *RekordboxTools) Run() {
 	}
 }
 
-// initModules prepares module definitions without initializing them
+// initModules prepares module definitions without initializing them.
+// This allows for lazy loading of modules that require database access,
+// improving startup performance and handling cases where the database might not be available.
 func (rt *RekordboxTools) initModules() {
 	rt.modules = []*moduleInfo{
 		{
@@ -194,7 +200,10 @@ func (rt *RekordboxTools) initModules() {
 	}
 }
 
-// createModuleTabItem creates a tab item for a module
+// createModuleTabItem creates a tab item for a module.
+// For modules that don't need database access, it creates the module immediately.
+// For modules that need database access, it creates a placeholder that will be
+// replaced with the actual module content when the tab is selected.
 func (rt *RekordboxTools) createModuleTabItem(info *moduleInfo) *container.TabItem {
 	if !info.isLoaded {
 		// Create temporary module just to get name and icon
@@ -216,7 +225,9 @@ func (rt *RekordboxTools) createModuleTabItem(info *moduleInfo) *container.TabIt
 	return container.NewTabItem(info.module.GetName(), info.module.GetContent())
 }
 
-// createMainContent creates the main window content with tabs
+// createMainContent creates the main window content with tabs.
+// It initializes all tab items, selects the first tab, and sets up the tab change handler
+// to support lazy loading of modules that require database access.
 func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 	rt.tabContainer = container.NewAppTabs()
 
@@ -268,6 +279,7 @@ func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 }
 
 // createMenuBar creates a simple horizontal bar with Settings and Help buttons.
+// These buttons open modal windows for application settings and help information.
 func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 	settingsButton := widget.NewButton(locales.Translate("settings.win.title"), func() {
 		ui.ShowSettingsWindow(rt.mainWindow, rt.configMgr)
@@ -280,6 +292,9 @@ func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 }
 
 // getDBManager returns the dbManager instance, initializing it if necessary.
+// This lazy initialization approach ensures the database is only connected when needed.
+// If the configuration manager is not available or database initialization fails,
+// it returns nil and logs appropriate errors.
 func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	if rt.dbManager == nil {
 		// DBManager initialization is non-fatal and handles nil configMgr.
@@ -300,7 +315,8 @@ func (rt *RekordboxTools) getDBManager() *common.DBManager {
 	return rt.dbManager
 }
 
-// main is the entry point. It initializes and runs the RekordboxTools application.
+// main is the entry point for the application.
+// It initializes and runs the RekordboxTools application, which handles the entire application lifecycle.
 func main() {
 	rt := NewRekordboxTools()
 	rt.Run()

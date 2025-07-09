@@ -1,5 +1,6 @@
 // common/language_manager.go
-
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains language management functionality.
 package common
 
 import (
@@ -8,9 +9,10 @@ import (
 	"sync"
 )
 
+// LanguageItem represents a supported language with its code and display name.
 type LanguageItem struct {
-	Code string
-	Name string
+	Code string // language code (e.g., "en", "cs")
+	Name string // display name of the language
 }
 
 // languageMutex ensures thread safety when setting the application language

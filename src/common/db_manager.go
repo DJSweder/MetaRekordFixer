@@ -1,4 +1,6 @@
 // common/db_manager.go
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains database management functionality for accessing and manipulating Rekordbox databases.
 
 package common
 
@@ -18,32 +20,52 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
-// Define parts for obsfuscation
+// Database password parts for obfuscation.
+// These parts are concatenated to form the complete password for database encryption.
+// Splitting the password into parts provides a basic level of obfuscation to prevent
+// casual inspection from revealing the complete password.
 var (
 	dbPasswordPart1 = "402fd482c38817c35ffa8"
 	dbPasswordPart2 = "ffb8c7d93143b749e7d3"
 	dbPasswordPart3 = "15df7a81732a1ff43608497"
 )
 
-// getDbPassword creates string by concatenating parts
+// getDbPassword creates the complete database password by concatenating the defined parts.
+// This function is used internally by the DBManager to access encrypted Rekordbox databases.
+//
+// Returns:
+//   - The complete database password string
 func getDbPassword() string {
 	return dbPasswordPart1 + dbPasswordPart2 + dbPasswordPart3
 }
 
-// DBManager provides unified database access for all modules
+// DBManager provides unified database access for all modules in the application.
+// It handles encrypted Rekordbox database connections, transactions, and query execution
+// while providing error handling, logging, and thread safety through mutex locking.
 type DBManager struct {
-	db                *sql.DB
-	dbPath            string
-	isConnected       bool
-	mutex             sync.Mutex
-	logger            *Logger
-	errorHandler      *ErrorHandler
-	useTransactions   bool
-	activeTransaction *sql.Tx
-	finalized         bool
+	db                *sql.DB            // database connection
+	dbPath            string             // path to the database file
+	isConnected       bool               // whether the connection is established
+	mutex             sync.Mutex         // mutex for thread safety
+	logger            *Logger            // logger for recording operations
+	errorHandler      *ErrorHandler      // handler for database errors
+	useTransactions   bool               // whether to use transactions
+	activeTransaction *sql.Tx            // current active transaction
+	finalized         bool               // whether the manager has been finalized
 }
 
-// NewDBManager creates a new database manager
+// NewDBManager creates a new database manager instance for the specified database path.
+// It ensures the database directory exists and initializes the manager with the provided
+// logger and error handler. If no logger is provided, an empty logger is created.
+//
+// Parameters:
+//   - dbPath: Path to the Rekordbox database file
+//   - logger: Logger instance for recording database operations
+//   - errorHandler: Error handler for processing database errors
+//
+// Returns:
+//   - A new DBManager instance and nil if successful
+//   - nil and an error if the database directory cannot be created
 func NewDBManager(dbPath string, logger *Logger, errorHandler *ErrorHandler) (*DBManager, error) {
 	dbDir := filepath.Dir(dbPath)
 	err := EnsureDirectoryExists(dbDir)
@@ -67,7 +89,19 @@ func NewDBManager(dbPath string, logger *Logger, errorHandler *ErrorHandler) (*D
 	return manager, nil
 }
 
-// Connect establishes a connection to the database
+// Connect establishes a connection to the encrypted Rekordbox database.
+// This method performs several validation steps:
+// 1. Checks if the database path is set
+// 2. Verifies the database file exists and is not empty
+// 3. Attempts to open the database with the encryption key
+// 4. Sets pragmas to optimize database performance
+//
+// The method is thread-safe through mutex locking and handles various error conditions
+// with specific localized error messages.
+//
+// Returns:
+//   - nil if the connection is successful
+//   - An error with context if any step fails
 func (m *DBManager) Connect() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -134,7 +168,16 @@ func (m *DBManager) Connect() error {
 	return nil
 }
 
-// EnsureConnected ensures the database connection is active
+// EnsureConnected ensures the database connection is active before performing operations.
+// If skipConnect is false and the database is not connected, it will attempt to connect.
+// If skipConnect is true and the database is not connected, it will return an error.
+//
+// Parameters:
+//   - skipConnect: If true, don't attempt to connect if not already connected
+//
+// Returns:
+//   - nil if the database is connected or was successfully connected
+//   - An error if the database could not be connected or skipConnect is true and not connected
 func (m *DBManager) EnsureConnected(skipConnect bool) error {
 	if !m.isConnected && !skipConnect {
 		return m.Connect()
@@ -145,7 +188,13 @@ func (m *DBManager) EnsureConnected(skipConnect bool) error {
 	return nil
 }
 
-// BeginTransaction starts a new transaction
+// BeginTransaction starts a new database transaction.
+// This method enables atomic operations that can be committed or rolled back as a unit.
+// It is thread-safe through mutex locking and prevents starting multiple concurrent transactions.
+//
+// Returns:
+//   - nil if the transaction was successfully started
+//   - An error if the database is not connected or a transaction is already active
 func (m *DBManager) BeginTransaction() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -170,7 +219,13 @@ func (m *DBManager) BeginTransaction() error {
 	return nil
 }
 
-// CommitTransaction commits the current transaction
+// CommitTransaction commits the current database transaction.
+// This makes all changes performed during the transaction permanent.
+// It is thread-safe through mutex locking.
+//
+// Returns:
+//   - nil if the transaction was successfully committed
+//   - An error if no transaction is active or the commit operation fails
 func (m *DBManager) CommitTransaction() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -188,7 +243,13 @@ func (m *DBManager) CommitTransaction() error {
 	return nil
 }
 
-// RollbackTransaction rolls back the current transaction
+// RollbackTransaction rolls back the current database transaction.
+// This discards all changes performed during the transaction.
+// It is thread-safe through mutex locking.
+//
+// Returns:
+//   - nil if the transaction was successfully rolled back
+//   - An error if no transaction is active or the rollback operation fails
 func (m *DBManager) RollbackTransaction() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -207,7 +268,18 @@ func (m *DBManager) RollbackTransaction() error {
 	return nil
 }
 
-// Execute runs an SQL statement with parameters
+// Execute runs an SQL statement with parameters that doesn't return results.
+// This method is typically used for INSERT, UPDATE, DELETE, and other statements
+// that modify the database. It ensures the database is connected before execution
+// and is thread-safe through mutex locking.
+//
+// Parameters:
+//   - query: The SQL statement to execute
+//   - args: Optional parameters for the SQL statement
+//
+// Returns:
+//   - nil if the statement executed successfully
+//   - An error if the database is not connected or the execution fails
 func (m *DBManager) Execute(query string, args ...interface{}) error {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -225,7 +297,17 @@ func (m *DBManager) Execute(query string, args ...interface{}) error {
 	return nil
 }
 
-// Query executes an SQL query and returns rows
+// Query executes an SQL query and returns rows of results.
+// This method is typically used for SELECT statements. It ensures the database
+// is connected before execution and is thread-safe through mutex locking.
+//
+// Parameters:
+//   - query: The SQL query to execute
+//   - args: Optional parameters for the SQL query
+//
+// Returns:
+//   - A pointer to sql.Rows containing the query results and nil if successful
+//   - nil and an error if the database is not connected or the query fails
 func (m *DBManager) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -243,8 +325,17 @@ func (m *DBManager) Query(query string, args ...interface{}) (*sql.Rows, error) 
 	return rows, nil
 }
 
-// QueryWithoutConnect executes an SQL query without ensuring a database connection
-// This is useful during initialization when we want to avoid connecting to the database
+// QueryWithoutConnect executes an SQL query without ensuring a database connection.
+// This is useful during initialization when we want to avoid connecting to the database.
+// The method is thread-safe through mutex locking but will fail if the database is not already connected.
+//
+// Parameters:
+//   - query: The SQL query to execute
+//   - args: Optional parameters for the SQL query
+//
+// Returns:
+//   - A pointer to sql.Rows containing the query results and nil if successful
+//   - nil and an error if the database is not connected or the query fails
 func (m *DBManager) QueryWithoutConnect(query string, args ...interface{}) (*sql.Rows, error) {
 	if !m.isConnected {
 		return nil, fmt.Errorf("database not connected")
@@ -261,7 +352,17 @@ func (m *DBManager) QueryWithoutConnect(query string, args ...interface{}) (*sql
 	return rows, nil
 }
 
-// QueryRow executes an SQL query and returns a single row
+// QueryRow executes an SQL query and returns a single row.
+// This method is typically used for SELECT statements where only one row is expected.
+// It ensures the database is connected before execution and is thread-safe through mutex locking.
+//
+// Parameters:
+//   - query: The SQL query to execute
+//   - args: Optional parameters for the SQL query
+//
+// Returns:
+//   - A pointer to sql.Row containing the query result
+//   - nil if the database is not connected
 func (m *DBManager) QueryRow(query string, args ...interface{}) *sql.Row {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -274,7 +375,17 @@ func (m *DBManager) QueryRow(query string, args ...interface{}) *sql.Row {
 	return m.db.QueryRow(query, args...)
 }
 
-// TableExists checks if a table exists in the database
+// TableExists checks if a table exists in the database.
+// This method queries the sqlite_master table to determine if the specified table exists.
+// It ensures the database is connected before execution.
+//
+// Parameters:
+//   - tableName: The name of the table to check for existence
+//
+// Returns:
+//   - true and nil if the table exists
+//   - false and nil if the table does not exist
+//   - false and an error if the database is not connected or the query fails
 func (m *DBManager) TableExists(tableName string) (bool, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -295,7 +406,13 @@ func (m *DBManager) TableExists(tableName string) (bool, error) {
 	return true, nil
 }
 
-// BackupDatabase creates a backup of the database
+// BackupDatabase creates a backup of the database.
+// This method creates a timestamped copy of the database file in the same directory.
+// It performs validation checks on the database path before attempting the backup.
+//
+// Returns:
+//   - nil if the backup was successful
+//   - An error if the database path is invalid, the file doesn't exist, or the copy operation fails
 func (m *DBManager) BackupDatabase() error {
 	// Check if database path is empty or not set
 	if m.dbPath == "" {
@@ -308,7 +425,7 @@ func (m *DBManager) BackupDatabase() error {
 	}
 
 	// Finalize connection if exists
-	m.logger.Info(locales.Translate("common.log.dbclosing"))
+	m.logger.Info("%s", locales.Translate("common.log.dbclosing"))
 	if err := m.Finalize(); err != nil {
 		m.logger.Error("Failed to close database for backup: %v", err)
 		return fmt.Errorf(locales.Translate("common.err.dbclose"), err)
@@ -328,7 +445,14 @@ func (m *DBManager) BackupDatabase() error {
 	return nil
 }
 
-// GetPlaylists loads all playlists from the database
+// GetPlaylists loads all playlists from the database with their hierarchical structure.
+// This method retrieves playlist information including ID, name, parent ID, and full path.
+// The path is constructed to show the playlist hierarchy (e.g., "Parent > Child").
+// Results are ordered by playlist sequence for proper hierarchical display.
+//
+// Returns:
+//   - A slice of PlaylistItem structures and nil if successful
+//   - nil and an error if the database is not connected or the query fails
 func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -368,7 +492,13 @@ func (m *DBManager) GetPlaylists() ([]PlaylistItem, error) {
 }
 
 // Finalize ensures the database connection is properly closed.
-// This should be called when the DBManager is no longer needed.
+// This method should be called when the DBManager is no longer needed to release
+// database resources and prevent connection leaks. It is thread-safe through mutex locking
+// and idempotent (can be called multiple times safely).
+//
+// Returns:
+//   - nil if the connection was successfully closed or was already closed
+//   - An error if closing the connection fails
 func (m *DBManager) Finalize() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -409,7 +539,16 @@ func (m *DBManager) Finalize() error {
 	return nil
 }
 
-// GetTracksBasedOnFolder retrieves all tracks from a specific folder
+// GetTracksBasedOnFolder retrieves all tracks from a specific folder in the Rekordbox database.
+// This method converts the provided folder path to the database format and queries
+// the djmdContent table for tracks with matching folder paths. Results are ordered by filename.
+//
+// Parameters:
+//   - folderPath: The filesystem path of the folder to search for tracks
+//
+// Returns:
+//   - A slice of TrackItem structures and nil if successful
+//   - nil and an error if the database is not connected, the query fails, or no tracks are found
 func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -468,7 +607,16 @@ func (m *DBManager) GetTracksBasedOnFolder(folderPath string) ([]TrackItem, erro
 	return tracks, nil
 }
 
-// GetTracksBasedOnPlaylist retrieves all tracks from a specific playlist
+// GetTracksBasedOnPlaylist retrieves all tracks from a specific playlist in the Rekordbox database.
+// This method joins the djmdContent and djmdSongPlaylist tables to find tracks associated
+// with the specified playlist ID. Results are ordered by filename.
+//
+// Parameters:
+//   - playlistID: The unique identifier of the playlist to retrieve tracks from
+//
+// Returns:
+//   - A slice of TrackItem structures and nil if successful
+//   - nil and an error if the database is not connected or the query fails
 func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -517,7 +665,16 @@ func (m *DBManager) GetTracksBasedOnPlaylist(playlistID string) ([]TrackItem, er
 	return tracks, nil
 }
 
-// GetTrackHotCues retrieves all hot cues for a specific track
+// GetTrackHotCues retrieves all hot cues for a specific track from the Rekordbox database.
+// This method queries the djmdCue table for all cue points associated with the specified track ID.
+// The results are returned as a slice of maps to accommodate the dynamic nature of cue point data.
+//
+// Parameters:
+//   - trackID: The unique identifier of the track to retrieve hot cues for
+//
+// Returns:
+//   - A slice of maps containing hot cue data and nil if successful
+//   - nil and an error if the database is not connected or the query fails
 func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, error) {
 	err := m.EnsureConnected(false)
 	if err != nil {
@@ -577,12 +734,18 @@ func (m *DBManager) GetTrackHotCues(trackID string) ([]map[string]interface{}, e
 	return hotCues, nil
 }
 
-// GetDatabasePath returns the configured database path
+// GetDatabasePath returns the configured database path.
+// This method provides read access to the internal database path configuration.
+//
+// Returns:
+//   - The current database file path as a string
 func (m *DBManager) GetDatabasePath() string {
 	return m.dbPath
 }
 
-// TrackItem represents a track from the djmdContent table with basic metadata
+// TrackItem represents a track from the djmdContent table with basic metadata.
+// This structure contains essential information about a track in the Rekordbox database,
+// including its unique identifier, file location, and various metadata fields.
 type TrackItem struct {
 	ID          string
 	FolderPath  string
@@ -593,19 +756,32 @@ type TrackItem struct {
 	DJPlayCount NullInt64
 }
 
-// NullString represents a string that may be NULL in the database
+// NullString represents a string that may be NULL in the database.
+// This type implements the sql.Scanner interface to properly handle NULL values
+// from the database and convert them to a meaningful Go representation.
 type NullString struct {
 	String string
 	Valid  bool // Valid is true if String is not NULL
 }
 
-// NullInt64 represents an int64 that may be NULL in the database
+// NullInt64 represents an int64 that may be NULL in the database.
+// This type implements the sql.Scanner interface to properly handle NULL values
+// from the database and convert them to a meaningful Go representation.
 type NullInt64 struct {
 	Int64 int64
 	Valid bool // Valid is true if Int64 is not NULL
 }
 
-// Scan implements the Scanner interface for NullString
+// Scan implements the sql.Scanner interface for NullString.
+// This method handles conversion from various database types to a string value,
+// properly managing NULL values by setting Valid to false.
+//
+// Parameters:
+//   - value: The database value to scan into the NullString
+//
+// Returns:
+//   - nil if successful
+//   - An error if the value cannot be converted to a string
 func (ns *NullString) Scan(value interface{}) error {
 	if value == nil {
 		ns.String, ns.Valid = "", false
@@ -623,7 +799,16 @@ func (ns *NullString) Scan(value interface{}) error {
 	return nil
 }
 
-// Scan implements the Scanner interface for NullInt64
+// Scan implements the sql.Scanner interface for NullInt64.
+// This method handles conversion from various database types to an int64 value,
+// properly managing NULL values by setting Valid to false.
+//
+// Parameters:
+//   - value: The database value to scan into the NullInt64
+//
+// Returns:
+//   - nil if successful
+//   - An error if the value cannot be converted to an int64
 func (ni *NullInt64) Scan(value interface{}) error {
 	if value == nil {
 		ni.Int64, ni.Valid = 0, false
@@ -657,7 +842,13 @@ func (ni *NullInt64) Scan(value interface{}) error {
 	return nil
 }
 
-// ValueOrNil returns the string value if valid, or nil if not valid
+// ValueOrNil returns the string value if valid, or nil if not valid.
+// This method is useful for serialization or when interfacing with code
+// that expects either a string or nil value.
+//
+// Returns:
+//   - The string value as interface{} if Valid is true
+//   - nil as interface{} if Valid is false
 func (ns NullString) ValueOrNil() interface{} {
 	if ns.Valid {
 		return ns.String
@@ -665,7 +856,13 @@ func (ns NullString) ValueOrNil() interface{} {
 	return nil
 }
 
-// ValueOrNil returns the int64 value if valid, or nil if not valid
+// ValueOrNil returns the int64 value if valid, or nil if not valid.
+// This method is useful for serialization or when interfacing with code
+// that expects either an int64 or nil value.
+//
+// Returns:
+//   - The int64 value as interface{} if Valid is true
+//   - nil as interface{} if Valid is false
 func (ni NullInt64) ValueOrNil() interface{} {
 	if ni.Valid {
 		return ni.Int64

@@ -1,5 +1,5 @@
-// modules/metadata_sync.go
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
+// Each module handles a specific task related to DJ database management and music file operations.
 package modules
 
 import (
@@ -21,7 +21,8 @@ import (
 
 // MetadataSyncModule handles metadata synchronization between different file formats.
 // It implements the standard Module interface and provides functionality for synchronizing
-// metadata between files in a specified folder.
+// metadata between MP3 and FLAC files in a specified folder, ensuring consistent metadata
+// across different formats of the same tracks.
 type MetadataSyncModule struct {
 	// ModuleBase is the base struct for all modules, which contains the module's window,
 	// error handler, and configuration manager.
@@ -40,7 +41,17 @@ type MetadataSyncModule struct {
 
 // NewMetadataSyncModule creates a new instance of MetadataSyncModule.
 // It initializes the module with the provided window, configuration manager,
-// database manager, and error handler.
+// database manager, and error handler, sets up the UI components, and loads
+// any saved configuration.
+//
+// Parameters:
+//   - window: The main application window
+//   - configMgr: Configuration manager for saving/loading module settings
+//   - dbMgr: Database manager for accessing the DJ database
+//   - errorHandler: Error handler for displaying and logging errors
+//
+// Returns:
+//   - A fully initialized MetadataSyncModule instance
 func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *MetadataSyncModule {
 	m := &MetadataSyncModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
@@ -56,22 +67,27 @@ func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, 
 }
 
 // GetName returns the localized name of this module.
+// This implements the Module interface method.
 func (m *MetadataSyncModule) GetName() string {
 	return locales.Translate("metsync.mod.name")
 }
 
 // GetConfigName returns the configuration key for this module.
+// This key is used to store and retrieve module-specific configuration.
 func (m *MetadataSyncModule) GetConfigName() string {
 	return "metsync"
 }
 
 // GetIcon returns the module's icon resource.
+// This implements the Module interface method and provides the visual representation
+// of this module in the UI.
 func (m *MetadataSyncModule) GetIcon() fyne.Resource {
 	return theme.HomeIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages.
-// This implements the method from ModuleBase to provide the module-specific UI.
+// This implements the method from ModuleBase to provide the module-specific UI
+// containing the folder selection field, recursive checkbox, and submit button.
 func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with folder selection field
 	form := &widget.Form{
@@ -103,6 +119,8 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 }
 
 // GetContent returns the module's main UI content.
+// This method returns the complete module layout with status messages container.
+// 
 // Note: This module intentionally does not implement database availability checks
 // as it operates without an active database connection until backup is created.
 // The module also does not implement enable/disable logic for its controls
@@ -114,6 +132,10 @@ func (m *MetadataSyncModule) GetContent() fyne.CanvasObject {
 
 // LoadConfig applies the configuration to the UI components.
 // If the configuration is nil, it creates a new one with default values.
+// It sets the source folder path and recursive checkbox state based on saved configuration.
+//
+// Parameters:
+//   - cfg: The module configuration to load
 func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
@@ -138,6 +160,10 @@ func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
 // It normalizes paths and saves boolean values for recursive processing.
+// This method is called whenever UI components change to persist user preferences.
+//
+// Returns:
+//   - A ModuleConfig containing all current UI settings
 func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
@@ -163,10 +189,7 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 
 // initializeUI sets up the user interface components.
 // It creates and configures the entry fields, checkboxes, and buttons,
-// and sets up their event handlers.
-// initializeUI sets up the user interface components.
-// It creates and configures the entry fields, checkboxes, and buttons,
-// and sets up their event handlers.
+// and sets up their event handlers to respond to user interactions.
 func (m *MetadataSyncModule) initializeUI() {
 	// Initialize entry fields
 	m.sourceFolderEntry = widget.NewEntry()
@@ -197,10 +220,14 @@ func (m *MetadataSyncModule) initializeUI() {
 	)
 }
 
-// Start performs the necessary steps before starting the main process
+// Start performs the necessary steps before starting the main process.
 // It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
 // and starts the main process.
 // Input validation also includes a test of the connection to the database and creating a backup of it.
+// Additionally, it validates that the source folder contains MP3 files before proceeding.
+//
+// This method is called when the user clicks the submit button and runs the validation
+// before launching the actual synchronization process in a goroutine.
 func (m *MetadataSyncModule) Start() {
 
 	// Create and run validator
@@ -268,8 +295,17 @@ func (m *MetadataSyncModule) Start() {
 }
 
 // processMetadataSync handles the actual metadata synchronization process.
-// It reads MP3 files from the database, updates corresponding FLAC files,
-// and manages the progress dialog.
+// It reads MP3 files from the database, updates corresponding FLAC files with matching metadata,
+// and manages the progress dialog and status updates throughout the process.
+//
+// The method performs the following steps:
+// 1. Queries the database for MP3 files in the specified folder
+// 2. For each MP3 file, finds the corresponding FLAC file by name
+// 3. Updates the FLAC file's metadata to match the MP3 file's metadata
+// 4. Updates progress and handles cancellation throughout the process
+//
+// Parameters:
+//   - sourcePath: The folder path to process for metadata synchronization
 func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 	// Normalize paths
 	sourcePath = common.NormalizePath(sourcePath)

@@ -1,4 +1,6 @@
 // common/module_base.go
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains the base module implementation and related interfaces.
 
 package common
 
@@ -15,45 +17,57 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// PlaylistItem represents a playlist item from Rekordbox database
+// PlaylistItem represents a playlist item from Rekordbox database.
+// It contains the playlist's identifier, name, parent ID, and full path.
 type PlaylistItem struct {
-	ID       string
-	Name     string
-	ParentID sql.NullString
-	Path     string
+	ID       string        // Unique identifier of the playlist
+	Name     string        // Display name of the playlist
+	ParentID sql.NullString // Parent playlist ID (nullable for root playlists)
+	Path     string        // Full path of the playlist including parent folders
 }
 
-// Module defines the interface that all modules must implement
+// Module defines the interface that all modules must implement.
+// This ensures consistent behavior and functionality across all application modules.
 type Module interface {
+	// GetName returns the localized display name of the module
 	GetName() string
+	// GetConfigName returns the identifier used for configuration storage
 	GetConfigName() string
+	// GetIcon returns the module's icon for display in the UI
 	GetIcon() fyne.Resource
+	// GetContent returns the complete UI of the module including status messages
 	GetContent() fyne.CanvasObject
+	// LoadConfig loads module configuration from the provided config object
 	LoadConfig(config ModuleConfig)
+	// SaveConfig saves the current module state to a configuration object
 	SaveConfig() ModuleConfig
+	// GetDatabaseRequirements returns the database access requirements for this module
 	GetDatabaseRequirements() DatabaseRequirements
+	// SetDatabaseRequirements configures the database access requirements for this module
 	SetDatabaseRequirements(needs bool, immediate bool)
 }
 
-// ModuleBase provides common functionality for all modules
+// ModuleBase provides common functionality for all modules.
+// It implements shared behavior and serves as a base struct for specific module implementations.
 type ModuleBase struct {
-	Window           fyne.Window
-	Content          fyne.CanvasObject
-	ConfigMgr        *ConfigManager
-	Progress         *widget.ProgressBar
-	Status           *widget.Label
-	ProgressDialog   *ProgressDialog
-	IsLoadingConfig  bool
-	mutex            sync.Mutex
-	isCancelled      bool
-	ErrorHandler     *ErrorHandler
-	Logger           *Logger
-	StatusMessages   *StatusMessagesContainer // Container for status messages
-	dbRequirements   DatabaseRequirements
-	fieldDefinitions map[string]FieldDefinition
+	Window           fyne.Window                // Main application window reference
+	Content          fyne.CanvasObject          // Module's UI content
+	ConfigMgr        *ConfigManager             // Configuration manager for loading/saving settings
+	Progress         *widget.ProgressBar        // Progress indicator for operations
+	Status           *widget.Label              // Status text display
+	ProgressDialog   *ProgressDialog            // Dialog showing progress with cancel option
+	IsLoadingConfig  bool                       // Flag to prevent saving during config loading
+	mutex            sync.Mutex                 // Mutex for thread-safe operations
+	isCancelled      bool                       // Flag indicating if current operation was cancelled
+	ErrorHandler     *ErrorHandler              // Central error handling component
+	Logger           *Logger                    // Logger for recording events
+	StatusMessages   *StatusMessagesContainer   // Container for status messages
+	dbRequirements   DatabaseRequirements       // Database access requirements
+	fieldDefinitions map[string]FieldDefinition // Field definitions for validation
 }
 
-// DatabaseRequirements defines how a module uses the database
+// DatabaseRequirements defines how a module uses the database.
+// This helps with lazy loading of database connections and proper initialization.
 type DatabaseRequirements struct {
 	// NeedsDatabase indicates if the module requires database access
 	NeedsDatabase bool
@@ -65,6 +79,9 @@ func (m *ModuleBase) GetFieldDefinitions() map[string]FieldDefinition {
 	return m.fieldDefinitions
 }
 
+// DefineField registers a field definition for validation purposes.
+// It specifies the field's type and whether it is required.
+// This is used by the validation system to ensure proper field values.
 func (m *ModuleBase) DefineField(fieldName string, fieldType string, required bool) {
 	if m.fieldDefinitions == nil {
 		m.fieldDefinitions = make(map[string]FieldDefinition)
@@ -75,7 +92,9 @@ func (m *ModuleBase) DefineField(fieldName string, fieldType string, required bo
 	}
 }
 
-// NewModuleBase initializes a new ModuleBase
+// NewModuleBase creates a new ModuleBase instance with the provided window, configuration manager, and error handler.
+// It initializes all necessary components including status messages container and database requirements.
+// This is the recommended way to create a new module base for all application modules.
 func NewModuleBase(window fyne.Window, configMgr *ConfigManager, errorHandler *ErrorHandler) *ModuleBase {
 	if errorHandler == nil {
 		panic("ErrorHandler cannot be nil")
@@ -92,7 +111,9 @@ func NewModuleBase(window fyne.Window, configMgr *ConfigManager, errorHandler *E
 	return base
 }
 
-// initBaseComponents initializes common UI components
+// initBaseComponents initializes common UI components used by all modules.
+// This includes progress bar, status label, and status messages container.
+// Called automatically by NewModuleBase to ensure proper initialization.
 func (m *ModuleBase) initBaseComponents() {
 	m.Progress = widget.NewProgressBar()
 	m.Status = widget.NewLabel("")
@@ -100,16 +121,24 @@ func (m *ModuleBase) initBaseComponents() {
 	m.StatusMessages = NewStatusMessagesContainer()
 }
 
-// GetModuleContent returns the module's content without status messages
-// This method should be implemented by modules to return their specific content
-// It is used by the CreateModuleLayoutWithStatusMessages method to create the full layout with status messages
+// GetModuleContent returns the module's content without status messages.
+// This method should be overridden by specific module implementations to return their unique UI content.
+// It is used by the CreateModuleLayoutWithStatusMessages method to create the full layout with status messages.
+// The default implementation returns a placeholder message indicating that the module content is not implemented.
 func (m *ModuleBase) GetModuleContent() fyne.CanvasObject {
 	return container.NewVBox(widget.NewLabel(locales.Translate("common.err.modulecontent")))
 }
 
-// CreateModuleLayoutWithStatusMessages creates a layout with module content and status messages
-// The module content is placed at the top and status messages at the bottom
-// This method is used by GetContent to create the full module layout
+// CreateModuleLayoutWithStatusMessages creates a layout with module content and status messages.
+// The module content is placed at the top and status messages at the bottom in a border container.
+// This method is used by module implementations to create their complete UI layout including status messages.
+// It is typically called from the GetContent method of specific module implementations.
+//
+// Parameters:
+//   - moduleContent: The specific module content to be displayed in the main area
+//
+// Returns:
+//   - A complete layout with the module content and status messages container properly positioned
 func (m *ModuleBase) CreateModuleLayoutWithStatusMessages(moduleContent fyne.CanvasObject) fyne.CanvasObject {
 	// Create a container for the module content
 	mainContent := container.NewVBox(moduleContent)
@@ -127,28 +156,48 @@ func (m *ModuleBase) CreateModuleLayoutWithStatusMessages(moduleContent fyne.Can
 	)
 }
 
-// GetName returns an empty name, should be overridden in modules
+// GetName returns the display name of the module.
+// This is a placeholder implementation that should be overridden by specific modules.
+// The module name is typically used in the UI for tab labels and other identifying purposes.
+// Returns "Unknown Module" as a default value.
 func (m *ModuleBase) GetName() string {
 	return ""
 }
 
-// GetConfigName returns an unknown module name, should be overridden
+// GetConfigName returns the configuration identifier for this module.
+// This is a placeholder implementation that should be overridden by specific modules.
+// The config name is used as a key for storing and retrieving module-specific configuration.
+// Returns "unknown" as a default value.
 func (m *ModuleBase) GetConfigName() string {
 	return "unknown_module"
 }
 
-// GetIcon returns a default icon, should be overridden in modules
+// GetIcon returns the icon resource for this module.
+// This is a placeholder implementation that should be overridden by specific modules.
+// The icon is typically displayed in the UI next to the module name in tabs or menus.
+// Returns nil as a default value, which will cause the UI to use a default icon.
 func (m *ModuleBase) GetIcon() fyne.Resource {
 	return nil
 }
 
-// LoadConfig is a placeholder for configuration loading
+// LoadConfig loads module configuration from the provided config object.
+// This is a placeholder implementation that should be overridden by specific modules.
+// Modules should implement this method to restore their state from saved configuration.
+// When implementing this method, modules should set IsLoadingConfig to true at the start
+// and false at the end to prevent unwanted save operations during loading.
 func (m *ModuleBase) LoadConfig(cfg ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 }
 
-// SaveConfig ensures that a valid `ModuleConfig` is returned
+// SaveConfig saves the current module state to a configuration object.
+// This is a placeholder implementation that should be overridden by specific modules.
+// Modules should implement this method to store their current state for later restoration.
+// The base implementation returns an empty configuration object and includes a safety check
+// to prevent saving during configuration loading.
+//
+// Returns:
+//   - A ModuleConfig object containing the module's configuration
 func (m *ModuleBase) SaveConfig() ModuleConfig {
 	if m.IsLoadingConfig {
 		return NewModuleConfig()
@@ -156,7 +205,15 @@ func (m *ModuleBase) SaveConfig() ModuleConfig {
 	return NewModuleConfig()
 }
 
-// ShowProgressDialog displays a progress dialog with stop button and optional cancel callback
+// ShowProgressDialog displays a progress dialog with stop button and optional cancel callback.
+// This creates a modal dialog with a progress bar and a stop button that allows the user
+// to cancel the current operation. The dialog is shown immediately.
+//
+// Parameters:
+//   - title: The title to display in the dialog header
+//   - onCancel: Optional callback functions to execute when the user cancels the operation
+//
+// The dialog will remain visible until CloseProgressDialog or CompleteProgressDialog is called.
 func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 	// Reset cancellation flag
 	m.mutex.Lock()
@@ -171,14 +228,14 @@ func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 			m.isCancelled = true
 			m.mutex.Unlock()
 			onCancel[0]()
-		}
+			}
 	} else {
 		cancelHandler = func() {
 			m.mutex.Lock()
 			m.isCancelled = true
 			m.mutex.Unlock()
-		}
 	}
+}
 
 	// Create and show progress dialog
 	m.mutex.Lock()
@@ -201,7 +258,13 @@ func (m *ModuleBase) UpdateProgressStatus(progress float64, statusText string) {
 	}
 }
 
-// CloseProgressDialog hides the progress dialog
+// CloseProgressDialog hides and destroys the progress dialog.
+// This should be called when an operation completes or is cancelled.
+// After calling this method, the progress dialog will no longer be visible
+// and its resources will be released.
+//
+// This method is safe to call from goroutines as it uses mutex protection.
+// If the progress dialog is not currently shown, this method has no effect.
 func (m *ModuleBase) CloseProgressDialog() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -212,7 +275,16 @@ func (m *ModuleBase) CloseProgressDialog() {
 	}
 }
 
-// CompleteProgressDialog marks the progress dialog as completed and changes the stop button to OK
+// CompleteProgressDialog marks the progress dialog as completed and changes the stop button to OK.
+// This should be called when an operation successfully completes but you want to keep
+// the dialog visible to show the final status to the user.
+//
+// The dialog will remain visible until the user clicks the OK button or CloseProgressDialog is called.
+// This provides a better user experience than immediately closing the dialog as it allows
+// the user to see that the operation completed successfully.
+//
+// This method is safe to call from goroutines as it uses mutex protection.
+// If the progress dialog is not currently shown, this method has no effect.
 func (m *ModuleBase) CompleteProgressDialog() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -222,7 +294,12 @@ func (m *ModuleBase) CompleteProgressDialog() {
 	}
 }
 
-// IsCancelled returns true if the current operation has been cancelled by the user
+// IsCancelled returns true if the current operation has been cancelled by the user.
+// This method is used to check if the user has clicked the cancel button in the progress dialog.
+// It is safe to call from goroutines as it uses mutex protection.
+//
+// Returns:
+//   - true if the operation has been cancelled, false otherwise
 func (m *ModuleBase) IsCancelled() bool {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -230,7 +307,15 @@ func (m *ModuleBase) IsCancelled() bool {
 	return m.isCancelled
 }
 
-// HandleError processes an error with context
+// HandleError processes an error with context information.
+// This method creates an ErrorContext with the module name, operation description, and error,
+// then delegates to the ErrorHandler to properly log and display the error.
+//
+// Parameters:
+//   - err: The error that occurred
+//   - operation: A description of the operation that was being performed when the error occurred
+//
+// If the ErrorHandler is not initialized, this method will silently return without processing the error.
 func (m *ModuleBase) HandleError(err error, operation string) {
 	if m.ErrorHandler == nil {
 		return
@@ -245,7 +330,13 @@ func (m *ModuleBase) HandleError(err error, operation string) {
 	m.ErrorHandler.ShowErrorWithContext(context)
 }
 
-// ShowError displays a simple error dialog
+// ShowError displays a simple error dialog with the provided error message.
+// This is a convenience method for displaying errors without additional context information.
+//
+// Parameters:
+//   - err: The error to display
+//
+// If the ErrorHandler is not initialized, this method will silently return without displaying the error.
 func (m *ModuleBase) ShowError(err error) {
 	if m.ErrorHandler == nil {
 		return
@@ -254,7 +345,14 @@ func (m *ModuleBase) ShowError(err error) {
 	m.ErrorHandler.ShowError(err)
 }
 
-// AddInfoMessage adds an information message to the status messages container and logs it
+// AddInfoMessage adds an information message to the status messages container and logs it.
+// This method is used to display non-critical information to the user and record it in the log.
+//
+// Parameters:
+//   - message: The information message to display and log
+//
+// The message will be displayed with an information icon in the status messages area
+// and will be logged with INFO level if a logger is available.
 func (m *ModuleBase) AddInfoMessage(message string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -267,7 +365,14 @@ func (m *ModuleBase) AddInfoMessage(message string) {
 	}
 }
 
-// AddWarningMessage adds a warning message to the status messages container and logs it
+// AddWarningMessage adds a warning message to the status messages container and logs it.
+// This method is used to display important but non-critical warnings to the user and record them in the log.
+//
+// Parameters:
+//   - message: The warning message to display and log
+//
+// The message will be displayed with a warning icon in the status messages area
+// and will be logged with WARNING level if a logger is available.
 func (m *ModuleBase) AddWarningMessage(message string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -280,7 +385,14 @@ func (m *ModuleBase) AddWarningMessage(message string) {
 	}
 }
 
-// AddErrorMessage adds an error message to the status messages container and logs it
+// AddErrorMessage adds an error message to the status messages container and logs it.
+// This method is used to display critical error information to the user and record it in the log.
+//
+// Parameters:
+//   - message: The error message to display and log
+//
+// The message will be displayed with an error icon in the status messages area
+// and will be logged with ERROR level if a logger is available.
 func (m *ModuleBase) AddErrorMessage(message string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -293,15 +405,22 @@ func (m *ModuleBase) AddErrorMessage(message string) {
 	}
 }
 
-// ClearStatusMessages clears all status messages
+// ClearStatusMessages clears all status messages from the status messages container.
+// This method is typically called when starting a new operation or resetting the module state.
+//
+// If the status messages container is not initialized, this method has no effect.
 func (m *ModuleBase) ClearStatusMessages() {
 	if m.StatusMessages != nil {
 		m.StatusMessages.ClearMessages()
 	}
 }
 
-// GetStatusMessagesContainer returns the status messages container
-// If it doesn't exist, it creates a new one
+// GetStatusMessagesContainer returns the status messages container.
+// If the container doesn't exist, it creates a new one, ensuring that status messages
+// can always be added without checking for nil.
+//
+// Returns:
+//   - A pointer to the StatusMessagesContainer for this module
 func (m *ModuleBase) GetStatusMessagesContainer() *StatusMessagesContainer {
 	// Make sure StatusMessages is initialized
 	if m.StatusMessages == nil {
@@ -312,7 +431,15 @@ func (m *ModuleBase) GetStatusMessagesContainer() *StatusMessagesContainer {
 	return m.StatusMessages
 }
 
-// CreateChangeHandler prevents unwanted save triggers during config loading
+// CreateChangeHandler creates a wrapper function that only calls the provided handler
+// when the module is not loading configuration. This prevents unwanted save operations
+// during configuration loading.
+//
+// Parameters:
+//   - handler: The function to call when a change occurs and config is not loading
+//
+// Returns:
+//   - A function that takes a string parameter and conditionally calls the handler
 func (m *ModuleBase) CreateChangeHandler(handler func()) func(string) {
 	return func(s string) {
 		if !m.IsLoadingConfig {
@@ -321,7 +448,14 @@ func (m *ModuleBase) CreateChangeHandler(handler func()) func(string) {
 	}
 }
 
-// CreateBoolChangeHandler handles boolean input changes safely
+// CreateBoolChangeHandler creates a wrapper function for boolean input changes.
+// Similar to CreateChangeHandler, it prevents handler execution during config loading.
+//
+// Parameters:
+//   - handler: The function to call when a boolean value changes and config is not loading
+//
+// Returns:
+//   - A function that takes a bool parameter and conditionally calls the handler
 func (m *ModuleBase) CreateBoolChangeHandler(handler func()) func(bool) {
 	return func(b bool) {
 		if !m.IsLoadingConfig {
@@ -330,7 +464,14 @@ func (m *ModuleBase) CreateBoolChangeHandler(handler func()) func(bool) {
 	}
 }
 
-// CreateSelectionChangeHandler handles selection input changes safely
+// CreateSelectionChangeHandler creates a wrapper function for selection input changes.
+// Similar to CreateChangeHandler, it prevents handler execution during config loading.
+//
+// Parameters:
+//   - handler: The function to call when a selection changes and config is not loading
+//
+// Returns:
+//   - A function that takes a string parameter and conditionally calls the handler
 func (m *ModuleBase) CreateSelectionChangeHandler(handler func()) func(string) {
 	return func(s string) {
 		if !m.IsLoadingConfig {
@@ -339,7 +480,16 @@ func (m *ModuleBase) CreateSelectionChangeHandler(handler func()) func(string) {
 	}
 }
 
-// LoadFolderEntries loads folder entries from the configuration
+// LoadFolderEntries loads folder entries from the configuration and converts them to widget entries.
+// This utility function parses a pipe-separated string of folder paths from the configuration
+// and creates entry widgets for each folder path.
+//
+// Parameters:
+//   - cfg: The module configuration object containing the settings
+//   - key: The configuration key where the folder paths are stored
+//
+// Returns:
+//   - A slice of entry widgets initialized with the folder paths
 func LoadFolderEntries(cfg ModuleConfig, key string) []*widget.Entry {
 	entries := []*widget.Entry{}
 	folders := strings.Split(cfg.Get(key, ""), "|")
@@ -353,7 +503,14 @@ func LoadFolderEntries(cfg ModuleConfig, key string) []*widget.Entry {
 	return entries
 }
 
-// SaveFolderEntries saves folder entries into the configuration
+// SaveFolderEntries saves folder entries into the configuration as a pipe-separated string.
+// This utility function collects non-empty text from entry widgets and joins them
+// with a pipe character for storage in the configuration.
+//
+// Parameters:
+//   - cfg: The module configuration object to store the settings in
+//   - key: The configuration key where the folder paths should be stored
+//   - entries: A slice of entry widgets containing the folder paths
 func SaveFolderEntries(cfg ModuleConfig, key string, entries []*widget.Entry) {
 	folders := []string{}
 	for _, entry := range entries {
@@ -364,7 +521,13 @@ func SaveFolderEntries(cfg ModuleConfig, key string, entries []*widget.Entry) {
 	cfg.Set(key, strings.Join(folders, "|"))
 }
 
-// SetDatabaseRequirements sets the database requirements for this module
+// SetDatabaseRequirements sets the database requirements for this module.
+// This configures whether the module needs database access and if that access
+// should be established immediately during initialization.
+//
+// Parameters:
+//   - needs: Whether the module requires database access at all
+//   - immediate: Whether database access is needed during initialization
 func (m *ModuleBase) SetDatabaseRequirements(needs bool, immediate bool) {
 	m.dbRequirements = DatabaseRequirements{
 		NeedsDatabase:        needs,
@@ -372,14 +535,23 @@ func (m *ModuleBase) SetDatabaseRequirements(needs bool, immediate bool) {
 	}
 }
 
-// GetDatabaseRequirements returns the database requirements for this module
+// GetDatabaseRequirements returns the database requirements for this module.
+// This is used by the application to determine if and when to establish
+// database connections for this module.
+//
+// Returns:
+//   - A DatabaseRequirements struct indicating the module's database needs
 func (m *ModuleBase) GetDatabaseRequirements() DatabaseRequirements {
 	return m.dbRequirements
 }
 
-// HandleProcessCancellation handles the standard process cancellation flow
-// message is the localization key for the status message
-// params are optional parameters for message formatting
+// HandleProcessCancellation handles the standard process cancellation flow.
+// This method updates the UI to indicate that an operation was cancelled,
+// showing a localized message and completing the progress dialog.
+//
+// Parameters:
+//   - message: The localization key for the status message to display
+//   - params: Optional parameters for message formatting
 func (m *ModuleBase) HandleProcessCancellation(message string, params ...interface{}) {
 	// Update progress dialog status
 	stoppedMessage := fmt.Sprintf(locales.Translate(message), params...)

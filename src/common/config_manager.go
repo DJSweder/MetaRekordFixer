@@ -1,4 +1,6 @@
 // common/config_manager.go
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains configuration management functionality.
 
 package common
 
@@ -10,18 +12,21 @@ import (
 	"sync"
 )
 
-// GlobalConfig holds global application settings
+// GlobalConfig holds global application settings that are shared across all modules.
+// These settings typically include application-wide preferences and configurations.
 type GlobalConfig struct {
 	DatabasePath string
 	Language     string
 }
 
-// ModuleConfig defines a configuration structure for modules
+// ModuleConfig defines a configuration structure for individual modules.
+// Each module can define its own set of configuration fields with different types and validation rules.
 type ModuleConfig struct {
 	Fields map[string]FieldDefinition
 }
 
-// ConfigManager handles application configuration
+// ConfigManager handles loading, saving, and managing application configuration.
+// It provides thread-safe access to both global and module-specific settings.
 type ConfigManager struct {
 	configPath    string
 	globalConfig  GlobalConfig
@@ -29,18 +34,27 @@ type ConfigManager struct {
 	mutex         sync.Mutex
 }
 
-// FieldDefinition defines validation rules for a configuration field
+// FieldDefinition defines the structure and validation rules for a configuration field.
+// It supports various field types, dependencies, and validation requirements.
 type FieldDefinition struct {
-	FieldType         string // folder, date, checkbox, select, playlist, file
-	Required          bool
-	DependsOn         string
-	ActiveWhen        string
-	ValidationType    string // exists, valid_date, filled, exists | write
-	Value             string
-	ValidateOnActions []string // list of actions for selected validation (eg. for modules with more functions with separated starting)
+	FieldType         string   // field type (folder, date, checkbox, select, playlist, file)
+	Required          bool     // whether the field is required
+	DependsOn         string   // field that this field depends on
+	ActiveWhen        string   // condition when this field is active
+	ValidationType    string   // validation type (exists, valid_date, filled, exists | write)
+	Value             string   // field value
+	ValidateOnActions []string // actions that trigger validation
 }
 
-// NewConfigManager initializes a new configuration manager
+// NewConfigManager initializes a new configuration manager instance.
+// It attempts to load existing configuration from the specified path, or creates a new one if it doesn't exist.
+//
+// Parameters:
+//   - configPath: Path to the configuration file
+//
+// Returns:
+//   - *ConfigManager: Initialized configuration manager
+//   - error: Any error that occurred during initialization
 func NewConfigManager(configPath string) (*ConfigManager, error) {
 	mgr := &ConfigManager{
 		configPath:    configPath,
@@ -58,7 +72,8 @@ func NewConfigManager(configPath string) (*ConfigManager, error) {
 	return mgr, nil
 }
 
-// GetGlobalConfig returns the global configuration
+// GetGlobalConfig returns a copy of the current global configuration.
+// The returned value is a copy to prevent race conditions and ensure thread safety.
 func (mgr *ConfigManager) GetGlobalConfig() GlobalConfig {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -66,7 +81,14 @@ func (mgr *ConfigManager) GetGlobalConfig() GlobalConfig {
 	return mgr.globalConfig
 }
 
-// SaveGlobalConfig saves the global configuration
+// SaveGlobalConfig updates and saves the global configuration.
+// This operation is thread-safe and will persist changes to disk.
+//
+// Parameters:
+//   - config: The new global configuration to save
+//
+// Returns:
+//   - error: Any error that occurred during the save operation
 func (mgr *ConfigManager) SaveGlobalConfig(config GlobalConfig) error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -76,7 +98,14 @@ func (mgr *ConfigManager) SaveGlobalConfig(config GlobalConfig) error {
 	return mgr.saveConfig()
 }
 
-// GetModuleConfig retrieves a module's configuration
+// GetModuleConfig retrieves the configuration for a specific module.
+// If the module doesn't have a configuration yet, a new empty one is created.
+//
+// Parameters:
+//   - moduleName: The name of the module to get configuration for
+//
+// Returns:
+//   - ModuleConfig: The module's configuration (never nil)
 func (mgr *ConfigManager) GetModuleConfig(moduleName string) ModuleConfig {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -91,7 +120,12 @@ func (mgr *ConfigManager) GetModuleConfig(moduleName string) ModuleConfig {
 	return NewModuleConfig()
 }
 
-// SaveModuleConfig saves a module's configuration
+// SaveModuleConfig updates and saves the configuration for a specific module.
+// The configuration is immediately persisted to disk.
+//
+// Parameters:
+//   - moduleName: The name of the module to save configuration for
+//   - config: The module configuration to save
 func (mgr *ConfigManager) SaveModuleConfig(moduleName string, config ModuleConfig) {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -100,7 +134,11 @@ func (mgr *ConfigManager) SaveModuleConfig(moduleName string, config ModuleConfi
 	mgr.saveConfig()
 }
 
-// loadConfig loads the configuration from a file
+// loadConfig loads the application configuration from the configuration file.
+// This is an internal method that is called during initialization.
+//
+// Returns:
+//   - error: Any error that occurred during loading
 func (mgr *ConfigManager) loadConfig() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -131,7 +169,12 @@ func (mgr *ConfigManager) loadConfig() error {
 	return nil
 }
 
-// saveConfig saves the configuration to a file
+// saveConfig saves the current configuration to the configuration file.
+// This is an internal method that handles the actual file I/O operations.
+// It ensures the configuration is properly formatted and includes default values.
+//
+// Returns:
+//   - error: Any error that occurred during the save operation
 func (mgr *ConfigManager) saveConfig() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -165,14 +208,26 @@ func (mgr *ConfigManager) saveConfig() error {
 	return nil
 }
 
-// NewModuleConfig creates a new empty module configuration
+// NewModuleConfig creates a new empty module configuration with an initialized fields map.
+// This ensures that the Fields map is never nil when working with a new ModuleConfig.
+//
+// Returns:
+//   - ModuleConfig: A new, empty module configuration
 func NewModuleConfig() ModuleConfig {
 	return ModuleConfig{
 		Fields: make(map[string]FieldDefinition),
 	}
 }
 
-// Get retrieves a string value from the module configuration
+// Get retrieves a string value from the module configuration.
+// If the specified key doesn't exist, it returns the provided default value.
+//
+// Parameters:
+//   - key: The configuration key to retrieve
+//   - defaultValue: The value to return if the key doesn't exist
+//
+// Returns:
+//   - string: The configuration value or the default value if not found
 func (c ModuleConfig) Get(key string, defaultValue string) string {
 	if field, exists := c.Fields[key]; exists {
 		return field.Value
@@ -180,7 +235,12 @@ func (c ModuleConfig) Get(key string, defaultValue string) string {
 	return defaultValue
 }
 
-// Set stores a string value in the module configuration
+// Set stores a string value in the module configuration with a default field type of "folder".
+// This is a convenience method for simple string values without complex validation.
+//
+// Parameters:
+//   - key: The configuration key to set
+//   - value: The string value to store
 func (c *ModuleConfig) Set(key string, value string) {
 	if c.Fields == nil {
 		c.Fields = make(map[string]FieldDefinition)

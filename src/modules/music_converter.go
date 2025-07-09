@@ -1,5 +1,7 @@
 // modules/music_converter.go
 
+// Package modules provides functionality for different modules in the MetaRekordFixer application.
+// Each module handles a specific task related to DJ database management and music file operations.
 package modules
 
 import (
@@ -27,8 +29,11 @@ import (
 	"strings"
 )
 
-// MusicConverterModule implements a module for converting music files between different formats
+// MusicConverterModule implements a module for converting music files between different formats.
+// It provides a user interface for selecting source and target formats, folders, and conversion parameters,
+// and uses ffmpeg to perform the actual audio conversion with metadata preservation.
 type MusicConverterModule struct {
+	// ModuleBase provides common module functionality like error handling and UI components
 	*common.ModuleBase // Embedded pointer to shared base
 
 	// Source and target settings
@@ -73,7 +78,17 @@ type MusicConverterModule struct {
 	ctx        context.Context
 }
 
-// NewMusicConverterModule creates a new instance of MusicConverterModule
+// NewMusicConverterModule creates a new instance of MusicConverterModule.
+// It initializes the module with the provided window, configuration manager, and error handler,
+// sets up the UI components, and loads any saved configuration.
+//
+// Parameters:
+//   - window: The main application window
+//   - configMgr: Configuration manager for saving/loading module settings
+//   - errorHandler: Error handler for displaying and logging errors
+//
+// Returns:
+//   - A fully initialized MusicConverterModule instance
 func NewMusicConverterModule(window fyne.Window, configMgr *common.ConfigManager, errorHandler *common.ErrorHandler) *MusicConverterModule {
 	m := &MusicConverterModule{
 		ModuleBase:   common.NewModuleBase(window, configMgr, errorHandler),
@@ -95,23 +110,32 @@ func NewMusicConverterModule(window fyne.Window, configMgr *common.ConfigManager
 	return m
 }
 
-// GetName returns the localized name of the module
+// GetName returns the localized name of the module.
+// This implements the Module interface method.
 func (m *MusicConverterModule) GetName() string {
 	return locales.Translate("convert.mod.name")
 }
 
-// GetConfigName returns the configuration identifier for the module
+// GetConfigName returns the configuration identifier for the module.
+// This key is used to store and retrieve module-specific configuration.
 func (m *MusicConverterModule) GetConfigName() string {
 	return "convert"
 }
 
-// GetIcon returns the module's icon
+// GetIcon returns the module's icon resource.
+// This implements the Module interface method and provides the visual representation
+// of this module in the UI.
 func (m *MusicConverterModule) GetIcon() fyne.Resource {
 	return theme.MediaMusicIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
+// GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
+// containing the source/target format selection, folder selection, and format-specific settings.
+//
+// The UI is organized into left and right panels:
+// - Left panel: Source and target folder/format selection and general options
+// - Right panel: Format-specific settings that change based on the selected target format
 func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	// Left section - Source and target settings
 	leftHeader := common.CreateDescriptionLabel(locales.Translate("convert.label.leftpanel"))
@@ -203,13 +227,19 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	return moduleContent
 }
 
-// GetContent returns the module's main UI content
+// GetContent returns the module's main UI content.
+// This method returns the complete module layout with status messages container.
 func (m *MusicConverterModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig loads module configuration
+// LoadConfig loads module configuration and applies it to the UI components.
+// If the configuration is nil or empty, it sets default values.
+// It loads source/target folder paths, format selections, and format-specific settings.
+//
+// Parameters:
+//   - cfg: The module configuration to load
 func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
@@ -321,7 +351,12 @@ func (m *MusicConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.metadataMap, _ = m.loadMetadataMap()
 }
 
-// SaveConfig saves the current module configuration
+// SaveConfig saves the current module configuration based on UI component states.
+// It saves source/target folder paths, format selections, and format-specific settings
+// with appropriate validation rules and dependencies.
+//
+// Returns:
+//   - A ModuleConfig containing all current UI settings
 func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
 
@@ -392,7 +427,9 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 	return cfg
 }
 
-// initializeUI sets up the user interface components
+// initializeUI sets up the user interface components.
+// It creates and configures all UI elements including entry fields, select boxes,
+// checkboxes, and buttons, and sets up their event handlers.
 func (m *MusicConverterModule) initializeUI() {
 	// Source folder selection
 	m.sourceFolderEntry = widget.NewEntry()
@@ -549,13 +586,22 @@ func (m *MusicConverterModule) initializeUI() {
 	})
 }
 
-// onSourceFormatChanged handles changes in source format selection
+// onSourceFormatChanged handles changes in source format selection.
+// It saves the updated configuration when the source format is changed.
+//
+// Parameters:
+//   - _: The selected format (unused in this implementation)
 func (m *MusicConverterModule) onSourceFormatChanged(_ string) {
 	// Save configuration
 	m.SaveConfig()
 }
 
-// onTargetFormatChanged handles changes in target format selection
+// onTargetFormatChanged handles changes in target format selection.
+// It updates the format settings container to show format-specific options
+// and saves the updated configuration.
+//
+// Parameters:
+//   - format: The selected target format (MP3, FLAC, WAV)
 func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 
 	// Update format settings container
@@ -565,7 +611,11 @@ func (m *MusicConverterModule) onTargetFormatChanged(format string) {
 	m.SaveConfig()
 }
 
-// updateFormatSettings updates the format settings container based on the selected target format
+// updateFormatSettings updates the format settings container based on the selected target format.
+// It shows different settings panels depending on whether MP3, FLAC, or WAV is selected.
+//
+// Parameters:
+//   - format: The selected target format (MP3, FLAC, WAV)
 func (m *MusicConverterModule) updateFormatSettings(format string) {
 	// Safety check - if containers are not initialized yet, return
 	if m.formatSettingsContainer == nil {
@@ -610,7 +660,12 @@ func (m *MusicConverterModule) updateFormatSettings(format string) {
 	m.formatSettingsContainer.Refresh()
 }
 
-// IsCancelled returns whether the current operation has been cancelled
+// IsCancelled returns whether the current operation has been cancelled.
+// It extends the base implementation to also kill any running ffmpeg process
+// when cancellation is detected.
+//
+// Returns:
+//   - true if the operation has been cancelled, false otherwise
 func (m *MusicConverterModule) IsCancelled() bool {
 	isCancelled := m.ModuleBase.IsCancelled()
 	if m.currentProcess != nil && isCancelled {
@@ -627,6 +682,8 @@ func (m *MusicConverterModule) IsCancelled() bool {
 	}
 	return isCancelled
 }
+// Start performs the necessary steps before starting the main process.
+// It validates the inputs and starts the conversion process if validation passes.
 func (m *MusicConverterModule) Start() {
 
 	// Create and run validator
@@ -639,7 +696,9 @@ func (m *MusicConverterModule) Start() {
 	m.startConversion()
 }
 
-// startConversion begins the conversion process
+// startConversion begins the conversion process.
+// It checks if a conversion is already in progress, disables the submit button,
+// retrieves configuration values, and starts the file conversion in a goroutine.
 func (m *MusicConverterModule) startConversion() {
 	// Check if already converting
 	if m.isConverting {
@@ -686,7 +745,15 @@ func (m *MusicConverterModule) startConversion() {
 	go m.convertFiles(sourceFolder, targetFolder, targetFormat, formatSettings)
 }
 
-// convertFiles performs the actual conversion of audio files using ffmpeg
+// convertFiles performs the actual conversion of audio files using ffmpeg.
+// It finds all audio files in the source folder, creates the necessary folder structure,
+// and converts each file with the specified format settings while preserving metadata.
+//
+// Parameters:
+//   - sourceFolder: Path to the folder containing source audio files
+//   - targetFolder: Path where converted files will be saved
+//   - targetFormat: Target format (MP3, FLAC, WAV)
+//   - formatSettings: Map of format-specific settings like bitrate, compression level, etc.
 func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
 	// Get values from configuration
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
@@ -897,7 +964,22 @@ func (m *MusicConverterModule) convertFiles(sourceFolder, targetFolder, targetFo
 	common.UpdateButtonToCompleted(m.submitBtn)
 }
 
-// convertFile converts a single audio file using ffmpeg
+// convertFile converts a single audio file using ffmpeg.
+// It builds the appropriate ffmpeg command line arguments based on the target format
+// and settings, maps metadata between formats, and executes the conversion.
+//
+// Parameters:
+//   - sourcePath: Path to the source audio file
+//   - targetPath: Path where the converted file will be saved
+//   - targetFormat: Target format (MP3, FLAC, WAV)
+//   - formatSettings: Map of format-specific settings
+//   - metadata: Map of metadata from the source file
+//   - bitDepth: Bit depth of the source file
+//   - sampleRate: Sample rate of the source file
+//   - metadataMap: Mapping rules for metadata between different formats
+//
+// Returns:
+//   - error if the conversion fails, nil otherwise
 func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat string, formatSettings map[string]string, metadata map[string]string, bitDepth string, sampleRate string, metadataMap *MetadataMap) error {
 	// Build ffmpeg arguments
 	args := []string{
@@ -1109,14 +1191,19 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	return nil
 }
 
-// MetadataMap represents the mapping between metadata fields for different formats
+// MetadataMap represents the mapping between metadata fields for different formats.
+// It provides translation tables between internal field names and format-specific field names.
 type MetadataMap struct {
+	// InternalToMP3 maps internal field names to MP3 (ID3) field names
 	InternalToMP3  map[string]string
+	// InternalToFLAC maps internal field names to FLAC field names
 	InternalToFLAC map[string]string
+	// InternalToWAV maps internal field names to WAV field names
 	InternalToWAV  map[string]string
 }
 
-// ConversionParameter represents a single parameter option for conversion
+// ConversionParameter represents a single parameter option for conversion.
+// It stores the mapping between UI representation, configuration value, and ffmpeg value.
 type ConversionParameter struct {
 	ConfigValue string // value stored in configuration (e.g. "5", "copy")
 	FFmpegValue string // value for ffmpeg (e.g. "5", "-")
@@ -1124,12 +1211,18 @@ type ConversionParameter struct {
 	IsCopy      bool   // indicates if this is a "copy" parameter
 }
 
-// ConversionParameterSet represents a set of parameters for a specific setting
+// ConversionParameterSet represents a set of parameters for a specific setting.
+// It provides methods to convert between localized values, configuration values, and ffmpeg values.
 type ConversionParameterSet struct {
+	// Parameters is the list of available parameter options
 	Parameters []ConversionParameter
 }
 
-// GetLocalizedValues returns a list of localized values for GUI
+// GetLocalizedValues returns a list of localized values for GUI display.
+// This is used to populate select boxes with human-readable, localized options.
+//
+// Returns:
+//   - A slice of localized strings for all parameters in the set
 func (ps *ConversionParameterSet) GetLocalizedValues() []string {
 	values := make([]string, len(ps.Parameters))
 	for i, p := range ps.Parameters {
@@ -1138,7 +1231,14 @@ func (ps *ConversionParameterSet) GetLocalizedValues() []string {
 	return values
 }
 
-// GetConfigValue returns a configuration value based on localized text
+// GetConfigValue returns a configuration value based on localized text.
+// This converts from the UI display value to the value stored in configuration.
+//
+// Parameters:
+//   - localizedValue: The localized text displayed in the UI
+//
+// Returns:
+//   - The corresponding configuration value, or "copy" as fallback
 func (ps *ConversionParameterSet) GetConfigValue(localizedValue string) string {
 	for _, p := range ps.Parameters {
 		if locales.Translate(p.LocaleKey) == localizedValue {
@@ -1148,7 +1248,15 @@ func (ps *ConversionParameterSet) GetConfigValue(localizedValue string) string {
 	return "copy" // fallback to copy if no match found
 }
 
-// GetFFmpegValue returns a value for ffmpeg based on configuration value and optionally source properties
+// GetFFmpegValue returns a value for ffmpeg based on configuration value and optionally source properties.
+// For "copy" parameters, it returns the source value if provided.
+//
+// Parameters:
+//   - configValue: The value from configuration
+//   - sourceValue: The value from the source file (used for "copy" parameters)
+//
+// Returns:
+//   - The value to use in ffmpeg command line arguments
 func (ps *ConversionParameterSet) GetFFmpegValue(configValue string, sourceValue string) string {
 	for _, p := range ps.Parameters {
 		if p.ConfigValue == configValue {
@@ -1161,7 +1269,14 @@ func (ps *ConversionParameterSet) GetFFmpegValue(configValue string, sourceValue
 	return "-" // fallback to copy
 }
 
-// GetLocalizedValue returns localized text based on configuration value
+// GetLocalizedValue returns localized text based on configuration value.
+// This converts from the stored configuration value to the UI display value.
+//
+// Parameters:
+//   - configValue: The value from configuration
+//
+// Returns:
+//   - The corresponding localized text for UI display
 func (ps *ConversionParameterSet) GetLocalizedValue(configValue string) string {
 	for _, p := range ps.Parameters {
 		if p.ConfigValue == configValue {
@@ -1225,7 +1340,12 @@ var (
 	}
 )
 
-// loadMetadataMap loads the metadata mapping from the CSV file
+// loadMetadataMap loads the metadata mapping from the embedded CSV file.
+// The CSV file defines how metadata fields should be mapped between different audio formats.
+//
+// Returns:
+//   - A populated MetadataMap structure and nil error on success
+//   - nil and an error if loading or parsing fails
 func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 	// Load the CSV content from the embedded file
 	csvContent := assets.ResourceMetadataMapCSV.Content()
@@ -1291,8 +1411,16 @@ func (m *MusicConverterModule) loadMetadataMap() (*MetadataMap, error) {
 	return result, nil
 }
 
-// findAudioFiles recursively finds all audio files in the given directory
-// If sourceFormat is specified (not "All"), only files of that format are returned
+// findAudioFiles recursively finds all audio files in the given directory.
+// If sourceFormat is specified (not "All"), only files of that format are returned.
+//
+// Parameters:
+//   - dir: The directory to search for audio files
+//   - sourceFormat: The format to filter by ("All", "MP3", "FLAC", "WAV")
+//
+// Returns:
+//   - A slice of paths to matching audio files
+//   - An error if directory reading fails
 func (m *MusicConverterModule) findAudioFiles(dir string, sourceFormat string) ([]string, error) {
 	var files []string
 

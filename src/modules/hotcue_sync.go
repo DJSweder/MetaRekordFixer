@@ -1,3 +1,5 @@
+// Package modules contains specialized functionality modules for the MetaRekordFixer application.
+// Each module handles a specific task related to DJ database management and music file operations.
 package modules
 
 import (
@@ -17,7 +19,7 @@ import (
 	"MetaRekordFixer/locales"
 )
 
-// SourceType defines the type of source (folder or playlist).
+// SourceType defines the type of source (folder or playlist) for synchronization operations.
 type SourceType string
 
 const (
@@ -25,7 +27,9 @@ const (
 	SourceTypePlaylist SourceType = "playlist"
 )
 
-// HotCueSyncModule handles hot cue synchronization.
+// HotCueSyncModule handles hot cue synchronization between tracks.
+// It allows copying hot cues and related metadata from source tracks to target tracks
+// based on matching filenames, using either folder or playlist as source/target.
 type HotCueSyncModule struct {
 	*common.ModuleBase
 	dbMgr                *common.DBManager
@@ -44,6 +48,16 @@ type HotCueSyncModule struct {
 }
 
 // NewHotCueSyncModule creates a new HotCueSyncModule instance and initializes its UI.
+// It sets up all UI components, loads saved configuration, and prepares the module for use.
+//
+// Parameters:
+//   - window: The main application window
+//   - configMgr: Configuration manager for saving/loading module settings
+//   - dbMgr: Database manager for accessing the DJ database
+//   - errorHandler: Error handler for displaying and logging errors
+//
+// Returns:
+//   - A fully initialized HotCueSyncModule instance
 func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *HotCueSyncModule {
 	m := &HotCueSyncModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
@@ -64,22 +78,27 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 }
 
 // GetName returns the localized name of this module.
+// This implements the Module interface method.
 func (m *HotCueSyncModule) GetName() string {
 	return locales.Translate("hotcuesync.mod.name")
 }
 
 // GetConfigName returns the configuration key for this module.
+// This key is used to store and retrieve module-specific configuration.
 func (m *HotCueSyncModule) GetConfigName() string {
 	return "hotcuesync"
 }
 
 // GetIcon returns the module's icon resource.
+// This implements the Module interface method and provides the visual representation
+// of this module in the UI.
 func (m *HotCueSyncModule) GetIcon() fyne.Resource {
 	return theme.ContentCopyIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
+// GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
+// containing all the input fields, selectors, and buttons needed for hot cue synchronization.
 func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 	// Form without submit button
 	standardForm := &widget.Form{
@@ -129,6 +148,9 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 }
 
 // GetContent returns the module's main UI content and initializes database connection.
+// This method performs database validation, loads playlists, and ensures all UI components
+// are properly initialized and enabled/disabled based on the current state.
+// It returns the complete module layout with status messages container.
 func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
@@ -170,6 +192,11 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 }
 
 // LoadConfig applies the configuration to the UI components.
+// It loads all saved settings from the provided ModuleConfig and updates the UI accordingly.
+// If the configuration is nil or empty, it creates a new configuration with default values.
+//
+// Parameters:
+//   - cfg: The module configuration to load
 func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
@@ -235,7 +262,11 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
+// It captures the current state of all UI components and creates a configuration
+// that can be persisted and later restored with LoadConfig.
+//
+// Returns:
+//   - A ModuleConfig containing all current UI settings
 func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
@@ -291,6 +322,8 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 }
 
 // initializeUI sets up the user interface components.
+// This method initializes all UI elements including selectors, entry fields,
+// and buttons, and sets up their event handlers.
 func (m *HotCueSyncModule) initializeUI() {
 	// Initialize source type selector
 	m.sourceType = widget.NewSelect([]string{
@@ -388,6 +421,12 @@ func (m *HotCueSyncModule) initializeUI() {
 // and then applies them to the target track. The function handles both
 // the retrieval and update of hot cue data.
 //
+// The method performs the following steps:
+// 1. Retrieves all hot cues from the source track
+// 2. For each hot cue, deletes any existing hot cue with the same Kind in the target track
+// 3. Generates a new ID for each hot cue
+// 4. Inserts the hot cue into the target track with updated timestamps
+//
 // Parameters:
 //   - sourceID: The ID of the source track to copy hot cues from
 //   - targetID: The ID of the target track to copy hot cues to
@@ -473,6 +512,13 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 
 // copyTrackMetadata copies specific metadata fields from source track to target track.
 // Fields copied: StockDate, DateCreated, ColorID, DJPlayCount
+//
+// Parameters:
+//   - sourceID: The ID of the source track to copy metadata from
+//   - targetID: The ID of the target track to copy metadata to
+//
+// Returns:
+//   - error: Returns nil if successful, otherwise returns an error with details about the failure
 func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 	// Query to get source track metadata
 	query := `
@@ -522,6 +568,11 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 }
 
 // getSourceTracks retrieves source tracks from the database based on the selected source type.
+// It handles both folder-based and playlist-based track retrieval.
+//
+// Returns:
+//   - []common.TrackItem: A slice of tracks retrieved from the selected source
+//   - error: An error if no tracks were found or if another issue occurred
 func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 	var tracks []common.TrackItem
 
@@ -550,6 +601,15 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 }
 
 // getTargetTracks retrieves target tracks from the database based on the selected target type.
+// It finds tracks in the target location (folder or playlist) that match the source track's filename
+// (without extension), allowing for synchronization between different formats of the same track.
+//
+// Parameters:
+//   - sourceTrack: The source track to find matches for
+//
+// Returns:
+//   - A slice of matching target tracks with their IDs and filenames
+//   - error: An error if retrieval failed
 func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]struct {
 	ID       string
 	FileName string
@@ -615,6 +675,11 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 }
 
 // loadPlaylists loads playlist items from the database and updates the playlist selectors.
+// It updates the UI to show loading state, retrieves playlists from the database,
+// and populates the source and target playlist selectors with the results.
+//
+// Returns:
+//   - error: An error if playlist loading failed
 func (m *HotCueSyncModule) loadPlaylists() error {
 	// Update UI to show loading state
 	m.UpdateProgressStatus(0, locales.Translate("common.status.playlistload"))
@@ -670,7 +735,9 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	return nil
 }
 
-// updateControlsState updates the state of playlist selectors.
+// updateControlsState updates the visibility of UI controls based on the current source and target types.
+// It ensures that only the relevant input fields are shown based on whether folder or playlist
+// is selected as the source and target.
 func (m *HotCueSyncModule) updateControlsState() {
 	// Get current source and target types
 	var sourceType, targetType SourceType
@@ -706,6 +773,10 @@ func (m *HotCueSyncModule) updateControlsState() {
 }
 
 // updateSourceVisibility updates the visibility of source input controls based on the selected source type.
+// When switching from folder to playlist, it also reloads playlists from the database.
+//
+// Parameters:
+//   - sourceType: The selected source type (folder or playlist)
 func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 	if sourceType == SourceTypeFolder {
 		m.sourceFolderField.Show()
@@ -730,6 +801,10 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 }
 
 // updateTargetVisibility updates the visibility of target input controls based on the selected target type.
+// When switching from folder to playlist, it also reloads playlists from the database.
+//
+// Parameters:
+//   - targetType: The selected target type (folder or playlist)
 func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 	if targetType == SourceTypeFolder {
 		m.targetFolderField.Show()
@@ -753,10 +828,11 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 	}
 }
 
-// Start performs the necessary steps before starting the main process
+// Start performs the necessary steps before starting the main process.
 // It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
 // and starts the main process.
 // Input validation also includes a test of the connection to the database and creating a backup of it.
+// This method is called when the user clicks the submit button.
 func (m *HotCueSyncModule) Start() {
 
 	// Create and run validator
@@ -774,6 +850,15 @@ func (m *HotCueSyncModule) Start() {
 }
 
 // processUpdate performs the actual hot cue synchronization process.
+// This method runs in a goroutine and handles the entire synchronization workflow:
+// 1. Gets source tracks based on selected source type
+// 2. For each source track, finds matching target tracks
+// 3. Copies hot cues and metadata from source to target tracks
+// 4. Updates progress and handles cancellation throughout the process
+// 5. Shows completion status when finished
+//
+// The method includes panic recovery to ensure the progress dialog is always closed
+// even if an unexpected error occurs.
 func (m *HotCueSyncModule) processUpdate() {
 	defer func() {
 		if r := recover(); r != nil {

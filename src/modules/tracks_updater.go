@@ -1,3 +1,5 @@
+// Package modules provides functionality for different modules in the MetaRekordFixer application.
+// Each module handles a specific task related to DJ database management and music file operations.
 package modules
 
 import (
@@ -16,8 +18,10 @@ import (
 )
 
 // TracksUpdaterModule is a module that handles updating track format in database.
+// It allows users to select a playlist and a folder with new audio files, then updates
+// the file paths and formats in the database to match the new files.
 type TracksUpdaterModule struct {
-	// ModuleBase is the base struct for all modules, which contains the module's window, error handler, and configuration manager.
+	// ModuleBase provides common module functionality like error handling and UI components
 	*common.ModuleBase
 	dbMgr             *common.DBManager
 	playlistSelect    *widget.Select
@@ -28,7 +32,18 @@ type TracksUpdaterModule struct {
 	pendingPlaylistID string // Temporary storage for playlist ID
 }
 
-// NewTracksUpdater creates a new instance of TracksUpdaterModule.
+// NewTracksUpdaterModule creates a new instance of TracksUpdaterModule.
+// It initializes the module with the provided window, configuration manager, database manager,
+// and error handler, sets up the UI components, and loads any saved configuration.
+//
+// Parameters:
+//   - window: The main application window
+//   - configMgr: Configuration manager for saving/loading module settings
+//   - dbMgr: Database manager for accessing the DJ database
+//   - errorHandler: Error handler for displaying and logging errors
+//
+// Returns:
+//   - A fully initialized TracksUpdaterModule instance
 func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdaterModule {
 	m := &TracksUpdaterModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
@@ -48,22 +63,27 @@ func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager,
 }
 
 // GetName returns the localized name of this module.
+// This implements the Module interface method.
 func (m *TracksUpdaterModule) GetName() string {
 	return locales.Translate("updater.mod.name")
 }
 
 // GetConfigName returns the module's configuration key.
+// This key is used to store and retrieve module-specific configuration.
 func (m *TracksUpdaterModule) GetConfigName() string {
 	return "updater"
 }
 
 // GetIcon returns the module's icon resource.
+// This implements the Module interface method and provides the visual representation
+// of this module in the UI.
 func (m *TracksUpdaterModule) GetIcon() fyne.Resource {
 	return theme.SearchReplaceIcon()
 }
 
-// GetModuleContent returns the module's specific content without status messages
+// GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
+// containing the playlist selector, folder selection field, and submit button.
 func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with playlist selector and folder selection field
 	form := &widget.Form{
@@ -95,6 +115,8 @@ func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
 }
 
 // GetContent returns the module's main UI content and initializes database connection.
+// It checks database requirements, loads playlists, and creates the complete module layout
+// with status messages container. If database checks fail, it disables the module controls.
 func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
@@ -131,6 +153,11 @@ func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 }
 
 // LoadConfig applies the configuration to the UI components.
+// If the configuration is nil or empty, it sets default values.
+// It loads folder path and playlist selection from the configuration.
+//
+// Parameters:
+//   - cfg: The module configuration to load
 func (m *TracksUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
@@ -164,6 +191,10 @@ func (m *TracksUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
 }
 
 // SaveConfig reads UI state and saves it into a new ModuleConfig.
+// It saves folder path and playlist ID with appropriate validation rules.
+//
+// Returns:
+//   - A ModuleConfig containing all current UI settings
 func (m *TracksUpdaterModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig()
@@ -184,6 +215,8 @@ func (m *TracksUpdaterModule) SaveConfig() common.ModuleConfig {
 }
 
 // initializeUI sets up the user interface components.
+// It creates and configures all UI elements including the playlist selector,
+// folder selection field, and submit button, and sets up their event handlers.
 func (m *TracksUpdaterModule) initializeUI() {
 	// Create a text entry for the user to input the folder path.
 	// When the user changes the text in the entry, save the config.
@@ -233,7 +266,14 @@ func (m *TracksUpdaterModule) initializeUI() {
 	)
 }
 
-// getFileType is used to translate the file type according to its extension into an identifier that is stored in updated records in djmdContent in the database
+// getFileType translates a file extension into a numeric identifier used in the DJ database.
+// This identifier is stored in the FileType field of the djmdContent table.
+//
+// Parameters:
+//   - ext: The file extension including the dot (e.g., ".mp3")
+//
+// Returns:
+//   - An integer representing the file type in the DJ database format
 func getFileType(ext string) int {
 	switch strings.ToLower(ext) {
 	case ".mp3":
@@ -252,6 +292,11 @@ func getFileType(ext string) int {
 }
 
 // loadPlaylists loads playlist items from the database and updates the playlist selector.
+// It connects to the database, retrieves all playlists, and updates the UI component
+// with the playlist paths. It also restores any previously selected playlist.
+//
+// Returns:
+//   - An error if database connection or playlist retrieval fails, nil otherwise
 func (m *TracksUpdaterModule) loadPlaylists() error {
 	err := m.dbMgr.Connect()
 	if err != nil {
@@ -296,10 +341,11 @@ func (m *TracksUpdaterModule) loadPlaylists() error {
 	return nil
 }
 
-// Start performs the necessary steps before starting the main process
-// It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
-// and starts the main process.
-// Input validation also includes a test of the connection to the database and creating a backup of it.
+// Start performs the necessary steps before starting the main process.
+// It validates the inputs, displays a progress dialog, and starts the update process.
+// Input validation includes checking the database connection and creating a backup.
+//
+// The actual update process runs in a separate goroutine to keep the UI responsive.
 func (m *TracksUpdaterModule) Start() {
 
 	// Create and run validator
@@ -315,6 +361,19 @@ func (m *TracksUpdaterModule) Start() {
 	go m.processUpdate()
 }
 
+// processUpdate performs the actual track update process.
+// It retrieves tracks from the selected playlist, finds matching files in the target folder,
+// and updates the file paths and formats in the database.
+//
+// The process includes:
+// 1. Validating the playlist selection
+// 2. Loading tracks from the selected playlist
+// 3. Scanning the target folder for matching files
+// 4. Matching files by base name (without extension)
+// 5. Updating track records in the database
+// 6. Reporting progress and results
+//
+// The process can be cancelled at any time by the user.
 func (m *TracksUpdaterModule) processUpdate() {
 	// Track the number of updated files.
 	updateCount := 0
