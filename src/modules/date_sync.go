@@ -761,33 +761,20 @@ func (m *DateSyncModule) addFolderEntryForConfig(folderPath string, isExcluded b
 // Input validation includes testing the database connection and creating a backup.
 // The actual processing is started in a goroutine to keep the UI responsive.
 func (m *DateSyncModule) Start(mode string) {
+	// Create and run validator
+	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
+	if err := validator.Validate(mode); err != nil {
+		return
+	}
 
-	if mode == "standard" {
+	// Show progress dialog with cancel support
+	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
 
-		// Create and run validator
-		validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
-		if err := validator.Validate(mode); err != nil {
-			return
-		}
-
-		// Show progress dialog with cancel support
-		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-
-		// Start processing in goroutine
+	// Start processing in goroutine based on mode
+	switch mode {
+	case "standard":
 		go m.processStandardUpdate()
-
-	} else if mode == "custom" {
-
-		// Create and run validator
-		validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
-		if err := validator.Validate(mode); err != nil {
-			return
-		}
-
-		// Show progress dialog with cancel support
-		m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
-
-		// Start processing in goroutine
+	case "custom":
 		go m.processCustomUpdate()
 	}
 }
