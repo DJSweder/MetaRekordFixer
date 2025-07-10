@@ -3,7 +3,6 @@
 package modules
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -120,7 +119,7 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 
 // GetContent returns the module's main UI content.
 // This method returns the complete module layout with status messages container.
-// 
+//
 // Note: This module intentionally does not implement database availability checks
 // as it operates without an active database connection until backup is created.
 // The module also does not implement enable/disable logic for its controls
@@ -224,7 +223,6 @@ func (m *MetadataSyncModule) initializeUI() {
 // It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
 // and starts the main process.
 // Input validation also includes a test of the connection to the database and creating a backup of it.
-// Additionally, it validates that the source folder contains MP3 files before proceeding.
 //
 // This method is called when the user clicks the submit button and runs the validation
 // before launching the actual synchronization process in a goroutine.
@@ -236,32 +234,7 @@ func (m *MetadataSyncModule) Start() {
 		return
 	}
 
-	// Validate source folder contains MP3 files (specific to this module)
 	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
-	mp3Files, err := common.ListFilesWithExtensions(sourcePath, []string{".mp3"}, m.recursiveCheck.Checked)
-	if err != nil {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Find MP3 Files",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %w", locales.Translate("common.err.noreadaccess"), err), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
-
-	if len(mp3Files) == 0 {
-		context := &common.ErrorContext{
-			Module:      m.GetName(),
-			Operation:   "Validate MP3 Files Exist",
-			Severity:    common.SeverityCritical,
-			Recoverable: false,
-		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("common.err.nofiles")), context)
-		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-		return
-	}
 
 	// Show progress dialog with cancel support
 	m.ShowProgressDialog(locales.Translate("metsync.dialog.header"))
@@ -323,19 +296,40 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 		Subtitle    common.NullString
 	}
 
-	// Query to get MP3 files from database
-	rows, err := m.dbMgr.Query(`
-		SELECT 
-			c1.FileNameL,
-			c1.AlbumID,
-			c1.ArtistID,
-			c1.OrgArtistID,
-			c1.ReleaseDate,
-			c1.Subtitle
-		FROM djmdContent c1
-		WHERE c1.FileNameL LIKE '%.mp3'
-		AND c1.FolderPath LIKE '%/' || ? || '/%' OR c1.FolderPath LIKE '%/' || ? || ''
-	`, lastFolderName, lastFolderName)
+	// Query to get rercords of MP3 files from database
+	var rows, err = m.dbMgr.Query(`
+        SELECT 
+            c1.FileNameL,
+            c1.AlbumID,
+            c1.ArtistID,
+            c1.OrgArtistID,
+            c1.ReleaseDate,
+            c1.Subtitle
+        FROM djmdContent c1
+        WHERE c1.FileNameL LIKE '%.mp3'
+        AND c1.FolderPath LIKE '%/' || ? || '/%' OR c1.FolderPath LIKE '%/' || ? || ''
+    `, lastFolderName, lastFolderName)
+
+	if !m.recursiveCheck.Checked {
+		// If recursive search is not checked, we close the previous result and make a new query
+		if rows != nil {
+			rows.Close()
+		}
+
+		// Search only the specified folder
+		rows, err = m.dbMgr.Query(`
+            SELECT 
+                c1.FileNameL,
+                c1.AlbumID,
+                c1.ArtistID,
+                c1.OrgArtistID,
+                c1.ReleaseDate,
+                c1.Subtitle
+            FROM djmdContent c1
+            WHERE c1.FileNameL LIKE '%.mp3'
+            AND c1.FolderPath LIKE '%/' || ? || '/' AND c1.FolderPath NOT LIKE '%/' || ? || '/%/%'
+        `, lastFolderName, lastFolderName)
+	}
 
 	if err != nil {
 		m.CloseProgressDialog()
