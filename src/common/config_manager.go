@@ -91,9 +91,8 @@ func (mgr *ConfigManager) GetGlobalConfig() GlobalConfig {
 //   - error: Any error that occurred during the save operation
 func (mgr *ConfigManager) SaveGlobalConfig(config GlobalConfig) error {
 	mgr.mutex.Lock()
-	defer mgr.mutex.Unlock()
-
 	mgr.globalConfig = config
+	mgr.mutex.Unlock()
 
 	return mgr.saveConfig()
 }
@@ -128,9 +127,9 @@ func (mgr *ConfigManager) GetModuleConfig(moduleName string) ModuleConfig {
 //   - config: The module configuration to save
 func (mgr *ConfigManager) SaveModuleConfig(moduleName string, config ModuleConfig) {
 	mgr.mutex.Lock()
-	defer mgr.mutex.Unlock()
-
 	mgr.moduleConfigs[moduleName] = config
+	mgr.mutex.Unlock()
+
 	mgr.saveConfig()
 }
 

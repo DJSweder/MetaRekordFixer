@@ -182,16 +182,14 @@ func (h *ErrorHandler) ShowPanicError(r interface{}, stackTrace string) {
 }
 
 // ShowStandardError displays an error with standard formatting and context.
-// This method is thread-safe through mutex locking and logs the error with context
-// information if available. It then displays a standard error dialog if a window is available.
+// This method logs the error with context information if available.
+// It then displays a standard error dialog if a window is available.
 // If the error is nil, no action is taken.
 //
 // Parameters:
 //   - err: The error to display and log
 //   - context: Additional context information about the error (may be nil)
 func (h *ErrorHandler) ShowStandardError(err error, context *ErrorContext) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
 	if err == nil {
 		return
 	}
