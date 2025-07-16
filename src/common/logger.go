@@ -19,11 +19,11 @@ var earlyLogMutex sync.Mutex
 func CaptureEarlyLog(level Severity, format string, args ...interface{}) {
 	earlyLogMutex.Lock()
 	defer earlyLogMutex.Unlock()
-	
+
 	// Format log message with timestamp and level
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	message := fmt.Sprintf("%s [%s] %s", timestamp, level, fmt.Sprintf(format, args...))
-	
+
 	earlyLogBuffer = append(earlyLogBuffer, message)
 }
 
@@ -31,13 +31,13 @@ func CaptureEarlyLog(level Severity, format string, args ...interface{}) {
 func FlushEarlyLogs(logger *Logger) {
 	earlyLogMutex.Lock()
 	defer earlyLogMutex.Unlock()
-	
+
 	if logger == nil || len(earlyLogBuffer) == 0 {
 		return
 	}
-	
+
 	logger.Info("--- Flushing %d early log messages ---", len(earlyLogBuffer))
-	
+
 	for _, message := range earlyLogBuffer {
 		// Extract severity from the message
 		parts := strings.SplitN(message, "]", 2)
@@ -46,13 +46,13 @@ func FlushEarlyLogs(logger *Logger) {
 			logger.Info("Early log: %s", message)
 			continue
 		}
-		
+
 		// Write directly to log file to preserve original timestamp
 		logger.mutex.Lock()
 		logger.logFile.WriteString(message + "\n")
 		logger.mutex.Unlock()
 	}
-	
+
 	// Clear the buffer after flushing
 	earlyLogBuffer = nil
 	logger.Info("--- End of early logs ---")
@@ -154,11 +154,6 @@ func (l *Logger) Log(level Severity, format string, args ...interface{}) error {
 
 	l.currentSize += int64(n)
 	return nil
-}
-
-// Debug logs a debug message
-func (l *Logger) Debug(format string, args ...interface{}) {
-	l.Log(SeverityInfo, format, args...)
 }
 
 // Info logs an info message

@@ -103,12 +103,6 @@ func (pd *ProgressDialog) ShowError(err error) {
 	dialog.ShowError(err, pd.window)
 }
 
-// ShowSuccess displays a success message and hides the progress dialog
-func (pd *ProgressDialog) ShowSuccess(message string) {
-	pd.Hide()
-	dialog.ShowInformation(locales.Translate("common.dialog.success"), message, pd.window)
-}
-
 // CreateNativeFolderBrowseButton creates a standardized folder browse button using native OS dialog
 // This is a replacement for CreateFolderBrowseButton that uses native OS dialogs instead of Fyne dialogs
 // to avoid issues with folder selection on Windows platforms
@@ -121,11 +115,6 @@ func CreateNativeFolderBrowseButton(title string, buttonText string, changeHandl
 			}
 		}
 	})
-}
-
-// CreateActionButton creates a standardized action button
-func CreateActionButton(text string, icon fyne.Resource, action func()) *widget.Button {
-	return widget.NewButtonWithIcon(text, icon, action)
 }
 
 // CreateFolderSelectionField creates a standardized folder selection field with browse button
@@ -506,6 +495,7 @@ func ShowPanicDialog(window fyne.Window, title, content string) {
 //   - placeholderText: Placeholder text for entry fields
 //   - onChange: Function to call when an entry value changes
 //   - onDelete: Function to call when an entry is deleted
+//
 // Returns:
 //   - The newly created entry widget that was added to the entries slice
 func CreateDynamicEntryList(
@@ -535,12 +525,12 @@ func CreateDynamicEntryList(
 		entry,
 		func(path string) {
 			entry.SetText(path)
-			
+
 			// Call the onChange handler if provided
 			if onChange != nil {
 				onChange(entry, path)
 			}
-			
+
 			// Add new field if this is the last non-empty one and we haven't reached the limit
 			// Bezpečnostní kontrola proti prázdnému poli
 			if entry.Text != "" && len(entries) > 0 && len(entries) < maxEntries {
@@ -560,7 +550,7 @@ func CreateDynamicEntryList(
 
 	// Add the entry to the container
 	container.Add(folderField)
-	
+
 	// Return the created entry so it can be added to the entries slice
 	return entry
 }

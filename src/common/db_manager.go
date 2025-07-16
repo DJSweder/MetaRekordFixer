@@ -43,15 +43,15 @@ func getDbPassword() string {
 // It handles encrypted Rekordbox database connections, transactions, and query execution
 // while providing error handling, logging, and thread safety through mutex locking.
 type DBManager struct {
-	db                *sql.DB            // database connection
-	dbPath            string             // path to the database file
-	isConnected       bool               // whether the connection is established
-	mutex             sync.Mutex         // mutex for thread safety
-	logger            *Logger            // logger for recording operations
-	errorHandler      *ErrorHandler      // handler for database errors
-	useTransactions   bool               // whether to use transactions
-	activeTransaction *sql.Tx            // current active transaction
-	finalized         bool               // whether the manager has been finalized
+	db                *sql.DB       // database connection
+	dbPath            string        // path to the database file
+	isConnected       bool          // whether the connection is established
+	mutex             sync.Mutex    // mutex for thread safety
+	logger            *Logger       // logger for recording operations
+	errorHandler      *ErrorHandler // handler for database errors
+	useTransactions   bool          // whether to use transactions
+	activeTransaction *sql.Tx       // current active transaction
+	finalized         bool          // whether the manager has been finalized
 }
 
 // NewDBManager creates a new database manager instance for the specified database path.
@@ -188,86 +188,6 @@ func (m *DBManager) EnsureConnected(skipConnect bool) error {
 	return nil
 }
 
-// BeginTransaction starts a new database transaction.
-// This method enables atomic operations that can be committed or rolled back as a unit.
-// It is thread-safe through mutex locking and prevents starting multiple concurrent transactions.
-//
-// Returns:
-//   - nil if the transaction was successfully started
-//   - An error if the database is not connected or a transaction is already active
-func (m *DBManager) BeginTransaction() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if !m.isConnected {
-		return fmt.Errorf(locales.Translate("common.err.dbnotconnected"), m.dbPath)
-	}
-
-	if m.activeTransaction != nil {
-		return fmt.Errorf(locales.Translate("common.err.dbtxactive"), m.dbPath)
-	}
-
-	tx, err := m.db.Begin()
-	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxbegin"), err)
-	}
-
-	m.activeTransaction = tx
-	m.useTransactions = true
-	m.logger.Info("Started database transaction")
-
-	return nil
-}
-
-// CommitTransaction commits the current database transaction.
-// This makes all changes performed during the transaction permanent.
-// It is thread-safe through mutex locking.
-//
-// Returns:
-//   - nil if the transaction was successfully committed
-//   - An error if no transaction is active or the commit operation fails
-func (m *DBManager) CommitTransaction() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.err.dbtxnoactive"), m.dbPath)
-	}
-
-	err := m.activeTransaction.Commit()
-	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxcommit"), err)
-	}
-	m.logger.Info("Committed database transaction")
-	m.activeTransaction = nil
-	return nil
-}
-
-// RollbackTransaction rolls back the current database transaction.
-// This discards all changes performed during the transaction.
-// It is thread-safe through mutex locking.
-//
-// Returns:
-//   - nil if the transaction was successfully rolled back
-//   - An error if no transaction is active or the rollback operation fails
-func (m *DBManager) RollbackTransaction() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if !m.useTransactions || m.activeTransaction == nil {
-		return fmt.Errorf(locales.Translate("common.err.dbtxnoactive"), m.dbPath)
-	}
-
-	err := m.activeTransaction.Rollback()
-	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("common.err.dbtxrollback"), err)
-	}
-	m.logger.Info("Rolled back database transaction")
-
-	m.activeTransaction = nil
-	return nil
-}
-
 // Execute runs an SQL statement with parameters that doesn't return results.
 // This method is typically used for INSERT, UPDATE, DELETE, and other statements
 // that modify the database. It ensures the database is connected before execution
@@ -325,33 +245,6 @@ func (m *DBManager) Query(query string, args ...interface{}) (*sql.Rows, error) 
 	return rows, nil
 }
 
-// QueryWithoutConnect executes an SQL query without ensuring a database connection.
-// This is useful during initialization when we want to avoid connecting to the database.
-// The method is thread-safe through mutex locking but will fail if the database is not already connected.
-//
-// Parameters:
-//   - query: The SQL query to execute
-//   - args: Optional parameters for the SQL query
-//
-// Returns:
-//   - A pointer to sql.Rows containing the query results and nil if successful
-//   - nil and an error if the database is not connected or the query fails
-func (m *DBManager) QueryWithoutConnect(query string, args ...interface{}) (*sql.Rows, error) {
-	if !m.isConnected {
-		return nil, fmt.Errorf("database not connected")
-	}
-
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	rows, queryErr := m.db.Query(query, args...)
-	if queryErr != nil {
-		return nil, fmt.Errorf("%s: %w", locales.Translate("common.err.dbquery"), queryErr)
-	}
-
-	return rows, nil
-}
-
 // QueryRow executes an SQL query and returns a single row.
 // This method is typically used for SELECT statements where only one row is expected.
 // It ensures the database is connected before execution and is thread-safe through mutex locking.
@@ -373,37 +266,6 @@ func (m *DBManager) QueryRow(query string, args ...interface{}) *sql.Row {
 	defer m.mutex.Unlock()
 
 	return m.db.QueryRow(query, args...)
-}
-
-// TableExists checks if a table exists in the database.
-// This method queries the sqlite_master table to determine if the specified table exists.
-// It ensures the database is connected before execution.
-//
-// Parameters:
-//   - tableName: The name of the table to check for existence
-//
-// Returns:
-//   - true and nil if the table exists
-//   - false and nil if the table does not exist
-//   - false and an error if the database is not connected or the query fails
-func (m *DBManager) TableExists(tableName string) (bool, error) {
-	err := m.EnsureConnected(false)
-	if err != nil {
-		return false, err
-	}
-
-	query := `SELECT name FROM sqlite_master WHERE type='table' AND name=?`
-	row := m.QueryRow(query, tableName)
-
-	var name string
-	err = row.Scan(&name)
-	if err == sql.ErrNoRows {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("%s: %w", locales.Translate("common.err.dbtablecheck"), err)
-	}
-
-	return true, nil
 }
 
 // BackupDatabase creates a backup of the database.

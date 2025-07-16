@@ -8,7 +8,6 @@ import (
 	"MetaRekordFixer/locales"
 	"database/sql"
 	"fmt"
-	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -20,10 +19,10 @@ import (
 // PlaylistItem represents a playlist item from Rekordbox database.
 // It contains the playlist's identifier, name, parent ID, and full path.
 type PlaylistItem struct {
-	ID       string        // Unique identifier of the playlist
-	Name     string        // Display name of the playlist
+	ID       string         // Unique identifier of the playlist
+	Name     string         // Display name of the playlist
 	ParentID sql.NullString // Parent playlist ID (nullable for root playlists)
-	Path     string        // Full path of the playlist including parent folders
+	Path     string         // Full path of the playlist including parent folders
 }
 
 // Module defines the interface that all modules must implement.
@@ -73,23 +72,6 @@ type DatabaseRequirements struct {
 	NeedsDatabase bool
 	// NeedsImmediateAccess indicates if database access is required during initialization
 	NeedsImmediateAccess bool
-}
-
-func (m *ModuleBase) GetFieldDefinitions() map[string]FieldDefinition {
-	return m.fieldDefinitions
-}
-
-// DefineField registers a field definition for validation purposes.
-// It specifies the field's type and whether it is required.
-// This is used by the validation system to ensure proper field values.
-func (m *ModuleBase) DefineField(fieldName string, fieldType string, required bool) {
-	if m.fieldDefinitions == nil {
-		m.fieldDefinitions = make(map[string]FieldDefinition)
-	}
-	m.fieldDefinitions[fieldName] = FieldDefinition{
-		FieldType: fieldType,
-		Required:  required,
-	}
 }
 
 // NewModuleBase creates a new ModuleBase instance with the provided window, configuration manager, and error handler.
@@ -228,14 +210,14 @@ func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 			m.isCancelled = true
 			m.mutex.Unlock()
 			onCancel[0]()
-			}
+		}
 	} else {
 		cancelHandler = func() {
 			m.mutex.Lock()
 			m.isCancelled = true
 			m.mutex.Unlock()
+		}
 	}
-}
 
 	// Create and show progress dialog
 	m.mutex.Lock()
@@ -305,29 +287,6 @@ func (m *ModuleBase) IsCancelled() bool {
 	defer m.mutex.Unlock()
 
 	return m.isCancelled
-}
-
-// HandleError processes an error with context information.
-// This method creates an ErrorContext with the module name, operation description, and error,
-// then delegates to the ErrorHandler to properly log and display the error.
-//
-// Parameters:
-//   - err: The error that occurred
-//   - operation: A description of the operation that was being performed when the error occurred
-//
-// If the ErrorHandler is not initialized, this method will silently return without processing the error.
-func (m *ModuleBase) HandleError(err error, operation string) {
-	if m.ErrorHandler == nil {
-		return
-	}
-
-	context := ErrorContext{
-		Module:    m.GetName(),
-		Operation: operation,
-		Error:     err,
-	}
-
-	m.ErrorHandler.ShowErrorWithContext(context)
 }
 
 // ShowError displays a simple error dialog with the provided error message.
@@ -478,47 +437,6 @@ func (m *ModuleBase) CreateSelectionChangeHandler(handler func()) func(string) {
 			handler()
 		}
 	}
-}
-
-// LoadFolderEntries loads folder entries from the configuration and converts them to widget entries.
-// This utility function parses a pipe-separated string of folder paths from the configuration
-// and creates entry widgets for each folder path.
-//
-// Parameters:
-//   - cfg: The module configuration object containing the settings
-//   - key: The configuration key where the folder paths are stored
-//
-// Returns:
-//   - A slice of entry widgets initialized with the folder paths
-func LoadFolderEntries(cfg ModuleConfig, key string) []*widget.Entry {
-	entries := []*widget.Entry{}
-	folders := strings.Split(cfg.Get(key, ""), "|")
-	for _, folder := range folders {
-		if folder != "" {
-			entry := widget.NewEntry()
-			entry.SetText(folder)
-			entries = append(entries, entry)
-		}
-	}
-	return entries
-}
-
-// SaveFolderEntries saves folder entries into the configuration as a pipe-separated string.
-// This utility function collects non-empty text from entry widgets and joins them
-// with a pipe character for storage in the configuration.
-//
-// Parameters:
-//   - cfg: The module configuration object to store the settings in
-//   - key: The configuration key where the folder paths should be stored
-//   - entries: A slice of entry widgets containing the folder paths
-func SaveFolderEntries(cfg ModuleConfig, key string, entries []*widget.Entry) {
-	folders := []string{}
-	for _, entry := range entries {
-		if entry.Text != "" {
-			folders = append(folders, entry.Text)
-		}
-	}
-	cfg.Set(key, strings.Join(folders, "|"))
 }
 
 // SetDatabaseRequirements sets the database requirements for this module.

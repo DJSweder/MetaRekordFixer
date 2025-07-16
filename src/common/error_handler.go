@@ -145,19 +145,6 @@ func (h *ErrorHandler) ShowErrorWithContext(context ErrorContext) {
 	}
 }
 
-// FormatError creates a standardized error message.
-// This method formats an error with the operation name for consistent error reporting.
-//
-// Parameters:
-//   - operation: A string describing the operation that failed
-//   - err: The original error
-//
-// Returns:
-//   - A new error with standardized formatting
-func (h *ErrorHandler) FormatError(operation string, err error) error {
-	return fmt.Errorf("%s: %v", operation, err)
-}
-
 // ShowPanicError displays a critical error dialog and logs the error from a recovered panic.
 // This method formats the panic information with a stack trace and displays it in a
 // specialized panic dialog. It also logs the panic details with the ERROR severity level.

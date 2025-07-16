@@ -3,11 +3,12 @@
 package common
 
 import (
+	"sync"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
-	"sync"
 
 	"MetaRekordFixer/theme"
 )
@@ -119,11 +120,6 @@ func (smc *StatusMessagesContainer) AddErrorMessage(content string) {
 	smc.AddMessage(MessageError, content)
 }
 
-// AddCriticalMessage adds a critical error message
-func (smc *StatusMessagesContainer) AddCriticalMessage(content string) {
-	smc.AddMessage(MessageCritical, content)
-}
-
 // ClearMessages removes all messages from the container
 func (smc *StatusMessagesContainer) ClearMessages() {
 	smc.mutex.Lock()
@@ -132,5 +128,3 @@ func (smc *StatusMessagesContainer) ClearMessages() {
 	smc.container.RemoveAll()
 	smc.Refresh()
 }
-
-

@@ -264,15 +264,6 @@ func (c *ModuleConfig) SetWithDefinition(key string, value string, fieldType str
 	}
 }
 
-func (c *ModuleConfig) SetWithDependency(key string, value string, fieldType string, required bool, dependsOn string, activeWhen string, validationType string) {
-	c.SetWithDefinition(key, value, fieldType, required, validationType)
-	if field, exists := c.Fields[key]; exists {
-		field.DependsOn = dependsOn
-		field.ActiveWhen = activeWhen
-		c.Fields[key] = field
-	}
-}
-
 // SetWithDefinitionAndActions stores a string value in the module configuration with field definition and validation actions
 func (cfg *ModuleConfig) SetWithDefinitionAndActions(key string, value string, fieldType string, required bool, validationType string, validateOnActions []string) {
 	if cfg.Fields == nil {
@@ -323,15 +314,6 @@ func (c *ModuleConfig) SetBoolWithDefinition(key string, value bool, required bo
 	}
 }
 
-func (c *ModuleConfig) SetBoolWithDependency(key string, value bool, required bool, dependsOn string, activeWhen string, validationType string) {
-	c.SetBoolWithDefinition(key, value, required, validationType)
-	if field, exists := c.Fields[key]; exists {
-		field.DependsOn = dependsOn
-		field.ActiveWhen = activeWhen
-		c.Fields[key] = field
-	}
-}
-
 // SetIntWithDefinition stores an integer value in the module configuration
 func (c *ModuleConfig) SetIntWithDefinition(key string, value int, required bool) {
 	if c.Fields == nil {
@@ -341,15 +323,6 @@ func (c *ModuleConfig) SetIntWithDefinition(key string, value int, required bool
 		FieldType: "number", // for numeric values
 		Required:  required,
 		Value:     fmt.Sprintf("%d", value),
-	}
-}
-
-func (c *ModuleConfig) SetIntWithDependency(key string, value int, required bool, dependsOn string, activeWhen string) {
-	c.SetIntWithDefinition(key, value, required)
-	if field, exists := c.Fields[key]; exists {
-		field.DependsOn = dependsOn
-		field.ActiveWhen = activeWhen
-		c.Fields[key] = field
 	}
 }
 
