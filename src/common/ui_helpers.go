@@ -527,7 +527,7 @@ func CreateDynamicEntryList(
 				if path != "" && newEntry == entries[len(entries)-1] && len(entries) < maxEntries {
 					addEntry("")
 				}
-				
+
 				// Notify about the change
 				if onChanged != nil {
 					onChanged(entries)
