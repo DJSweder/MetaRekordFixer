@@ -484,73 +484,99 @@ func ShowPanicDialog(window fyne.Window, title, content string) {
 	panicDialog.Show()
 }
 
-// CreateDynamicEntryList creates a dynamic list of folder entry fields with add/remove functionality.
-// It abstracts the common pattern of adding and removing folder entry rows used in modules.
+// CreateDynamicEntryList creates and manages a dynamic list of folder entry fields.
+// This function encapsulates the entire logic for adding, removing, and displaying folder entries.
 // Parameters:
-//   - container: The container where the entry fields will be added
-//   - entries: Slice of entry widgets to manage
-//   - addEntryFunc: Function to call when a new entry needs to be added
-//   - maxEntries: Maximum number of entries allowed (default 6)
-//   - title: Title for the folder selection dialog
-//   - placeholderText: Placeholder text for entry fields
-//   - onChange: Function to call when an entry value changes
-//   - onDelete: Function to call when an entry is deleted
+// - parent: The parent window for dialogs.
+// - initialEntries: A slice of strings to populate the initial entry fields.
+// - maxEntries: The maximum number of entries allowed in the list.
 //
 // Returns:
-//   - The newly created entry widget that was added to the entries slice
+// - A container with the complete, self-managed UI for the dynamic list.
+// - A slice of entry widgets for the calling module to read/write values.
 func CreateDynamicEntryList(
-	container *fyne.Container,
-	entries []*widget.Entry,
-	addEntryFunc func(),
+	parent fyne.Window,
+	initialEntries []string,
 	maxEntries int,
-	title string,
-	placeholderText string,
-	onChange func(entry *widget.Entry, value string),
-	onDelete func(entry *widget.Entry),
-) *widget.Entry {
-	// Check if we've reached the maximum number of entries
-	if len(entries) >= maxEntries {
-		return nil
-	}
+	onChanged func([]*widget.Entry),
+) (*fyne.Container, []*widget.Entry) {
+	entryContainer := container.NewVBox()
+	var entries []*widget.Entry
 
-	// Create a new entry
-	entry := widget.NewEntry()
-	if placeholderText != "" {
-		entry.SetPlaceHolder(placeholderText)
-	}
+	// addEntry creates a new folder entry row and adds it to the container.
+	var addEntry func(path string) *widget.Entry
+	addEntry = func(path string) *widget.Entry {
+		if len(entries) >= maxEntries {
+			return nil // Do not add more than the max limit
+		}
 
-	// Create the folder selection field with delete button
-	folderField := CreateFolderSelectionFieldWithDelete(
-		title,
-		entry,
-		func(path string) {
-			entry.SetText(path)
+		newEntry := widget.NewEntry()
+		newEntry.SetPlaceHolder(locales.Translate("common.folder.placeholder"))
+		if path != "" {
+			newEntry.SetText(path)
+		}
 
-			// Call the onChange handler if provided
-			if onChange != nil {
-				onChange(entry, path)
-			}
+		// Create a folder selection field with delete button
+		folderField := CreateFolderSelectionFieldWithDelete(
+			locales.Translate("common.button.browsefolder"),
+			newEntry,
+			func(path string) {
+				newEntry.SetText(path)
 
-			// Add new field if this is the last non-empty one and we haven't reached the limit
-			// Bezpečnostní kontrola proti prázdnému poli
-			if entry.Text != "" && len(entries) > 0 && len(entries) < maxEntries {
-				// Kontrola, zda je tento entry poslední v poli
-				if entry == entries[len(entries)-1] {
-					addEntryFunc()
+				// If this is the last entry and it's not empty, add a new one
+				if path != "" && newEntry == entries[len(entries)-1] && len(entries) < maxEntries {
+					addEntry("")
 				}
-			}
-		},
-		func() {
-			// Call the onDelete handler if provided
-			if onDelete != nil {
-				onDelete(entry)
-			}
-		},
-	)
+				
+				// Notify about the change
+				if onChanged != nil {
+					onChanged(entries)
+				}
+			},
+			func() {
+				// Find and remove this entry
+				for i, entry := range entries {
+					if entry == newEntry {
+						// Remove from container and entries slice
+						entryContainer.Remove(entryContainer.Objects[i])
+						entries = append(entries[:i], entries[i+1:]...)
+						entryContainer.Refresh()
+						break
+					}
+				}
 
-	// Add the entry to the container
-	container.Add(folderField)
+				// If no entries remain, add an empty one
+				if len(entries) == 0 {
+					addEntry("")
+				}
 
-	// Return the created entry so it can be added to the entries slice
-	return entry
+				// Notify about the change
+				if onChanged != nil {
+					onChanged(entries)
+				}
+			},
+		)
+
+		entries = append(entries, newEntry)
+		entryContainer.Add(folderField)
+		entryContainer.Refresh()
+
+		return newEntry
+	}
+
+	// Populate with initial entries
+	if len(initialEntries) > 0 {
+		for _, path := range initialEntries {
+			if path != "" {
+				addEntry(path)
+			}
+		}
+	}
+
+	// Always ensure there is at least one entry field or add empty entry if not at max limit
+	if len(entries) == 0 || (len(entries) < maxEntries && entries[len(entries)-1].Text != "") {
+		addEntry("")
+	}
+
+	return entryContainer, entries
 }
