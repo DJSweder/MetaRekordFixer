@@ -280,6 +280,8 @@ func (m *MetadataSyncModule) Start() {
 // Parameters:
 //   - sourcePath: The folder path to process for metadata synchronization
 func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
+
+	defer m.dbMgr.Finalize()
 	// Normalize paths
 	sourcePath = common.NormalizePath(sourcePath)
 

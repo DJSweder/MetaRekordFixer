@@ -141,33 +141,33 @@ func (m *MusicConverterModule) GetModuleContent() fyne.CanvasObject {
 	leftHeader := common.CreateDescriptionLabel(locales.Translate("convert.label.leftpanel"))
 
 	// Source folder container
-	sourceBrowseBtn := common.CreateNativeFolderBrowseButton(
+	sourceFolderField := common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		"",
+		m.sourceFolderEntry,
 		func(path string) {
-			m.sourceFolderEntry.SetText(path)
+			m.sourceFolderEntry.SetText(common.NormalizePath(path))
 			m.SaveConfig()
 		},
 	)
 	sourceContainer := container.NewBorder(
 		nil, nil,
-		m.sourceFormatSelect, sourceBrowseBtn,
-		m.sourceFolderEntry,
+		m.sourceFormatSelect, nil,
+		sourceFolderField,
 	)
 
 	// Target folder container
-	targetBrowseBtn := common.CreateNativeFolderBrowseButton(
+	targetFolderField := common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		"",
+		m.targetFolderEntry,
 		func(path string) {
-			m.targetFolderEntry.SetText(path)
+			m.targetFolderEntry.SetText(common.NormalizePath(path))
 			m.SaveConfig()
 		},
 	)
 	targetContainer := container.NewBorder(
 		nil, nil,
-		m.targetFormatSelect, targetBrowseBtn,
-		m.targetFolderEntry,
+		m.targetFormatSelect, nil,
+		targetFolderField,
 	)
 
 	// Create form for source and target inputs
@@ -431,14 +431,6 @@ func (m *MusicConverterModule) SaveConfig() common.ModuleConfig {
 // It creates and configures all UI elements including entry fields, select boxes,
 // checkboxes, and buttons, and sets up their event handlers.
 func (m *MusicConverterModule) initializeUI() {
-	// Source folder selection
-	m.sourceFolderEntry = widget.NewEntry()
-	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
-
-	// Target folder selection
-	m.targetFolderEntry = widget.NewEntry()
-	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() { m.SaveConfig() })
-
 	// Source format selection
 	sourceFormats := []string{
 		locales.Translate("convert.srcformats.all"),
@@ -460,6 +452,28 @@ func (m *MusicConverterModule) initializeUI() {
 		m.onTargetFormatChanged(format)
 		m.SaveConfig()
 	})
+
+	// Source folder selection
+	sourceFolderField := common.CreateFolderSelectionField(
+		locales.Translate("common.entry.placeholderpath"),
+		nil, // Entry will create inside function
+		func(path string) {
+			m.sourceFolderEntry.SetText(common.NormalizePath(path))
+			m.SaveConfig()
+		},
+	)
+	m.sourceFolderEntry = sourceFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
+
+	// Target folder selection
+	targetFolderField := common.CreateFolderSelectionField(
+		locales.Translate("common.entry.placeholderpath"),
+		nil, // Entry will create inside function
+		func(path string) {
+			m.targetFolderEntry.SetText(common.NormalizePath(path))
+			m.SaveConfig()
+		},
+	)
+	m.targetFolderEntry = targetFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
 
 	// Checkboxes
 	m.rewriteExistingCheckbox = common.CreateCheckbox(locales.Translate("convert.chkbox.rewrite"), nil)
@@ -682,6 +696,7 @@ func (m *MusicConverterModule) IsCancelled() bool {
 	}
 	return isCancelled
 }
+
 // Start performs the necessary steps before starting the main process.
 // It validates the inputs and starts the conversion process if validation passes.
 func (m *MusicConverterModule) Start() {
@@ -1195,11 +1210,11 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 // It provides translation tables between internal field names and format-specific field names.
 type MetadataMap struct {
 	// InternalToMP3 maps internal field names to MP3 (ID3) field names
-	InternalToMP3  map[string]string
+	InternalToMP3 map[string]string
 	// InternalToFLAC maps internal field names to FLAC field names
 	InternalToFLAC map[string]string
 	// InternalToWAV maps internal field names to WAV field names
-	InternalToWAV  map[string]string
+	InternalToWAV map[string]string
 }
 
 // ConversionParameter represents a single parameter option for conversion.

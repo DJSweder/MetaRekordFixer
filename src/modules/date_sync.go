@@ -619,6 +619,9 @@ func (m *DateSyncModule) processCustomUpdate() {
 //
 // The method handles cancellation during processing.
 func (m *DateSyncModule) setStandardDates() (int, error) {
+	// Ensure database resources are properly released
+	defer m.dbMgr.Finalize()
+
 	// Build WHERE clause for excluded folders
 	whereClause := "WHERE ReleaseDate IS NOT NULL"
 	if m.excludeFoldersCheck.Checked {
@@ -676,6 +679,8 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 //
 // The method handles cancellation during processing.
 func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
+	// Ensure database resources are properly released
+	defer m.dbMgr.Finalize()
 
 	// Build WHERE clause for selected folders
 	whereClause := "WHERE"
