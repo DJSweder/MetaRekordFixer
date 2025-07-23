@@ -368,7 +368,7 @@ func GetLogFilePath() string {
 
 	// Construct the path to the log file
 	logDir := filepath.Join(appDataDir, "MetaRekordFixer", "log")
-	logFile := filepath.Join(logDir, "metarekordfixer.log")
+	logFile := filepath.Join(logDir, "metarekordfixer_app.log")
 
 	return logFile
 }

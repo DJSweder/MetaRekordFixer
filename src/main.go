@@ -51,7 +51,7 @@ type moduleInfo struct {
 // Any critical errors during initialization are stored and displayed after the UI is ready.
 func NewRekordboxTools() *RekordboxTools {
 	// Phase 1: Initialize Logger
-	logPath, err := common.LocateOrCreatePath("metarekordfixer.log", "log")
+	logPath, err := common.LocateOrCreatePath("metarekordfixer_app.log", "log")
 	if err != nil {
 		// This is a critical failure, as we cannot log anything without a logger.
 		// We capture the error in early log buffer and exit.
@@ -81,13 +81,13 @@ func NewRekordboxTools() *RekordboxTools {
 	configPath, configInitError := common.LocateOrCreatePath("settings.conf", "") // Empty subDir for config at MetaRekordFixer/settings.conf
 	if configInitError != nil {
 		rt.configInitError = fmt.Errorf("failed to determine path for config file: %w", configInitError)
-		logger.Error(rt.configInitError.Error())
+		logger.Error("%s", rt.configInitError.Error())
 		// We proceed without a config manager, the error will be shown to the user in Run().
 	} else {
 		configMgr, err := common.NewConfigManager(configPath)
 		if err != nil {
 			rt.configInitError = fmt.Errorf("failed to initialize config manager at '%s': %w", configPath, err)
-			logger.Error(rt.configInitError.Error())
+			logger.Error("%s", rt.configInitError.Error())
 		} else {
 			rt.configMgr = configMgr
 			// Flush any early logs captured during initialization (after ConfigManager is initialized)

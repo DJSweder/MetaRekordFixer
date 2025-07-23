@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -450,8 +449,6 @@ func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
 			return
 		}
 
-		// Small delay to prevent database overload
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Update progress to completion

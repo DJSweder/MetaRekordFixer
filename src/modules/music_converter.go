@@ -76,6 +76,9 @@ type MusicConverterModule struct {
 	// Cancel context and function for stopping ffmpeg
 	cancelFunc context.CancelFunc
 	ctx        context.Context
+
+	// Logger for ffmpeg output
+	ffmpegLogger *common.Logger
 }
 
 // NewMusicConverterModule creates a new instance of MusicConverterModule.
@@ -94,6 +97,24 @@ func NewMusicConverterModule(window fyne.Window, configMgr *common.ConfigManager
 		ModuleBase:   common.NewModuleBase(window, configMgr, errorHandler),
 		isConverting: false,
 	}
+
+	// FFmpeg logger initialization
+	//
+	// We do NOT handle errors here. If the main application logger works,
+	// it is almost guaranteed that ffmpeg logger will work too, because it uses
+	// the exact same path and permissions logic. If ffmpeg logger fails to initialize
+	// (which should never happen in normal operation), we simply do not log ffmpeg output
+	// to a separate file. This keeps the code simple and avoids unnecessary user warnings.
+	//
+	// If you ever change the log path logic or permissions, reconsider this approach.
+	ffmpegLogPath, err := common.LocateOrCreatePath("metarekordfixer_ffmpeg.log", "log")
+	if err == nil {
+		ffmpegLogger, err := common.NewLogger(ffmpegLogPath, 10, 7)
+		if err == nil {
+			m.ffmpegLogger = ffmpegLogger
+		}
+	}
+
 	// Check if module has configuration, if not, create default
 	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
 
@@ -1178,11 +1199,16 @@ func (m *MusicConverterModule) convertFile(sourcePath, targetPath, targetFormat 
 	cmd := exec.CommandContext(m.ctx, "tools/ffmpeg.exe", args...)
 	m.currentProcess = cmd
 
-	// Run the command and wait for it to finish
-	err := cmd.Run()
+	// Run ffmpeg and get output
+	output, err := cmd.CombinedOutput()
 
 	// Clear process reference
 	m.currentProcess = nil
+
+	// Always log ffmpeg output
+	if m.ffmpegLogger != nil {
+		m.ffmpegLogger.Info("FFMPEG %s -> %s\n%s", sourcePath, targetPath, string(output))
+	}
 
 	// Check if process was cancelled
 	if m.IsCancelled() {
@@ -1602,4 +1628,11 @@ func (m *MusicConverterModule) SetDefaultConfig() common.ModuleConfig {
 	cfg.SetWithDependencyAndActions("wav_bitdepth", "copy", "select", true, "target_format", "WAV", "none", []string{"start"})
 
 	return cfg
+}
+
+// Close releases resources held by the module (logger for ffmpeg included)
+func (m *MusicConverterModule) Close() {
+	if m.ffmpegLogger != nil {
+		_ = m.ffmpegLogger.Close()
+	}
 }
