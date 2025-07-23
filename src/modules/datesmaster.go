@@ -1,5 +1,11 @@
+// modules/datesmaster.go
+
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
-// This file contains the DateSyncModule implementation for synchronizing dates in the Rekordbox database.
+// This file contains the DatesMasterModule implementation for synchronizing dates in the Rekordbox database.
+
+// This module changes *StockDate* (date added) and *DateCreated* (date created) for tracks in the Rekordbox database in 2 ways:
+// 1. Copies values of release date fields with the option to exclude songs in folders (maximum 6 folders)
+// 2. Sets custom date for tracks in specific folders (maximum 6 folders)
 
 package modules
 
@@ -33,9 +39,9 @@ const (
 	maxFolderEntries = 6
 )
 
-// DateSyncModule implements a module for synchronizing dates in the Rekordbox database.
+// DatesMasterModule implements a module for synchronizing dates in the Rekordbox database.
 // It provides functionality to set standard dates based on release dates or custom dates for specific folders.
-type DateSyncModule struct {
+type DatesMasterModule struct {
 	*common.ModuleBase
 	dbMgr                  *common.DBManager
 	calendarBtn            *widget.Button
@@ -82,18 +88,18 @@ func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
 	}
 
 	months := []string{
-		locales.Translate("datesync.month.jan"),
-		locales.Translate("datesync.month.feb"),
-		locales.Translate("datesync.month.mar"),
-		locales.Translate("datesync.month.apr"),
-		locales.Translate("datesync.month.may"),
-		locales.Translate("datesync.month.jun"),
-		locales.Translate("datesync.month.jul"),
-		locales.Translate("datesync.month.aug"),
-		locales.Translate("datesync.month.sep"),
-		locales.Translate("datesync.month.okt"),
-		locales.Translate("datesync.month.nov"),
-		locales.Translate("datesync.month.dec"),
+		locales.Translate("datesmaster.month.jan"),
+		locales.Translate("datesmaster.month.feb"),
+		locales.Translate("datesmaster.month.mar"),
+		locales.Translate("datesmaster.month.apr"),
+		locales.Translate("datesmaster.month.may"),
+		locales.Translate("datesmaster.month.jun"),
+		locales.Translate("datesmaster.month.jul"),
+		locales.Translate("datesmaster.month.aug"),
+		locales.Translate("datesmaster.month.sep"),
+		locales.Translate("datesmaster.month.okt"),
+		locales.Translate("datesmaster.month.nov"),
+		locales.Translate("datesmaster.month.dec"),
 	}
 
 	c.yearSelect = widget.NewSelect(years, func(s string) {
@@ -104,18 +110,18 @@ func NewCustomCalendar(callback func(time.Time)) *CustomCalendar {
 	})
 	c.monthSelect = widget.NewSelect(months, func(s string) {
 		months := map[string]time.Month{
-			locales.Translate("datesync.month.jan"): time.January,
-			locales.Translate("datesync.month.feb"): time.February,
-			locales.Translate("datesync.month.mar"): time.March,
-			locales.Translate("datesync.month.apr"): time.April,
-			locales.Translate("datesync.month.may"): time.May,
-			locales.Translate("datesync.month.jun"): time.June,
-			locales.Translate("datesync.month.jul"): time.July,
-			locales.Translate("datesync.month.aug"): time.August,
-			locales.Translate("datesync.month.sep"): time.September,
-			locales.Translate("datesync.month.okt"): time.October,
-			locales.Translate("datesync.month.nov"): time.November,
-			locales.Translate("datesync.month.dec"): time.December,
+			locales.Translate("datesmaster.month.jan"): time.January,
+			locales.Translate("datesmaster.month.feb"): time.February,
+			locales.Translate("datesmaster.month.mar"): time.March,
+			locales.Translate("datesmaster.month.apr"): time.April,
+			locales.Translate("datesmaster.month.may"): time.May,
+			locales.Translate("datesmaster.month.jun"): time.June,
+			locales.Translate("datesmaster.month.jul"): time.July,
+			locales.Translate("datesmaster.month.aug"): time.August,
+			locales.Translate("datesmaster.month.sep"): time.September,
+			locales.Translate("datesmaster.month.okt"): time.October,
+			locales.Translate("datesmaster.month.nov"): time.November,
+			locales.Translate("datesmaster.month.dec"): time.December,
 		}
 
 		c.currentMonth = months[s]
@@ -146,13 +152,13 @@ func (c *CustomCalendar) updateDays() {
 	c.daysGrid.Objects = []fyne.CanvasObject{}
 
 	days := []string{
-		locales.Translate("datesync.day.mon"),
-		locales.Translate("datesync.day.tue"),
-		locales.Translate("datesync.day.wed"),
-		locales.Translate("datesync.day.thu"),
-		locales.Translate("datesync.day.fri"),
-		locales.Translate("datesync.day.sat"),
-		locales.Translate("datesync.day.sun"),
+		locales.Translate("datesmaster.day.mon"),
+		locales.Translate("datesmaster.day.tue"),
+		locales.Translate("datesmaster.day.wed"),
+		locales.Translate("datesmaster.day.thu"),
+		locales.Translate("datesmaster.day.fri"),
+		locales.Translate("datesmaster.day.sat"),
+		locales.Translate("datesmaster.day.sun"),
 	}
 
 	for _, day := range days {
@@ -184,7 +190,7 @@ func (c *CustomCalendar) updateDays() {
 	c.Refresh()
 }
 
-// NewDateSyncModule creates a new instance of DateSyncModule.
+// NewDatesMasterModule creates a new instance of DatesMasterModule.
 // It initializes the UI components and loads the configuration.
 // Parameters:
 //   - window: The main application window
@@ -192,9 +198,9 @@ func (c *CustomCalendar) updateDays() {
 //   - dbMgr: Database manager for database operations
 //   - errorHandler: Error handler for error management
 //
-// Returns a new DateSyncModule instance.
-func NewDateSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *DateSyncModule {
-	m := &DateSyncModule{
+// Returns a new DatesMasterModule instance.
+func NewDatesMasterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *DatesMasterModule {
+	m := &DatesMasterModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
@@ -210,28 +216,28 @@ func NewDateSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMg
 
 // GetName returns the localized name of the module.
 // This implements the Module interface method.
-func (m *DateSyncModule) GetName() string {
-	return locales.Translate("datesync.mod.name")
+func (m *DatesMasterModule) GetName() string {
+	return locales.Translate("datesmaster.mod.name")
 }
 
 // GetConfigName returns the configuration identifier for the module.
 // This implements the Module interface method and is used for configuration storage.
-func (m *DateSyncModule) GetConfigName() string {
-	return "datesync"
+func (m *DatesMasterModule) GetConfigName() string {
+	return "datesmaster"
 }
 
 // GetIcon returns the module's icon resource.
 // This implements the Module interface method.
-func (m *DateSyncModule) GetIcon() fyne.Resource {
+func (m *DatesMasterModule) GetIcon() fyne.Resource {
 	return theme.StorageIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI.
 // Returns a canvas object containing the module's UI components.
-func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
+func (m *DatesMasterModule) GetModuleContent() fyne.CanvasObject {
 	// Left section - excluded folders
-	leftHeader := widget.NewLabel(locales.Translate("datesync.label.leftpanel"))
+	leftHeader := widget.NewLabel(locales.Translate("datesmaster.label.leftpanel"))
 	leftHeader.TextStyle = fyne.TextStyle{Bold: true}
 
 	leftSection := container.NewVBox(
@@ -242,7 +248,7 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 	)
 
 	// Right section - custom date folders
-	rightHeader := widget.NewLabel(locales.Translate("datesync.label.rightpanel"))
+	rightHeader := widget.NewLabel(locales.Translate("datesmaster.label.rightpanel"))
 	rightHeader.TextStyle = fyne.TextStyle{Bold: true}
 
 	// Date picker with calendar button
@@ -267,7 +273,7 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		common.CreateDescriptionLabel(locales.Translate("datesync.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("datesmaster.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)
@@ -278,7 +284,7 @@ func (m *DateSyncModule) GetModuleContent() fyne.CanvasObject {
 // GetContent returns the module's main UI content including status messages.
 // This implements the Module interface method.
 // Returns a canvas object containing the complete module layout.
-func (m *DateSyncModule) GetContent() fyne.CanvasObject {
+func (m *DatesMasterModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
@@ -289,7 +295,7 @@ func (m *DateSyncModule) GetContent() fyne.CanvasObject {
 //   - cfg: The module configuration to load
 //
 // The method sets IsLoadingConfig flag during loading to prevent triggering save operations.
-func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
+func (m *DatesMasterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
@@ -357,7 +363,7 @@ func (m *DateSyncModule) LoadConfig(cfg common.ModuleConfig) {
 // It collects values from all UI components and stores them in the configuration manager.
 // Returns the newly created and saved ModuleConfig.
 // The method checks IsLoadingConfig flag to prevent saving during configuration loading.
-func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
+func (m *DatesMasterModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
 	}
@@ -415,9 +421,9 @@ func (m *DateSyncModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components for the module.
 // It creates all UI elements, sets up event handlers, and initializes containers.
 // This method is called during module creation.
-func (m *DateSyncModule) initializeUI() {
+func (m *DatesMasterModule) initializeUI() {
 	// Create excluded folders checkbox
-	m.excludeFoldersCheck = widget.NewCheck(locales.Translate("datesync.chkbox.exception"),
+	m.excludeFoldersCheck = widget.NewCheck(locales.Translate("datesmaster.chkbox.exception"),
 		m.CreateBoolChangeHandler(func() {
 			m.SaveConfig()
 		}),
@@ -431,7 +437,7 @@ func (m *DateSyncModule) initializeUI() {
 
 	// Create date picker
 	m.datePickerEntry = widget.NewEntry()
-	m.datePickerEntry.SetPlaceHolder(locales.Translate("datesync.date.placeholder"))
+	m.datePickerEntry.SetPlaceHolder(locales.Translate("datesmaster.date.placeholder"))
 	m.datePickerEntry.OnChanged = m.CreateChangeHandler(func() {
 
 		// Limit input to 10 characters (YYYY-MM-DD)
@@ -449,7 +455,7 @@ func (m *DateSyncModule) initializeUI() {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
 		})
-		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesync.datepicker.header"), calendar, m.Window)
+		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesmaster.datepicker.header"), calendar, m.Window)
 		calendar.onSelected = func(selectedDate time.Time) {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
 			m.SaveConfig()
@@ -461,13 +467,13 @@ func (m *DateSyncModule) initializeUI() {
 	})
 
 	// Create standard update button
-	m.standardUpdateBtn = common.CreateSubmitButton(locales.Translate("datesync.button.startupdate"), func() {
+	m.standardUpdateBtn = common.CreateSubmitButton(locales.Translate("datesmaster.button.startupdate"), func() {
 		m.Start("standard")
 	},
 	)
 
 	// Create custom date update button
-	m.customDateUpdateBtn = common.CreateSubmitButton(locales.Translate("datesync.button.startcustomupdate"), func() {
+	m.customDateUpdateBtn = common.CreateSubmitButton(locales.Translate("datesmaster.button.startcustomupdate"), func() {
 		m.Start("custom")
 	},
 	)
@@ -494,8 +500,6 @@ func (m *DateSyncModule) initializeUI() {
 	)
 }
 
-
-
 // Start performs the necessary steps before starting the main process.
 // It saves the configuration, validates the inputs, informs the user, displays a dialog with a progress bar
 // and starts the main process based on specific mode.
@@ -505,7 +509,7 @@ func (m *DateSyncModule) initializeUI() {
 //
 // Input validation includes testing the database connection and creating a backup.
 // The actual processing is started in a goroutine to keep the UI responsive.
-func (m *DateSyncModule) Start(mode string) {
+func (m *DatesMasterModule) Start(mode string) {
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
 	if err := validator.Validate(mode); err != nil {
@@ -513,7 +517,7 @@ func (m *DateSyncModule) Start(mode string) {
 	}
 
 	// Show progress dialog with cancel support
-	m.ShowProgressDialog(locales.Translate("datesync.dialog.header"))
+	m.ShowProgressDialog(locales.Translate("datesmaster.dialog.header"))
 
 	// Start processing in goroutine based on mode
 	switch mode {
@@ -528,7 +532,7 @@ func (m *DateSyncModule) Start(mode string) {
 // It updates the progress dialog, calls setStandardDates to perform the database update,
 // handles errors and cancellation, and updates the UI with results.
 // This method runs in a separate goroutine.
-func (m *DateSyncModule) processStandardUpdate() {
+func (m *DatesMasterModule) processStandardUpdate() {
 
 	// Execute standard date sync
 	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
@@ -563,7 +567,7 @@ func (m *DateSyncModule) processStandardUpdate() {
 // It collects custom date folders, calls setCustomDates to perform the database update,
 // handles errors and cancellation, and updates the UI with results.
 // This method runs in a separate goroutine.
-func (m *DateSyncModule) processCustomUpdate() {
+func (m *DatesMasterModule) processCustomUpdate() {
 
 	// No need to parse custom date, it's already parsed in the validator
 	customDate, _ := time.Parse("2006-01-02", m.datePickerEntry.Text)
@@ -618,7 +622,7 @@ func (m *DateSyncModule) processCustomUpdate() {
 //   - error: Any error that occurred during the operation
 //
 // The method handles cancellation during processing.
-func (m *DateSyncModule) setStandardDates() (int, error) {
+func (m *DatesMasterModule) setStandardDates() (int, error) {
 	// Ensure database resources are properly released
 	defer m.dbMgr.Finalize()
 
@@ -643,7 +647,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	var totalCount int
 	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbitemscount"), err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesmaster.err.dbitemscount"), err)
 	}
 
 	// Add info message about number of records to update
@@ -660,7 +664,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 	updateQuery := fmt.Sprintf("UPDATE djmdContent SET StockDate = ReleaseDate, DateCreated = ReleaseDate %s", whereClause)
 	err = m.dbMgr.Execute(updateQuery)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbupdate"), err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesmaster.err.dbupdate"), err)
 	}
 
 	return totalCount, nil
@@ -678,7 +682,7 @@ func (m *DateSyncModule) setStandardDates() (int, error) {
 //   - error: Any error that occurred during the operation
 //
 // The method handles cancellation during processing.
-func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
+func (m *DatesMasterModule) setCustomDates(customDateFoldersEntry []string, customDate time.Time) (int, error) {
 	// Ensure database resources are properly released
 	defer m.dbMgr.Finalize()
 
@@ -696,7 +700,7 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 	var totalCount int
 	err := m.dbMgr.QueryRow(countQuery).Scan(&totalCount)
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbitemscount"), err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesmaster.err.dbitemscount"), err)
 	}
 
 	// Add info message about number of records to update
@@ -718,7 +722,7 @@ func (m *DateSyncModule) setCustomDates(customDateFoldersEntry []string, customD
 
 	err = m.dbMgr.Execute(updateQuery, customDate.Format("2006-01-02"), customDate.Format("2006-01-02"))
 	if err != nil {
-		return 0, fmt.Errorf("%s: %w", locales.Translate("datesync.err.dbupdate"), err)
+		return 0, fmt.Errorf("%s: %w", locales.Translate("datesmaster.err.dbupdate"), err)
 	}
 
 	return totalCount, nil

@@ -1,5 +1,11 @@
+// modules/formatupdater.go
+
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
+
+// This module is used for changing the format of music files (e.g. replacing MP3 with FLAC) while maintaining all original track information.
+// In order to be able to identify these tracks, it is necessary to prepare them in advance in a playlist.
+
 package modules
 
 import (
@@ -17,10 +23,10 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// TracksUpdaterModule is a module that handles updating track format in database.
+// FormatUpdaterModule is a module that handles updating track format in database.
 // It allows users to select a playlist and a folder with new audio files, then updates
 // the file paths and formats in the database to match the new files.
-type TracksUpdaterModule struct {
+type FormatUpdaterModule struct {
 	// ModuleBase provides common module functionality like error handling and UI components
 	*common.ModuleBase
 	dbMgr             *common.DBManager
@@ -32,7 +38,7 @@ type TracksUpdaterModule struct {
 	pendingPlaylistID string // Temporary storage for playlist ID
 }
 
-// NewTracksUpdaterModule creates a new instance of TracksUpdaterModule.
+// NewFormatUpdaterModule creates a new instance of FormatUpdaterModule.
 // It initializes the module with the provided window, configuration manager, database manager,
 // and error handler, sets up the UI components, and loads any saved configuration.
 //
@@ -43,9 +49,9 @@ type TracksUpdaterModule struct {
 //   - errorHandler: Error handler for displaying and logging errors
 //
 // Returns:
-//   - A fully initialized TracksUpdaterModule instance
-func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *TracksUpdaterModule {
-	m := &TracksUpdaterModule{
+//   - A fully initialized FormatUpdaterModule instance
+func NewFormatUpdaterModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *FormatUpdaterModule {
+	m := &FormatUpdaterModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
@@ -64,32 +70,32 @@ func NewTracksUpdaterModule(window fyne.Window, configMgr *common.ConfigManager,
 
 // GetName returns the localized name of this module.
 // This implements the Module interface method.
-func (m *TracksUpdaterModule) GetName() string {
-	return locales.Translate("updater.mod.name")
+func (m *FormatUpdaterModule) GetName() string {
+	return locales.Translate("formatupdater.mod.name")
 }
 
 // GetConfigName returns the module's configuration key.
 // This key is used to store and retrieve module-specific configuration.
-func (m *TracksUpdaterModule) GetConfigName() string {
-	return "updater"
+func (m *FormatUpdaterModule) GetConfigName() string {
+	return "formatupdater"
 }
 
 // GetIcon returns the module's icon resource.
 // This implements the Module interface method and provides the visual representation
 // of this module in the UI.
-func (m *TracksUpdaterModule) GetIcon() fyne.Resource {
+func (m *FormatUpdaterModule) GetIcon() fyne.Resource {
 	return theme.SearchReplaceIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
 // containing the playlist selector, folder selection field, and submit button.
-func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
+func (m *FormatUpdaterModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with playlist selector and folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("updater.label.replaced"), Widget: m.playlistSelect},
-			{Text: locales.Translate("updater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderEntry)},
+			{Text: locales.Translate("formatupdater.label.replaced"), Widget: m.playlistSelect},
+			{Text: locales.Translate("formatupdater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderEntry)},
 		},
 	}
 
@@ -100,7 +106,7 @@ func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		common.CreateDescriptionLabel(locales.Translate("updater.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("formatupdater.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)
@@ -117,7 +123,7 @@ func (m *TracksUpdaterModule) GetModuleContent() fyne.CanvasObject {
 // GetContent returns the module's main UI content and initializes database connection.
 // It checks database requirements, loads playlists, and creates the complete module layout
 // with status messages container. If database checks fail, it disables the module controls.
-func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
+func (m *FormatUpdaterModule) GetContent() fyne.CanvasObject {
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
 		context := &common.ErrorContext{
@@ -158,7 +164,7 @@ func (m *TracksUpdaterModule) GetContent() fyne.CanvasObject {
 //
 // Parameters:
 //   - cfg: The module configuration to load
-func (m *TracksUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
+func (m *FormatUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
@@ -195,7 +201,7 @@ func (m *TracksUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
 //
 // Returns:
 //   - A ModuleConfig containing all current UI settings
-func (m *TracksUpdaterModule) SaveConfig() common.ModuleConfig {
+func (m *FormatUpdaterModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig()
 	}
@@ -217,7 +223,7 @@ func (m *TracksUpdaterModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components.
 // It creates and configures all UI elements including the playlist selector,
 // folder selection field, and submit button, and sets up their event handlers.
-func (m *TracksUpdaterModule) initializeUI() {
+func (m *FormatUpdaterModule) initializeUI() {
 	// Create a text entry for the user to input the folder path.
 	// When the user changes the text in the entry, save the config.
 	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
@@ -260,7 +266,7 @@ func (m *TracksUpdaterModule) initializeUI() {
 	// The submit button is disabled to prevent the user from starting the module
 	// before the module is fully loaded.
 	// When the user clicks the submit button, start the module.
-	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("updater.button.libupd"), func() {
+	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("formatupdater.button.libupd"), func() {
 		go m.Start()
 	},
 	)
@@ -297,7 +303,7 @@ func getFileType(ext string) int {
 //
 // Returns:
 //   - An error if database connection or playlist retrieval fails, nil otherwise
-func (m *TracksUpdaterModule) loadPlaylists() error {
+func (m *FormatUpdaterModule) loadPlaylists() error {
 	err := m.dbMgr.Connect()
 	if err != nil {
 		return err // DBMgr.Connect() is expected to return a localized error.
@@ -346,7 +352,7 @@ func (m *TracksUpdaterModule) loadPlaylists() error {
 // Input validation includes checking the database connection and creating a backup.
 //
 // The actual update process runs in a separate goroutine to keep the UI responsive.
-func (m *TracksUpdaterModule) Start() {
+func (m *FormatUpdaterModule) Start() {
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -355,7 +361,7 @@ func (m *TracksUpdaterModule) Start() {
 	}
 
 	// Show the progress dialog
-	m.ShowProgressDialog(locales.Translate("updater.dialog.header"))
+	m.ShowProgressDialog(locales.Translate("formatupdater.dialog.header"))
 
 	// Start processing in a goroutine
 	go m.processUpdate()
@@ -374,7 +380,7 @@ func (m *TracksUpdaterModule) Start() {
 // 6. Reporting progress and results
 //
 // The process can be cancelled at any time by the user.
-func (m *TracksUpdaterModule) processUpdate() {
+func (m *FormatUpdaterModule) processUpdate() {
 	// Track the number of updated files.
 	updateCount := 0
 	// Validate playlist selection
@@ -385,7 +391,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("formatupdater.err.noplaylist")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -428,13 +434,13 @@ func (m *TracksUpdaterModule) processUpdate() {
 			Severity:    common.SeverityWarning,
 			Recoverable: true,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("updater.err.noplaylist")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("formatupdater.err.noplaylist")), context)
 		m.CloseProgressDialog()
 		return
 	}
 
 	// Get the tracks from the playlist.
-	m.UpdateProgressStatus(0.4, locales.Translate("updater.status.gettrackspls"))
+	m.UpdateProgressStatus(0.4, locales.Translate("formatupdater.status.gettrackspls"))
 	rows, err := m.dbMgr.Query(`
 		SELECT c.ID, c.FileNameL
 		FROM djmdContent c
@@ -480,8 +486,8 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Report playlist track count
-	m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.playlistcount"), len(tracks)))
+	m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("formatupdater.tracks.playlistcount"), len(tracks)))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.tracks.playlistcount"), len(tracks)))
 
 	// Check if operation was cancelled
 	if m.IsCancelled() {
@@ -491,7 +497,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Get all files in target folder
-	m.UpdateProgressStatus(0.6, locales.Translate("updater.tracks.gettracksfldr"))
+	m.UpdateProgressStatus(0.6, locales.Translate("formatupdater.tracks.gettracksfldr"))
 	files, err := common.ListFilesWithExtensions(m.folderEntry.Text, nil, false)
 	if err != nil {
 		m.CloseProgressDialog()
@@ -507,7 +513,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Inform about number of files in folder
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.countinfolder"), len(files)))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.tracks.countinfolder"), len(files)))
 
 	// Check if operation was cancelled
 	if m.IsCancelled() {
@@ -528,7 +534,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}, 0)
 
 	// Match files and prepare updates
-	m.UpdateProgressStatus(0.7, locales.Translate("updater.status.matching"))
+	m.UpdateProgressStatus(0.7, locales.Translate("formatupdater.status.matching"))
 	for _, track := range tracks {
 		baseName := strings.TrimSuffix(track.FileName, filepath.Ext(track.FileName))
 		newFiles, err := filepath.Glob(filepath.Join(m.folderEntry.Text, baseName+".*"))
@@ -563,18 +569,18 @@ func (m *TracksUpdaterModule) processUpdate() {
 
 	// Report non-matching files
 	if nonMatchingFiles > 0 {
-		m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfilenamescount"), nonMatchingFiles))
+		m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.tracks.badfilenamescount"), nonMatchingFiles))
 
 		// Display list of non-matching files as warning
 		fileListStr := ""
 		if len(mismatchedFiles) > 5 {
 			fileListStr = fmt.Sprintf("%s %s",
 				strings.Join(mismatchedFiles[:5], ", "),
-				fmt.Sprintf(locales.Translate("updater.tracks.morefiles"), len(mismatchedFiles)-5))
+				fmt.Sprintf(locales.Translate("formatupdater.tracks.morefiles"), len(mismatchedFiles)-5))
 		} else {
 			fileListStr = strings.Join(mismatchedFiles, ", ")
 		}
-		m.AddWarningMessage(fmt.Sprintf(locales.Translate("updater.tracks.badfileslist"), fileListStr))
+		m.AddWarningMessage(fmt.Sprintf(locales.Translate("formatupdater.tracks.badfileslist"), fileListStr))
 	}
 
 	// Check if operation was cancelled
@@ -585,7 +591,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Update tracks in database
-	m.UpdateProgressStatus(0.8, locales.Translate("updater.tracks.starting"))
+	m.UpdateProgressStatus(0.8, locales.Translate("formatupdater.tracks.starting"))
 	for _, updateTrack := range updateTracks {
 		if err := m.dbMgr.Execute(`
 			UPDATE djmdContent
@@ -608,7 +614,7 @@ func (m *TracksUpdaterModule) processUpdate() {
 
 		updateCount++
 		progress := float64(updateCount) / float64(len(updateTracks))
-		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("updater.status.progress"), updateCount, len(updateTracks)))
+		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("formatupdater.status.progress"), updateCount, len(updateTracks)))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -619,8 +625,8 @@ func (m *TracksUpdaterModule) processUpdate() {
 	}
 
 	// Update progress and status
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("updater.status.completed"), updateCount))
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("formatupdater.status.completed"), updateCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.status.completed"), updateCount))
 
 	// Mark the progress dialog as completed
 	m.CompleteProgressDialog()

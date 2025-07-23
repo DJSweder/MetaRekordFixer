@@ -164,35 +164,35 @@ func (rt *RekordboxTools) initModules() {
 	rt.modules = []*moduleInfo{
 		{
 			createFn: func() common.Module {
-				m := modules.NewMetadataSyncModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				m := modules.NewFlacFixerModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},
 		},
 		{
 			createFn: func() common.Module {
-				m := modules.NewHotCueSyncModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				m := modules.NewDataDuplicatorModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
 		},
 		{
 			createFn: func() common.Module {
-				m := modules.NewDateSyncModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				m := modules.NewDatesMasterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},
 		},
 		{
 			createFn: func() common.Module {
-				m := modules.NewTracksUpdaterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				m := modules.NewFormatUpdaterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
 		},
 		{
 			createFn: func() common.Module {
-				m := modules.NewMusicConverterModule(rt.mainWindow, rt.configMgr, rt.errorHandler)
+				m := modules.NewFormatConverterModule(rt.mainWindow, rt.configMgr, rt.errorHandler)
 				m.SetDatabaseRequirements(false, false)
 				return m
 			},

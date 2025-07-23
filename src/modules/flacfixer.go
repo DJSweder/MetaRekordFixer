@@ -1,5 +1,10 @@
+// modules/flacfixer.go
+
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
+
+// This module copy metadata that is stored in the database for MP3 versions of identical tracks to the FLAC track collection
+
 package modules
 
 import (
@@ -17,11 +22,11 @@ import (
 	"MetaRekordFixer/locales"
 )
 
-// MetadataSyncModule handles metadata synchronization between different file formats.
+// FlacFixerModule handles metadata synchronization between different file formats.
 // It implements the standard Module interface and provides functionality for synchronizing
 // metadata between MP3 and FLAC files in a specified folder, ensuring consistent metadata
 // across different formats of the same tracks.
-type MetadataSyncModule struct {
+type FlacFixerModule struct {
 	// ModuleBase is the base struct for all modules, which contains the module's window,
 	// error handler, and configuration manager.
 	*common.ModuleBase
@@ -37,7 +42,7 @@ type MetadataSyncModule struct {
 	submitBtn *widget.Button
 }
 
-// NewMetadataSyncModule creates a new instance of MetadataSyncModule.
+// NewFlacFixerModule creates a new instance of FlacFixerModule.
 // It initializes the module with the provided window, configuration manager,
 // database manager, and error handler, sets up the UI components, and loads
 // any saved configuration.
@@ -49,9 +54,9 @@ type MetadataSyncModule struct {
 //   - errorHandler: Error handler for displaying and logging errors
 //
 // Returns:
-//   - A fully initialized MetadataSyncModule instance
-func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *MetadataSyncModule {
-	m := &MetadataSyncModule{
+//   - A fully initialized FlacFixerModule instance
+func NewFlacFixerModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *FlacFixerModule {
+	m := &FlacFixerModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
@@ -66,31 +71,31 @@ func NewMetadataSyncModule(window fyne.Window, configMgr *common.ConfigManager, 
 
 // GetName returns the localized name of this module.
 // This implements the Module interface method.
-func (m *MetadataSyncModule) GetName() string {
-	return locales.Translate("metsync.mod.name")
+func (m *FlacFixerModule) GetName() string {
+	return locales.Translate("flacfixer.mod.name")
 }
 
 // GetConfigName returns the configuration key for this module.
 // This key is used to store and retrieve module-specific configuration.
-func (m *MetadataSyncModule) GetConfigName() string {
-	return "metsync"
+func (m *FlacFixerModule) GetConfigName() string {
+	return "flacfixer"
 }
 
 // GetIcon returns the module's icon resource.
 // This implements the Module interface method and provides the visual representation
 // of this module in the UI.
-func (m *MetadataSyncModule) GetIcon() fyne.Resource {
+func (m *FlacFixerModule) GetIcon() fyne.Resource {
 	return theme.HomeIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
 // containing the folder selection field, recursive checkbox, and submit button.
-func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
+func (m *FlacFixerModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("metsync.label.source"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.sourceFolderEntry)},
+			{Text: locales.Translate("flacfixer.label.source"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.sourceFolderEntry)},
 		},
 	}
 
@@ -102,7 +107,7 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create module content with description and separator
 	moduleContent := container.NewVBox(
-		common.CreateDescriptionLabel(locales.Translate("metsync.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("flacfixer.label.info")),
 		widget.NewSeparator(),
 		contentContainer,
 	)
@@ -123,7 +128,7 @@ func (m *MetadataSyncModule) GetModuleContent() fyne.CanvasObject {
 // as it operates without an active database connection until backup is created.
 // The module also does not implement enable/disable logic for its controls
 // as it needs to remain functional even when database is not available.
-func (m *MetadataSyncModule) GetContent() fyne.CanvasObject {
+func (m *FlacFixerModule) GetContent() fyne.CanvasObject {
 	// Create the complete module layout with status messages container
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
@@ -134,7 +139,7 @@ func (m *MetadataSyncModule) GetContent() fyne.CanvasObject {
 //
 // Parameters:
 //   - cfg: The module configuration to load
-func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
+func (m *FlacFixerModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
@@ -162,7 +167,7 @@ func (m *MetadataSyncModule) LoadConfig(cfg common.ModuleConfig) {
 //
 // Returns:
 //   - A ModuleConfig containing all current UI settings
-func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
+func (m *FlacFixerModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
 	}
@@ -188,7 +193,7 @@ func (m *MetadataSyncModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components.
 // It creates and configures the entry fields, checkboxes, and buttons,
 // and sets up their event handlers to respond to user interactions.
-func (m *MetadataSyncModule) initializeUI() {
+func (m *FlacFixerModule) initializeUI() {
 	// Initialize entry fields
 	m.sourceFolderEntry = widget.NewEntry()
 	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
@@ -207,12 +212,12 @@ func (m *MetadataSyncModule) initializeUI() {
 	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
 	// Initialize recursive checkbox using standardized function
-	m.recursiveCheck = common.CreateCheckbox(locales.Translate("metsync.chkbox.recursive"), func(checked bool) {
+	m.recursiveCheck = common.CreateCheckbox(locales.Translate("flacfixer.chkbox.recursive"), func(checked bool) {
 		m.SaveConfig()
 	})
 
 	// Initialize sync button
-	m.submitBtn = common.CreateSubmitButton(locales.Translate("metsync.button.sync"), func() {
+	m.submitBtn = common.CreateSubmitButton(locales.Translate("flacfixer.button.sync"), func() {
 		go m.Start()
 	},
 	)
@@ -225,7 +230,7 @@ func (m *MetadataSyncModule) initializeUI() {
 //
 // This method is called when the user clicks the submit button and runs the validation
 // before launching the actual synchronization process in a goroutine.
-func (m *MetadataSyncModule) Start() {
+func (m *FlacFixerModule) Start() {
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -236,7 +241,7 @@ func (m *MetadataSyncModule) Start() {
 	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
 
 	// Show progress dialog with cancel support
-	m.ShowProgressDialog(locales.Translate("metsync.dialog.header"))
+	m.ShowProgressDialog(locales.Translate("flacfixer.dialog.header"))
 
 	// Start processing in a goroutine
 	go func() {
@@ -262,11 +267,11 @@ func (m *MetadataSyncModule) Start() {
 		}
 
 		// Process metadata synchronization
-		m.processMetadataSync(sourcePath)
+		m.processFlacFixer(sourcePath)
 	}()
 }
 
-// processMetadataSync handles the actual metadata synchronization process.
+// processFlacFixer handles the actual metadata synchronization process.
 // It reads MP3 files from the database, updates corresponding FLAC files with matching metadata,
 // and manages the progress dialog and status updates throughout the process.
 //
@@ -278,7 +283,7 @@ func (m *MetadataSyncModule) Start() {
 //
 // Parameters:
 //   - sourcePath: The folder path to process for metadata synchronization
-func (m *MetadataSyncModule) processMetadataSync(sourcePath string) {
+func (m *FlacFixerModule) processFlacFixer(sourcePath string) {
 
 	defer m.dbMgr.Finalize()
 	// Normalize paths

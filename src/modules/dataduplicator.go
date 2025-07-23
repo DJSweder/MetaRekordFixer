@@ -1,5 +1,12 @@
+// modules/dataduplicator.go
+
 // Package modules contains specialized functionality modules for the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
+
+// This module copies these metadata fields from tracks to tracks:
+// HOT CUE & Memor CUE points, play counts, addition/creation dates, color
+// This is useful if the user maintains a music library in multiple formats.
+
 package modules
 
 import (
@@ -27,10 +34,10 @@ const (
 	SourceTypePlaylist SourceType = "playlist"
 )
 
-// HotCueSyncModule handles hot cue synchronization between tracks.
+// DataDuplicatorModule handles hot cue synchronization between tracks.
 // It allows copying hot cues and related metadata from source tracks to target tracks
 // based on matching filenames, using either folder or playlist as source/target.
-type HotCueSyncModule struct {
+type DataDuplicatorModule struct {
 	*common.ModuleBase
 	dbMgr                *common.DBManager
 	sourceType           *widget.Select
@@ -47,7 +54,7 @@ type HotCueSyncModule struct {
 	submitBtn            *widget.Button
 }
 
-// NewHotCueSyncModule creates a new HotCueSyncModule instance and initializes its UI.
+// NewDataDuplicatorModule creates a new DataDuplicatorModule instance and initializes its UI.
 // It sets up all UI components, loads saved configuration, and prepares the module for use.
 //
 // Parameters:
@@ -57,9 +64,9 @@ type HotCueSyncModule struct {
 //   - errorHandler: Error handler for displaying and logging errors
 //
 // Returns:
-//   - A fully initialized HotCueSyncModule instance
-func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *HotCueSyncModule {
-	m := &HotCueSyncModule{
+//   - A fully initialized DataDuplicatorModule instance
+func NewDataDuplicatorModule(window fyne.Window, configMgr *common.ConfigManager, dbMgr *common.DBManager, errorHandler *common.ErrorHandler) *DataDuplicatorModule {
+	m := &DataDuplicatorModule{
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
@@ -79,32 +86,32 @@ func NewHotCueSyncModule(window fyne.Window, configMgr *common.ConfigManager, db
 
 // GetName returns the localized name of this module.
 // This implements the Module interface method.
-func (m *HotCueSyncModule) GetName() string {
-	return locales.Translate("hotcuesync.mod.name")
+func (m *DataDuplicatorModule) GetName() string {
+	return locales.Translate("dataduplicator.mod.name")
 }
 
 // GetConfigName returns the configuration key for this module.
 // This key is used to store and retrieve module-specific configuration.
-func (m *HotCueSyncModule) GetConfigName() string {
-	return "hotcuesync"
+func (m *DataDuplicatorModule) GetConfigName() string {
+	return "dataduplicator"
 }
 
 // GetIcon returns the module's icon resource.
 // This implements the Module interface method and provides the visual representation
 // of this module in the UI.
-func (m *HotCueSyncModule) GetIcon() fyne.Resource {
+func (m *DataDuplicatorModule) GetIcon() fyne.Resource {
 	return theme.ContentCopyIcon()
 }
 
 // GetModuleContent returns the module's specific content without status messages.
 // This implements the method from ModuleBase to provide the module-specific UI
 // containing all the input fields, selectors, and buttons needed for hot cue synchronization.
-func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
+func (m *DataDuplicatorModule) GetModuleContent() fyne.CanvasObject {
 	// Form without submit button
 	standardForm := &widget.Form{
 		Items: []*widget.FormItem{
 			{
-				Text: locales.Translate("hotcuesync.label.source"),
+				Text: locales.Translate("dataduplicator.label.source"),
 				Widget: container.NewBorder(
 					nil, nil,
 					m.sourceType,
@@ -116,7 +123,7 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 				),
 			},
 			{
-				Text: locales.Translate("hotcuesync.label.target"),
+				Text: locales.Translate("dataduplicator.label.target"),
 				Widget: container.NewBorder(
 					nil, nil,
 					m.targetType,
@@ -132,7 +139,7 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 
 	// Create content container
 	contentContainer := container.NewVBox(
-		common.CreateDescriptionLabel(locales.Translate("hotcuesync.label.info")),
+		common.CreateDescriptionLabel(locales.Translate("dataduplicator.label.info")),
 		widget.NewSeparator(),
 		standardForm,
 	)
@@ -151,7 +158,7 @@ func (m *HotCueSyncModule) GetModuleContent() fyne.CanvasObject {
 // This method performs database validation, loads playlists, and ensures all UI components
 // are properly initialized and enabled/disabled based on the current state.
 // It returns the complete module layout with status messages container.
-func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
+func (m *DataDuplicatorModule) GetContent() fyne.CanvasObject {
 	// Check database requirements
 	if m.dbMgr.GetDatabasePath() == "" {
 		context := &common.ErrorContext{
@@ -179,10 +186,10 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 	}
 
 	// Enable interactive components if all checks passed
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) {
+	if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypePlaylist)) {
 		m.sourcePlaylistSelect.Enable()
 	}
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypePlaylist)) {
+	if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypePlaylist)) {
 		m.targetPlaylistSelect.Enable()
 	}
 	m.submitBtn.Enable()
@@ -197,7 +204,7 @@ func (m *HotCueSyncModule) GetContent() fyne.CanvasObject {
 //
 // Parameters:
 //   - cfg: The module configuration to load
-func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
+func (m *DataDuplicatorModule) LoadConfig(cfg common.ModuleConfig) {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
@@ -219,12 +226,12 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 	// Load source type
 	sourceTypeStr := cfg.Get("source_type", string(SourceTypeFolder))
 	sourceType := SourceType(sourceTypeStr)
-	m.sourceType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(sourceType)))
+	m.sourceType.SetSelected(locales.Translate("dataduplicator.dropdown." + string(sourceType)))
 
 	// Load target type
 	targetTypeStr := cfg.Get("target_type", string(SourceTypeFolder))
 	targetType := SourceType(targetTypeStr)
-	m.targetType.SetSelected(locales.Translate("hotcuesync.dropdown." + string(targetType)))
+	m.targetType.SetSelected(locales.Translate("dataduplicator.dropdown." + string(targetType)))
 
 	// Load folder paths
 	m.sourceFolderEntry.SetText(cfg.Get("source_folder", ""))
@@ -267,7 +274,7 @@ func (m *HotCueSyncModule) LoadConfig(cfg common.ModuleConfig) {
 //
 // Returns:
 //   - A ModuleConfig containing all current UI settings
-func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
+func (m *DataDuplicatorModule) SaveConfig() common.ModuleConfig {
 	if m.IsLoadingConfig {
 		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
 	}
@@ -276,7 +283,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 
 	// Save source type
 	var sourceType SourceType
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		sourceType = SourceTypeFolder
 	} else {
 		sourceType = SourceTypePlaylist
@@ -285,7 +292,7 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 
 	// Save target type
 	var targetType SourceType
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		targetType = SourceTypeFolder
 	} else {
 		targetType = SourceTypePlaylist
@@ -324,15 +331,15 @@ func (m *HotCueSyncModule) SaveConfig() common.ModuleConfig {
 // initializeUI sets up the user interface components.
 // This method initializes all UI elements including selectors, entry fields,
 // and buttons, and sets up their event handlers.
-func (m *HotCueSyncModule) initializeUI() {
+func (m *DataDuplicatorModule) initializeUI() {
 	// Initialize source type selector
 	m.sourceType = widget.NewSelect([]string{
-		locales.Translate("hotcuesync.dropdown.folder"),
-		locales.Translate("hotcuesync.dropdown.playlist"),
+		locales.Translate("dataduplicator.dropdown.folder"),
+		locales.Translate("dataduplicator.dropdown.playlist"),
 	}, nil)
 	m.sourceType.OnChanged = m.CreateSelectionChangeHandler(func() {
 		var sourceType SourceType
-		if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 			sourceType = SourceTypeFolder
 		} else {
 			sourceType = SourceTypePlaylist
@@ -343,12 +350,12 @@ func (m *HotCueSyncModule) initializeUI() {
 
 	// Initialize target type selector
 	m.targetType = widget.NewSelect([]string{
-		locales.Translate("hotcuesync.dropdown.folder"),
-		locales.Translate("hotcuesync.dropdown.playlist"),
+		locales.Translate("dataduplicator.dropdown.folder"),
+		locales.Translate("dataduplicator.dropdown.playlist"),
 	}, nil)
 	m.targetType.OnChanged = m.CreateSelectionChangeHandler(func() {
 		var targetType SourceType
-		if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+		if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 			targetType = SourceTypeFolder
 		} else {
 			targetType = SourceTypePlaylist
@@ -410,7 +417,7 @@ func (m *HotCueSyncModule) initializeUI() {
 	})
 
 	// Create a standardized submit button
-	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("hotcuesync.button.start"), func() {
+	m.submitBtn = common.CreateDisabledSubmitButton(locales.Translate("dataduplicator.button.start"), func() {
 		go m.Start()
 	},
 	)
@@ -434,10 +441,10 @@ func (m *HotCueSyncModule) initializeUI() {
 // Returns:
 //   - error: Returns nil if successful, otherwise returns an error with a localized message
 //     describing what went wrong (e.g., database query errors, update errors)
-func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
+func (m *DataDuplicatorModule) copyHotCues(sourceID, targetID string) error {
 	hotCues, err := m.dbMgr.GetTrackHotCues(sourceID)
 	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.querycues"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.querycues"), err)
 	}
 
 	// Counter for tracking the number of hot cues
@@ -457,14 +464,14 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Delete existing hot cues with the same Kind value in the target track
 		err = m.dbMgr.Execute(`DELETE FROM djmdCue WHERE ContentID = ? AND Kind = ?`, targetID, kind)
 		if err != nil {
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.deletecue"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.deletecue"), err)
 		}
 
 		// Generate a new ID for the hot cue in the target track
 		var maxID int64
 		err = m.dbMgr.QueryRow("SELECT COALESCE(MAX(CAST(ID AS INTEGER)), 0) FROM djmdCue").Scan(&maxID)
 		if err != nil {
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.maxidcheck"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.maxidcheck"), err)
 		}
 		maxID++
 		newID := fmt.Sprintf("%d", maxID)
@@ -502,11 +509,11 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 		// Execute the insert
 		err = m.dbMgr.Execute(query, params...)
 		if err != nil {
-			return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.cueinsert"), err)
+			return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.cueinsert"), err)
 		}
 	}
 
-	m.Logger.Info(locales.Translate("hotcuesync.status.copiedcues"), hotCueCount, sourceID, targetID)
+	m.Logger.Info(locales.Translate("dataduplicator.status.copiedcues"), hotCueCount, sourceID, targetID)
 	return nil
 }
 
@@ -519,7 +526,7 @@ func (m *HotCueSyncModule) copyHotCues(sourceID, targetID string) error {
 //
 // Returns:
 //   - error: Returns nil if successful, otherwise returns an error with details about the failure
-func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
+func (m *DataDuplicatorModule) copyTrackMetadata(sourceID, targetID string) error {
 	// Query to get source track metadata
 	query := `
 		SELECT StockDate, DateCreated, ColorID, DJPlayCount
@@ -529,7 +536,7 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 
 	row := m.dbMgr.QueryRow(query, sourceID)
 	if row == nil {
-		return fmt.Errorf("%s", locales.Translate("hotcuesync.err.querysource"))
+		return fmt.Errorf("%s", locales.Translate("dataduplicator.err.querysource"))
 	}
 
 	// Scan source track metadata using our custom null types
@@ -540,7 +547,7 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 
 	err := row.Scan(&stockDate, &dateCreated, &colorID, &djPlayCount)
 	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadatascan"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.metadatascan"), err)
 	}
 
 	// Get current timestamp for updated_at
@@ -560,10 +567,10 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 		djPlayCount.ValueOrNil(),
 		currentTime, targetID)
 	if err != nil {
-		return fmt.Errorf("%s: %w", locales.Translate("hotcuesync.err.metadataupdate"), err)
+		return fmt.Errorf("%s: %w", locales.Translate("dataduplicator.err.metadataupdate"), err)
 	}
 
-	m.Logger.Info(locales.Translate("hotcuesync.status.copiedmetadata"), sourceID, targetID)
+	m.Logger.Info(locales.Translate("dataduplicator.status.copiedmetadata"), sourceID, targetID)
 	return nil
 }
 
@@ -573,10 +580,10 @@ func (m *HotCueSyncModule) copyTrackMetadata(sourceID, targetID string) error {
 // Returns:
 //   - []common.TrackItem: A slice of tracks retrieved from the selected source
 //   - error: An error if no tracks were found or if another issue occurred
-func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
+func (m *DataDuplicatorModule) getSourceTracks() ([]common.TrackItem, error) {
 	var tracks []common.TrackItem
 
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		tracks, _ = m.dbMgr.GetTracksBasedOnFolder(m.sourceFolderEntry.Text)
 	} else {
 		// Find playlist ID
@@ -594,7 +601,7 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 	}
 
 	if len(tracks) == 0 {
-		return nil, fmt.Errorf("%s", locales.Translate("hotcuesync.err.nosourcetracks"))
+		return nil, fmt.Errorf("%s", locales.Translate("dataduplicator.err.nosourcetracks"))
 	}
 
 	return tracks, nil
@@ -610,7 +617,7 @@ func (m *HotCueSyncModule) getSourceTracks() ([]common.TrackItem, error) {
 // Returns:
 //   - A slice of matching target tracks with their IDs and filenames
 //   - error: An error if retrieval failed
-func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]struct {
+func (m *DataDuplicatorModule) getTargetTracks(sourceTrack common.TrackItem) ([]struct {
 	ID       string
 	FileName string
 }, error) {
@@ -620,7 +627,7 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 
 	var targetTracks []common.TrackItem
 
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		targetTracks, _ = m.dbMgr.GetTracksBasedOnFolder(m.targetFolderEntry.Text)
 	} else {
 		// Find playlist ID
@@ -666,9 +673,9 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 	}
 
 	if len(result) == 0 {
-		m.Logger.Warning(locales.Translate("hotcuesync.err.notgttracks"), fileName)
+		m.Logger.Warning(locales.Translate("dataduplicator.err.notgttracks"), fileName)
 	} else {
-		m.Logger.Info(locales.Translate("hotcuesync.status.foundtargettracks"), fileName, len(result))
+		m.Logger.Info(locales.Translate("dataduplicator.status.foundtargettracks"), fileName, len(result))
 	}
 
 	return result, nil
@@ -680,7 +687,7 @@ func (m *HotCueSyncModule) getTargetTracks(sourceTrack common.TrackItem) ([]stru
 //
 // Returns:
 //   - error: An error if playlist loading failed
-func (m *HotCueSyncModule) loadPlaylists() error {
+func (m *DataDuplicatorModule) loadPlaylists() error {
 	// Update UI to show loading state
 	m.UpdateProgressStatus(0, locales.Translate("common.status.playlistload"))
 
@@ -731,23 +738,23 @@ func (m *HotCueSyncModule) loadPlaylists() error {
 	common.SetPlaylistSelectState(m.sourcePlaylistSelect, true, sourceSelectedValue)
 	common.SetPlaylistSelectState(m.targetPlaylistSelect, true, targetSelectedValue)
 
-	m.Logger.Info(locales.Translate("hotcuesync.status.loadedplaylists"), len(playlists))
+	m.Logger.Info(locales.Translate("dataduplicator.status.loadedplaylists"), len(playlists))
 	return nil
 }
 
 // updateControlsState updates the visibility of UI controls based on the current source and target types.
 // It ensures that only the relevant input fields are shown based on whether folder or playlist
 // is selected as the source and target.
-func (m *HotCueSyncModule) updateControlsState() {
+func (m *DataDuplicatorModule) updateControlsState() {
 	// Get current source and target types
 	var sourceType, targetType SourceType
-	if m.sourceType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		sourceType = SourceTypeFolder
 	} else {
 		sourceType = SourceTypePlaylist
 	}
 
-	if m.targetType.Selected == locales.Translate("hotcuesync.dropdown."+string(SourceTypeFolder)) {
+	if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		targetType = SourceTypeFolder
 	} else {
 		targetType = SourceTypePlaylist
@@ -777,7 +784,7 @@ func (m *HotCueSyncModule) updateControlsState() {
 //
 // Parameters:
 //   - sourceType: The selected source type (folder or playlist)
-func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
+func (m *DataDuplicatorModule) updateSourceVisibility(sourceType SourceType) {
 	if sourceType == SourceTypeFolder {
 		m.sourceFolderField.Show()
 		m.sourcePlaylistSelect.Hide()
@@ -805,7 +812,7 @@ func (m *HotCueSyncModule) updateSourceVisibility(sourceType SourceType) {
 //
 // Parameters:
 //   - targetType: The selected target type (folder or playlist)
-func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
+func (m *DataDuplicatorModule) updateTargetVisibility(targetType SourceType) {
 	if targetType == SourceTypeFolder {
 		m.targetFolderField.Show()
 		m.targetPlaylistSelect.Hide()
@@ -833,7 +840,7 @@ func (m *HotCueSyncModule) updateTargetVisibility(targetType SourceType) {
 // and starts the main process.
 // Input validation also includes a test of the connection to the database and creating a backup of it.
 // This method is called when the user clicks the submit button.
-func (m *HotCueSyncModule) Start() {
+func (m *DataDuplicatorModule) Start() {
 
 	// Create and run validator
 	validator := common.NewValidator(m, m.ConfigMgr, m.dbMgr, m.ErrorHandler)
@@ -842,7 +849,7 @@ func (m *HotCueSyncModule) Start() {
 	}
 
 	// Show progress dialog
-	m.ShowProgressDialog(locales.Translate("hotcuesync.dialog.header"))
+	m.ShowProgressDialog(locales.Translate("dataduplicator.dialog.header"))
 
 	// Start processing in goroutine
 	go m.processUpdate()
@@ -859,7 +866,7 @@ func (m *HotCueSyncModule) Start() {
 //
 // The method includes panic recovery to ensure the progress dialog is always closed
 // even if an unexpected error occurs.
-func (m *HotCueSyncModule) processUpdate() {
+func (m *DataDuplicatorModule) processUpdate() {
 	defer func() {
 		if r := recover(); r != nil {
 			m.CloseProgressDialog()
@@ -869,7 +876,7 @@ func (m *HotCueSyncModule) processUpdate() {
 				Severity:    common.SeverityCritical,
 				Recoverable: false,
 			}
-			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("hotcuesync.err.panic"), r), context)
+			m.ErrorHandler.ShowStandardError(fmt.Errorf("%s: %v", locales.Translate("dataduplicator.err.panic"), r), context)
 		}
 	}()
 
@@ -883,7 +890,7 @@ func (m *HotCueSyncModule) processUpdate() {
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("hotcuesync.err.nosourcetracks")), context)
+		m.ErrorHandler.ShowStandardError(errors.New(locales.Translate("dataduplicator.err.nosourcetracks")), context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
@@ -897,7 +904,7 @@ func (m *HotCueSyncModule) processUpdate() {
 
 	// Update progress
 	m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.srctrackscount"), len(sourceTracks)))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("dataduplicator.status.srctrackscount"), len(sourceTracks)))
 
 	// Track successful and skipped files
 	processedCount := 0
@@ -938,7 +945,7 @@ func (m *HotCueSyncModule) processUpdate() {
 
 		// Update progress
 		progress := 0.2 + (float64(processedCount+1) / float64(len(sourceTracks)) * 0.8)
-		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("hotcuesync.diagstatus.process"), processedCount+1, len(sourceTracks)))
+		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("dataduplicator.diagstatus.process"), processedCount+1, len(sourceTracks)))
 
 		// Process target tracks
 		for _, targetTrack := range targetTracks {
@@ -986,8 +993,8 @@ func (m *HotCueSyncModule) processUpdate() {
 	}
 
 	// Update progress and status
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("hotcuesync.status.completed"), processedCount, skippedCount))
+	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("dataduplicator.status.completed"), processedCount, skippedCount))
+	m.AddInfoMessage(fmt.Sprintf(locales.Translate("dataduplicator.status.completed"), processedCount, skippedCount))
 
 	// Complete progress dialog and update button
 	m.CompleteProgressDialog()
