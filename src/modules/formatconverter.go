@@ -869,7 +869,7 @@ func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetF
 	for i, file := range files {
 		// Check if cancelled
 		if m.IsCancelled() {
-			m.HandleProcessCancellation("convert.dialog.stop", successCount, len(files))
+			m.HandleProcessCancellation("formatconverter.dialog.stop", successCount, len(files))
 			common.UpdateButtonToCompleted(m.submitBtn)
 			return
 		}
@@ -963,7 +963,7 @@ func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetF
 		if err != nil {
 			// Check if the error is due to cancellation
 			if m.IsCancelled() {
-				m.HandleProcessCancellation("convert.dialog.stop", successCount, len(files))
+				m.HandleProcessCancellation("formatconverter.dialog.stop", successCount, len(files))
 				common.UpdateButtonToCompleted(m.submitBtn)
 				return
 			} else {
@@ -1336,51 +1336,51 @@ var (
 	// Source format parameters
 	sourceFormatParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
-			{ConfigValue: "All", FFmpegValue: "All", LocaleKey: "convert.srcformats.all", IsCopy: false},
-			{ConfigValue: "MP3", FFmpegValue: "MP3", LocaleKey: "convert.srcformats.mp3", IsCopy: false},
-			{ConfigValue: "FLAC", FFmpegValue: "FLAC", LocaleKey: "convert.srcformats.flac", IsCopy: false},
-			{ConfigValue: "WAV", FFmpegValue: "WAV", LocaleKey: "convert.srcformats.wav", IsCopy: false},
+			{ConfigValue: "All", FFmpegValue: "All", LocaleKey: "formatconverter.srcformats.all", IsCopy: false},
+			{ConfigValue: "MP3", FFmpegValue: "MP3", LocaleKey: "formatconverter.srcformats.mp3", IsCopy: false},
+			{ConfigValue: "FLAC", FFmpegValue: "FLAC", LocaleKey: "formatconverter.srcformats.flac", IsCopy: false},
+			{ConfigValue: "WAV", FFmpegValue: "WAV", LocaleKey: "formatconverter.srcformats.wav", IsCopy: false},
 		},
 	}
 
 	// FLAC compression parameters
 	flacCompressionParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
-			{ConfigValue: "5", FFmpegValue: "5", LocaleKey: "convert.configpar.compressmed", IsCopy: false},
-			{ConfigValue: "12", FFmpegValue: "12", LocaleKey: "convert.configpar.compressfull", IsCopy: false},
-			{ConfigValue: "0", FFmpegValue: "0", LocaleKey: "convert.configpar.nocompress", IsCopy: false},
+			{ConfigValue: "5", FFmpegValue: "5", LocaleKey: "formatconverter.configpar.compressmed", IsCopy: false},
+			{ConfigValue: "12", FFmpegValue: "12", LocaleKey: "formatconverter.configpar.compressfull", IsCopy: false},
+			{ConfigValue: "0", FFmpegValue: "0", LocaleKey: "formatconverter.configpar.nocompress", IsCopy: false},
 		},
 	}
 
 	// MP3 bitrate parameters
 	mp3BitrateParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
-			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
-			{ConfigValue: "128k", FFmpegValue: "128k", LocaleKey: "convert.bitrate.128", IsCopy: false},
-			{ConfigValue: "192k", FFmpegValue: "192k", LocaleKey: "convert.bitrate.192", IsCopy: false},
-			{ConfigValue: "256k", FFmpegValue: "256k", LocaleKey: "convert.bitrate.256", IsCopy: false},
-			{ConfigValue: "320k", FFmpegValue: "320k", LocaleKey: "convert.bitrate.320", IsCopy: false},
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "formatconverter.configpar.copypar", IsCopy: true},
+			{ConfigValue: "128k", FFmpegValue: "128k", LocaleKey: "formatconverter.bitrate.128", IsCopy: false},
+			{ConfigValue: "192k", FFmpegValue: "192k", LocaleKey: "formatconverter.bitrate.192", IsCopy: false},
+			{ConfigValue: "256k", FFmpegValue: "256k", LocaleKey: "formatconverter.bitrate.256", IsCopy: false},
+			{ConfigValue: "320k", FFmpegValue: "320k", LocaleKey: "formatconverter.bitrate.320", IsCopy: false},
 		},
 	}
 
 	// Sample rate parameters
 	sampleRateParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
-			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
-			{ConfigValue: "44100", FFmpegValue: "44100", LocaleKey: "convert.samplerate.44", IsCopy: false},
-			{ConfigValue: "48000", FFmpegValue: "48000", LocaleKey: "convert.samplerate.48", IsCopy: false},
-			{ConfigValue: "96000", FFmpegValue: "96000", LocaleKey: "convert.samplerate.96", IsCopy: false},
-			{ConfigValue: "192000", FFmpegValue: "192000", LocaleKey: "convert.samplerate.192", IsCopy: false},
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "formatconverter.configpar.copypar", IsCopy: true},
+			{ConfigValue: "44100", FFmpegValue: "44100", LocaleKey: "formatconverter.samplerate.44", IsCopy: false},
+			{ConfigValue: "48000", FFmpegValue: "48000", LocaleKey: "formatconverter.samplerate.48", IsCopy: false},
+			{ConfigValue: "96000", FFmpegValue: "96000", LocaleKey: "formatconverter.samplerate.96", IsCopy: false},
+			{ConfigValue: "192000", FFmpegValue: "192000", LocaleKey: "formatconverter.samplerate.192", IsCopy: false},
 		},
 	}
 
 	// Bit depth parameters
 	bitDepthParams = ConversionParameterSet{
 		Parameters: []ConversionParameter{
-			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "convert.configpar.copypar", IsCopy: true},
-			{ConfigValue: "16", FFmpegValue: "16", LocaleKey: "convert.bitdepth.16", IsCopy: false},
-			{ConfigValue: "24", FFmpegValue: "24", LocaleKey: "convert.bitdepth.24", IsCopy: false},
-			{ConfigValue: "32", FFmpegValue: "32", LocaleKey: "convert.bitdepth.32", IsCopy: false},
+			{ConfigValue: "copy", FFmpegValue: "-", LocaleKey: "formatconverter.configpar.copypar", IsCopy: true},
+			{ConfigValue: "16", FFmpegValue: "16", LocaleKey: "formatconverter.bitdepth.16", IsCopy: false},
+			{ConfigValue: "24", FFmpegValue: "24", LocaleKey: "formatconverter.bitdepth.24", IsCopy: false},
+			{ConfigValue: "32", FFmpegValue: "32", LocaleKey: "formatconverter.bitdepth.32", IsCopy: false},
 		},
 	}
 )
