@@ -141,7 +141,7 @@ func (v *Validator) validateFields(action string) error {
 		// Validate date format if needed
 		if field.FieldType == "date" {
 			if !IsEmptyString(value) && !IsValidDateFormat(value) {
-				err := errors.New(locales.Translate("validator.err.invaliddate")) // In this case, it is intentional that the user gets a more general message about the date entered. 
+				err := errors.New(locales.Translate("validator.err.invaliddate")) // In this case, it is intentional that the user gets a more general message about the date entered.
 				// In the GUI, user see what entered, so "bad date" also means the case where "no date" is entered.
 				v.errorHandler.ShowStandardError(err, context)
 				return err
