@@ -20,23 +20,14 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
-// Database password parts for obfuscation.
-// These parts are concatenated to form the complete password for database encryption.
-// Splitting the password into parts provides a basic level of obfuscation to prevent
-// casual inspection from revealing the complete password.
-var (
-	dbPasswordPart1 = "402fd482c38817c35ffa8"
-	dbPasswordPart2 = "ffb8c7d93143b749e7d3"
-	dbPasswordPart3 = "15df7a81732a1ff43608497"
-)
+// Declaration of a variable with a password.
+// The password is passed through ldflags during application compilation.
+var dbPassword string
 
-// getDbPassword creates the complete database password by concatenating the defined parts.
-// This function is used internally by the DBManager to access encrypted Rekordbox databases.
-//
-// Returns:
-//   - The complete database password string
+// getDbPassword is used internally by the DBManager to access encrypted Rekordbox database.
+// Returns the complete database password string
 func getDbPassword() string {
-	return dbPasswordPart1 + dbPasswordPart2 + dbPasswordPart3
+	return dbPassword
 }
 
 // DBManager provides unified database access for all modules in the application.
