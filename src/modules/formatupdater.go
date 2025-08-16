@@ -4,7 +4,7 @@
 // Each module handles a specific task related to DJ database management and music file operations.
 
 // This module is used for changing the format of music files (e.g. replacing MP3 with FLAC) while maintaining all original track information.
-// In order to be able to identify these tracks, it is necessary to prepare them in advance in a playlist.
+// To identify these tracks, it is necessary to prepare them in advance in a playlist.
 
 package modules
 
@@ -63,7 +63,7 @@ func NewFormatUpdaterModule(window fyne.Window, configMgr *common.ConfigManager,
 	m.initializeUI()
 
 	// Then load configuration
-	m.LoadConfig(m.ConfigMgr.GetModuleConfig(m.GetConfigName()))
+	m.LoadCfg()
 
 	return m
 }
@@ -158,66 +158,51 @@ func (m *FormatUpdaterModule) GetContent() fyne.CanvasObject {
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig applies the configuration to the UI components.
-// If the configuration is nil or empty, it sets default values.
-// It loads folder path and playlist selection from the configuration.
-//
-// Parameters:
-//   - cfg: The module configuration to load
-func (m *FormatUpdaterModule) LoadConfig(cfg common.ModuleConfig) {
+// LoadCfg loads typed configuration and updates UI elements
+func (m *FormatUpdaterModule) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if Fields are not initialized
-	if cfg.Fields == nil {
-		cfg = common.NewModuleConfig()
-
-		// Set default values with their definitions
-		cfg.SetWithDefinitionAndActions("folder", "", "folder", true, "exists", []string{"start"})
-		cfg.SetWithDefinitionAndActions("playlist_id", "", "playlist", true, "filled", []string{"start"})
-
-		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	// Load typed config from ConfigManager
+	config, err := m.ConfigMgr.GetModuleCfg("formatupdater", m.GetConfigName())
+	if err != nil {
+		// This should not happen with the updated GetModuleCfg(), but handle gracefully
+		return
 	}
 
-	// Load folder path
-	m.folderEntry.SetText(cfg.Get("folder", ""))
-
-	// Load playlist ID
-	m.pendingPlaylistID = cfg.Get("playlist_id", "")
-
-	// Load playlist selection if playlists are already loaded
-	if m.pendingPlaylistID != "" && len(m.playlists) > 0 {
-		for _, playlist := range m.playlists {
-			if playlist.ID == m.pendingPlaylistID {
-				m.playlistSelect.SetSelected(playlist.Path)
-				break
+	// Cast to FormatUpdater specific config
+	if cfg, ok := config.(common.FormatUpdaterCfg); ok {
+		// Update UI elements with loaded values
+		m.folderEntry.SetText(cfg.Folder.Value)
+		m.pendingPlaylistID = cfg.PlaylistID.Value
+		
+		// Load playlist selection if playlists are already loaded
+		if m.pendingPlaylistID != "" && len(m.playlists) > 0 {
+			for _, playlist := range m.playlists {
+				if playlist.ID == m.pendingPlaylistID {
+					m.playlistSelect.SetSelected(playlist.Path)
+					break
+				}
 			}
 		}
 	}
 }
 
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
-// It saves folder path and playlist ID with appropriate validation rules.
-//
-// Returns:
-//   - A ModuleConfig containing all current UI settings
-func (m *FormatUpdaterModule) SaveConfig() common.ModuleConfig {
+// SaveCfg saves current UI state to typed configuration
+func (m *FormatUpdaterModule) SaveCfg() {
 	if m.IsLoadingConfig {
-		return common.NewModuleConfig()
+		return // Safeguard: no save if config is being loaded
 	}
 
-	cfg := common.NewModuleConfig()
+	// Get default configuration with all field definitions
+	cfg := common.GetDefaultFormatUpdaterCfg()
+	
+	// Update only the values from current UI state
+	cfg.Folder.Value = m.folderEntry.Text
+	cfg.PlaylistID.Value = m.pendingPlaylistID
 
-	// Save folder path
-	cfg.SetWithDefinitionAndActions("folder", m.folderEntry.Text, "folder", true, "exists", []string{"start"})
-
-	// Save playlist ID
-	if m.pendingPlaylistID != "" {
-		cfg.SetWithDefinitionAndActions("playlist_id", m.pendingPlaylistID, "playlist", true, "filled", []string{"start"})
-	}
-
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	return cfg
+	// Save typed config via ConfigManager
+	m.ConfigMgr.SaveModuleCfg("formatupdater", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -227,7 +212,7 @@ func (m *FormatUpdaterModule) initializeUI() {
 	// Create a text entry for the user to input the folder path.
 	// When the user changes the text in the entry, save the config.
 	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Create a disabled select widget for the user to choose a playlist.
@@ -242,7 +227,7 @@ func (m *FormatUpdaterModule) initializeUI() {
 				break
 			}
 		}
-		m.SaveConfig()
+		m.SaveCfg()
 	}), "common.select.plsplacehldrinact")
 
 	// Create a folder selection field using the standardized function.
@@ -255,7 +240,7 @@ func (m *FormatUpdaterModule) initializeUI() {
 		m.folderEntry,
 		func(path string) {
 			m.folderEntry.SetText(path)
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 

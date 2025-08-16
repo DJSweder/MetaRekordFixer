@@ -3,8 +3,8 @@
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
 
-// This module convert music files from the source folder to the destination folder while maintaining the same folder structure.
-// It also allows to select the target format and some format-specific settings.
+// This module converts music files from the source folder to the destination folder while maintaining the same folder structure.
+// It also allows selecting the target format and format-specific settings.
 
 package modules
 
@@ -119,18 +119,14 @@ func NewFormatConverterModule(window fyne.Window, configMgr *common.ConfigManage
 		}
 	}
 
-	// Check if module has configuration, if not, create default
-	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-
-	if len(cfg.Fields) == 0 {
-		cfg = m.SetDefaultConfig()
-		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	}
 	// Initialize UI and load config
 	m.IsLoadingConfig = true
 	m.initializeUI()
-	m.LoadConfig(cfg)
+	m.LoadCfg()
 	m.IsLoadingConfig = false
+
+	// Save initial configuration with default values
+	m.SaveCfg()
 
 	return m
 }
@@ -171,7 +167,7 @@ func (m *FormatConverterModule) GetModuleContent() fyne.CanvasObject {
 		m.sourceFolderEntry,
 		func(path string) {
 			m.sourceFolderEntry.SetText(common.NormalizePath(path))
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 	sourceContainer := container.NewBorder(
@@ -186,7 +182,7 @@ func (m *FormatConverterModule) GetModuleContent() fyne.CanvasObject {
 		m.targetFolderEntry,
 		func(path string) {
 			m.targetFolderEntry.SetText(common.NormalizePath(path))
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 	targetContainer := container.NewBorder(
@@ -259,115 +255,69 @@ func (m *FormatConverterModule) GetContent() fyne.CanvasObject {
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig loads module configuration and applies it to the UI components.
-// If the configuration is nil or empty, it sets default values.
-// It loads source/target folder paths, format selections, and format-specific settings.
-//
-// Parameters:
-//   - cfg: The module configuration to load
-func (m *FormatConverterModule) LoadConfig(cfg common.ModuleConfig) {
+// LoadCfg loads typed configuration and sets UI elements
+func (m *FormatConverterModule) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// If configuration is nil or empty, set it to default
-	if common.IsNilConfig(cfg) {
-		cfg = m.SetDefaultConfig()
+	// Load typed config from ConfigManager
+	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	if err != nil {
+		// This should not happen with the updated GetModuleCfg(), but handle gracefully
+		return
 	}
 
-	// Load source and target folder paths
-	if m.sourceFolderEntry != nil {
-		if sourceFolder := cfg.Get("source_folder", ""); sourceFolder != "" {
-			m.sourceFolderEntry.SetText(sourceFolder)
+	// Cast to FormatConverter specific config
+	if cfg, ok := config.(common.FormatConverterCfg); ok {
+		// Update UI elements with loaded values
+		if m.sourceFolderEntry != nil {
+			m.sourceFolderEntry.SetText(cfg.SourceFolder.Value)
 		}
-	}
-
-	if m.targetFolderEntry != nil {
-		if targetFolder := cfg.Get("target_folder", ""); targetFolder != "" {
-			m.targetFolderEntry.SetText(targetFolder)
+		if m.targetFolderEntry != nil {
+			m.targetFolderEntry.SetText(cfg.TargetFolder.Value)
 		}
-	}
-
-	// Load format selections
-	if m.sourceFormatSelect != nil {
-		// Get the technical value from config and set the localized value in the select
-		configValue := cfg.Get("source_format", "All")
-		localizedValue := sourceFormatParams.GetLocalizedValue(configValue)
-		m.sourceFormatSelect.SetSelected(localizedValue)
-	}
-
-	if m.targetFormatSelect != nil {
-		if targetFormat := cfg.Get("target_format", ""); targetFormat != "" {
-			m.targetFormatSelect.SetSelected(targetFormat)
-			// Update format settings panel based on selected format
-			m.updateFormatSettings(targetFormat)
-		} else {
-			m.targetFormatSelect.SetSelected("MP3")
-			// Update format settings panel for MP3
-			m.updateFormatSettings("MP3")
+		if m.sourceFormatSelect != nil {
+			localizedValue := sourceFormatParams.GetLocalizedValue(cfg.SourceFormat.Value)
+			m.sourceFormatSelect.SetSelected(localizedValue)
 		}
-	}
+		if m.targetFormatSelect != nil {
+			m.targetFormatSelect.SetSelected(cfg.TargetFormat.Value)
+			m.updateFormatSettings(cfg.TargetFormat.Value)
+		}
+		if m.rewriteExistingCheckbox != nil {
+			m.rewriteExistingCheckbox.SetChecked(cfg.RewriteExisting.Value == "true")
+		}
+		if m.makeTargetFolderCheckbox != nil {
+			m.makeTargetFolderCheckbox.SetChecked(cfg.MakeTargetFolder.Value == "true")
+		}
 
-	// Load checkboxes
-	if m.rewriteExistingCheckbox != nil {
-		m.rewriteExistingCheckbox.SetChecked(cfg.GetBool("rewrite_existing", false))
-	}
-	if m.makeTargetFolderCheckbox != nil {
-		m.makeTargetFolderCheckbox.SetChecked(cfg.GetBool("make_target_folder", false))
-	}
-
-	// Load format-specific settings
-	// Load MP3 settings
-	if m.MP3BitrateSelect != nil {
-		mp3Bitrate := cfg.Get("mp3_bitrate", "320k") // Default value 320 if not set
-		if mp3Bitrate != "" {
-			// Convert technical value to localized text for UI
-			localizedValue := mp3BitrateParams.GetLocalizedValue(mp3Bitrate)
+		// Load format-specific settings
+		if m.MP3BitrateSelect != nil {
+			localizedValue := mp3BitrateParams.GetLocalizedValue(cfg.MP3Bitrate.Value)
 			m.MP3BitrateSelect.SetSelected(localizedValue)
 		}
-	}
-	if m.MP3SampleRateSelect != nil {
-		mp3SampleRate := cfg.Get("mp3_samplerate", "copy") // Default value copy if not set
-		if mp3SampleRate != "" {
-			localizedValue := sampleRateParams.GetLocalizedValue(mp3SampleRate)
+		if m.MP3SampleRateSelect != nil {
+			localizedValue := sampleRateParams.GetLocalizedValue(cfg.MP3Samplerate.Value)
 			m.MP3SampleRateSelect.SetSelected(localizedValue)
 		}
-	}
-
-	// Load FLAC settings
-	if m.FLACCompressionSelect != nil {
-		flacCompression := cfg.Get("flac_compression", "12") // Default value 5 (medium) if not set
-		if flacCompression != "" {
-			localizedValue := flacCompressionParams.GetLocalizedValue(flacCompression)
+		if m.FLACCompressionSelect != nil {
+			localizedValue := flacCompressionParams.GetLocalizedValue(cfg.FLACCompression.Value)
 			m.FLACCompressionSelect.SetSelected(localizedValue)
 		}
-	}
-	if m.FLACSampleRateSelect != nil {
-		flacSampleRate := cfg.Get("flac_samplerate", "copy") // Default value copy if not set
-		if flacSampleRate != "" {
-			localizedValue := sampleRateParams.GetLocalizedValue(flacSampleRate)
+		if m.FLACSampleRateSelect != nil {
+			localizedValue := sampleRateParams.GetLocalizedValue(cfg.FLACSamplerate.Value)
 			m.FLACSampleRateSelect.SetSelected(localizedValue)
 		}
-	}
-	if m.FLACBitDepthSelect != nil {
-		flacBitDepth := cfg.Get("flac_bitdepth", "copy") // Default value copy if not set
-		if flacBitDepth != "" {
-			localizedValue := bitDepthParams.GetLocalizedValue(flacBitDepth)
+		if m.FLACBitDepthSelect != nil {
+			localizedValue := bitDepthParams.GetLocalizedValue(cfg.FLACBitdepth.Value)
 			m.FLACBitDepthSelect.SetSelected(localizedValue)
 		}
-	}
-
-	// Load WAV settings
-	if m.WAVSampleRateSelect != nil {
-		wavSampleRate := cfg.Get("wav_samplerate", "copy") // Default value copy if not set
-		if wavSampleRate != "" {
-			localizedValue := sampleRateParams.GetLocalizedValue(wavSampleRate)
+		if m.WAVSampleRateSelect != nil {
+			localizedValue := sampleRateParams.GetLocalizedValue(cfg.WAVSamplerate.Value)
 			m.WAVSampleRateSelect.SetSelected(localizedValue)
 		}
-	}
-	if m.WAVBitDepthSelect != nil {
-		wavBitDepth := cfg.Get("wav_bitdepth", "copy") // Default value copy if not set
-		if wavBitDepth != "" {
-			localizedValue := bitDepthParams.GetLocalizedValue(wavBitDepth)
+		if m.WAVBitDepthSelect != nil {
+			localizedValue := bitDepthParams.GetLocalizedValue(cfg.WAVBitdepth.Value)
 			m.WAVBitDepthSelect.SetSelected(localizedValue)
 		}
 	}
@@ -376,80 +326,32 @@ func (m *FormatConverterModule) LoadConfig(cfg common.ModuleConfig) {
 	m.metadataMap, _ = m.loadMetadataMap()
 }
 
-// SaveConfig saves the current module configuration based on UI component states.
-// It saves source/target folder paths, format selections, and format-specific settings
-// with appropriate validation rules and dependencies.
-//
-// Returns:
-//   - A ModuleConfig containing all current UI settings
-func (m *FormatConverterModule) SaveConfig() common.ModuleConfig {
-	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-
-	// Save source and target folder paths with validation
-	if m.sourceFolderEntry != nil {
-		cfg.SetWithDefinitionAndActions("source_folder", m.sourceFolderEntry.Text, "folder", true, "exists", []string{"start"})
-	}
-	if m.targetFolderEntry != nil {
-		cfg.SetWithDefinitionAndActions("target_folder", m.targetFolderEntry.Text, "folder", true, "exists | write", []string{"start"})
+// SaveCfg saves current UI state to typed configuration
+func (m *FormatConverterModule) SaveCfg() {
+	if m.IsLoadingConfig {
+		return // Safeguard: no save if config is being loaded
 	}
 
-	// Save format selections with validation
-	if m.sourceFormatSelect != nil {
-		// Save technical value, not localized
-		configValue := sourceFormatParams.GetConfigValue(m.sourceFormatSelect.Selected)
-		cfg.SetWithDefinitionAndActions("source_format", configValue, "select", true, "none", []string{"start"})
-	}
-	if m.targetFormatSelect != nil {
-		cfg.SetWithDefinitionAndActions("target_format", m.targetFormatSelect.Selected, "select", true, "none", []string{"start"})
-	}
+	// Get default configuration with all field definitions
+	cfg := common.GetDefaultFormatConverterCfg()
 
-	// Save checkboxes
-	if m.rewriteExistingCheckbox != nil {
-		cfg.SetBoolWithDefinition("rewrite_existing", m.rewriteExistingCheckbox.Checked, false, "none")
-	}
-	if m.makeTargetFolderCheckbox != nil {
-		cfg.SetBoolWithDefinition("make_target_folder", m.makeTargetFolderCheckbox.Checked, false, "none")
-	}
+	// Update only the values from current UI state
+	cfg.SourceFolder.Value = common.NormalizePath(m.sourceFolderEntry.Text)
+	cfg.TargetFolder.Value = common.NormalizePath(m.targetFolderEntry.Text)
+	cfg.SourceFormat.Value = sourceFormatParams.GetConfigValue(m.sourceFormatSelect.Selected)
+	cfg.TargetFormat.Value = m.targetFormatSelect.Selected
+	cfg.MakeTargetFolder.Value = fmt.Sprintf("%t", m.makeTargetFolderCheckbox.Checked)
+	cfg.RewriteExisting.Value = fmt.Sprintf("%t", m.rewriteExistingCheckbox.Checked)
+	cfg.MP3Bitrate.Value = mp3BitrateParams.GetConfigValue(m.MP3BitrateSelect.Selected)
+	cfg.MP3Samplerate.Value = sampleRateParams.GetConfigValue(m.MP3SampleRateSelect.Selected)
+	cfg.FLACBitdepth.Value = bitDepthParams.GetConfigValue(m.FLACBitDepthSelect.Selected)
+	cfg.FLACSamplerate.Value = sampleRateParams.GetConfigValue(m.FLACSampleRateSelect.Selected)
+	cfg.FLACCompression.Value = flacCompressionParams.GetConfigValue(m.FLACCompressionSelect.Selected)
+	cfg.WAVBitdepth.Value = bitDepthParams.GetConfigValue(m.WAVBitDepthSelect.Selected)
+	cfg.WAVSamplerate.Value = sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
 
-	// Save format-specific settings with dependencies
-	// Save MP3 settings
-	if m.MP3BitrateSelect.Selected != "" {
-		// Convert localized text to technical value for configuration
-		configValue := mp3BitrateParams.GetConfigValue(m.MP3BitrateSelect.Selected)
-		cfg.SetWithDependencyAndActions("mp3_bitrate", configValue, "select", true, "target_format", "MP3", "none", []string{"start"})
-	}
-	if m.MP3SampleRateSelect.Selected != "" {
-		configValue := sampleRateParams.GetConfigValue(m.MP3SampleRateSelect.Selected)
-		cfg.SetWithDependencyAndActions("mp3_samplerate", configValue, "select", true, "target_format", "MP3", "none", []string{"start"})
-	}
-
-	// Save FLAC settings
-	if m.FLACCompressionSelect.Selected != "" {
-		configValue := flacCompressionParams.GetConfigValue(m.FLACCompressionSelect.Selected)
-		cfg.SetWithDependencyAndActions("flac_compression", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
-	}
-	if m.FLACSampleRateSelect.Selected != "" {
-		configValue := sampleRateParams.GetConfigValue(m.FLACSampleRateSelect.Selected)
-		cfg.SetWithDependencyAndActions("flac_samplerate", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
-	}
-	if m.FLACBitDepthSelect.Selected != "" {
-		configValue := bitDepthParams.GetConfigValue(m.FLACBitDepthSelect.Selected)
-		cfg.SetWithDependencyAndActions("flac_bitdepth", configValue, "select", true, "target_format", "FLAC", "none", []string{"start"})
-	}
-
-	// Save WAV settings
-	if m.WAVSampleRateSelect.Selected != "" {
-		configValue := sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
-		cfg.SetWithDependencyAndActions("wav_samplerate", configValue, "select", true, "target_format", "WAV", "none", []string{"start"})
-	}
-	if m.WAVBitDepthSelect.Selected != "" {
-		configValue := bitDepthParams.GetConfigValue(m.WAVBitDepthSelect.Selected)
-		cfg.SetWithDependencyAndActions("wav_bitdepth", configValue, "select", true, "target_format", "WAV", "none", []string{"start"})
-	}
-
-	// Store to config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	return cfg
+	// Save typed config via ConfigManager
+	m.ConfigMgr.SaveModuleCfg("formatconverter", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -475,7 +377,7 @@ func (m *FormatConverterModule) initializeUI() {
 	}
 	m.targetFormatSelect = widget.NewSelect(targetFormats, func(format string) {
 		m.onTargetFormatChanged(format)
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Source folder selection
@@ -484,7 +386,7 @@ func (m *FormatConverterModule) initializeUI() {
 		nil, // Entry will create inside function
 		func(path string) {
 			m.sourceFolderEntry.SetText(common.NormalizePath(path))
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 	m.sourceFolderEntry = sourceFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
@@ -495,49 +397,49 @@ func (m *FormatConverterModule) initializeUI() {
 		nil, // Entry will create inside function
 		func(path string) {
 			m.targetFolderEntry.SetText(common.NormalizePath(path))
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 	m.targetFolderEntry = targetFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
 
 	// Checkboxes
 	m.rewriteExistingCheckbox = common.CreateCheckbox(locales.Translate("formatconverter.chkbox.rewrite"), nil)
-	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
+	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveCfg() })
 
 	m.makeTargetFolderCheckbox = common.CreateCheckbox(locales.Translate("formatconverter.chkbox.maketargetfolder"), nil)
-	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveConfig() })
+	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() { m.SaveCfg() })
 
 	// Initialize format-specific settings
 	// MP3 settings
 	mp3BitrateOptions := mp3BitrateParams.GetLocalizedValues()
 	m.MP3BitrateSelect = widget.NewSelect(mp3BitrateOptions, nil)
-	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	mp3SampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.MP3SampleRateSelect = widget.NewSelect(mp3SampleRateOptions, nil)
-	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	// FLAC settings
 	flacCompressionOptions := flacCompressionParams.GetLocalizedValues()
 	m.FLACCompressionSelect = widget.NewSelect(flacCompressionOptions, nil)
-	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	flacSampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.FLACSampleRateSelect = widget.NewSelect(flacSampleRateOptions, nil)
-	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	flacBitDepthOptions := bitDepthParams.GetLocalizedValues()
 	m.FLACBitDepthSelect = widget.NewSelect(flacBitDepthOptions, nil)
-	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	// WAV settings
 	wavSampleRateOptions := sampleRateParams.GetLocalizedValues()
 	m.WAVSampleRateSelect = widget.NewSelect(wavSampleRateOptions, nil)
-	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	wavBitDepthOptions := bitDepthParams.GetLocalizedValues()
 	m.WAVBitDepthSelect = widget.NewSelect(wavBitDepthOptions, nil)
-	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveConfig() })
+	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() { m.SaveCfg() })
 
 	// Create format settings containers
 	mp3BitrateLabel := widget.NewLabel(locales.Translate("formatconverter.configpar.bitrate"))
@@ -583,45 +485,45 @@ func (m *FormatConverterModule) initializeUI() {
 
 	// Checkboxes
 	m.rewriteExistingCheckbox.OnChanged = m.CreateBoolChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.makeTargetFolderCheckbox.OnChanged = m.CreateBoolChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// MP3 settings
 	m.MP3BitrateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.MP3SampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// FLAC settings
 	m.FLACCompressionSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.FLACSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.FLACBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// WAV settings
 	m.WAVSampleRateSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.WAVBitDepthSelect.OnChanged = m.CreateSelectionChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Folder entries
 	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		_ = m.SaveConfig()
+		m.SaveCfg()
 	})
 }
 
@@ -632,7 +534,7 @@ func (m *FormatConverterModule) initializeUI() {
 //   - _: The selected format (unused in this implementation)
 func (m *FormatConverterModule) onSourceFormatChanged(_ string) {
 	// Save configuration
-	m.SaveConfig()
+	m.SaveCfg()
 }
 
 // onTargetFormatChanged handles changes in target format selection.
@@ -647,7 +549,7 @@ func (m *FormatConverterModule) onTargetFormatChanged(format string) {
 	m.updateFormatSettings(format)
 
 	// Save configuration
-	m.SaveConfig()
+	m.SaveCfg()
 }
 
 // updateFormatSettings updates the format settings container based on the selected target format.
@@ -754,26 +656,72 @@ func (m *FormatConverterModule) startConversion() {
 		m.submitBtn.SetIcon(theme.ConfirmIcon())
 	}()
 
-	// Get values from configuration
-	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
-	sourceFolder := cfg.Get("source_folder", "")
-	targetFolder := cfg.Get("target_folder", "")
-	targetFormat := cfg.Get("target_format", "")
+	// Get values from typed configuration
+	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "startConversion",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	cfg, ok := config.(common.FormatConverterCfg)
+	if !ok {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "startConversion",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New("invalid configuration type"), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	sourceFolder := cfg.SourceFolder.Value
+	targetFolder := cfg.TargetFolder.Value
+	targetFormat := cfg.TargetFormat.Value
 
 	// Get format-specific settings
 	formatSettings := make(map[string]string)
 
 	switch targetFormat {
 	case "MP3":
-		formatSettings["bitrate"] = cfg.Get("mp3_bitrate", "320")
-		formatSettings["samplerate"] = cfg.Get("mp3_samplerate", "copy")
+		formatSettings["bitrate"] = cfg.MP3Bitrate.Value
+		if formatSettings["bitrate"] == "" {
+			formatSettings["bitrate"] = "320k"
+		}
+		formatSettings["samplerate"] = cfg.MP3Samplerate.Value
+		if formatSettings["samplerate"] == "" {
+			formatSettings["samplerate"] = "copy"
+		}
 	case "FLAC":
-		formatSettings["compression"] = cfg.Get("flac_compression", "5") // Default FLAC compression level
-		formatSettings["samplerate"] = cfg.Get("flac_samplerate", "copy")
-		formatSettings["bitdepth"] = cfg.Get("flac_bitdepth", "copy")
+		formatSettings["compression"] = cfg.FLACCompression.Value
+		if formatSettings["compression"] == "" {
+			formatSettings["compression"] = "12"
+		}
+		formatSettings["samplerate"] = cfg.FLACSamplerate.Value
+		if formatSettings["samplerate"] == "" {
+			formatSettings["samplerate"] = "copy"
+		}
+		formatSettings["bitdepth"] = cfg.FLACBitdepth.Value
+		if formatSettings["bitdepth"] == "" {
+			formatSettings["bitdepth"] = "copy"
+		}
 	case "WAV":
-		formatSettings["samplerate"] = cfg.Get("wav_samplerate", "copy")
-		formatSettings["bitdepth"] = cfg.Get("wav_bitdepth", "copy")
+		formatSettings["samplerate"] = cfg.WAVSamplerate.Value
+		if formatSettings["samplerate"] == "" {
+			formatSettings["samplerate"] = "copy"
+		}
+		formatSettings["bitdepth"] = cfg.WAVBitdepth.Value
+		if formatSettings["bitdepth"] == "" {
+			formatSettings["bitdepth"] = "copy"
+		}
 	}
 
 	// Log conversion parameters
@@ -795,10 +743,38 @@ func (m *FormatConverterModule) startConversion() {
 //   - targetFormat: Target format (MP3, FLAC, WAV)
 //   - formatSettings: Map of format-specific settings like bitrate, compression level, etc.
 func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
-	// Get values from configuration
-	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
+	// Get values from typed configuration
+	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	if err != nil {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "convertFiles",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(err, context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
+	cfg, ok := config.(common.FormatConverterCfg)
+	if !ok {
+		context := &common.ErrorContext{
+			Module:      m.GetName(),
+			Operation:   "convertFiles",
+			Severity:    common.SeverityCritical,
+			Recoverable: false,
+		}
+		m.ErrorHandler.ShowStandardError(errors.New("invalid configuration type"), context)
+		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+		return
+	}
+
 	// Find all audio files in the source folder
-	sourceFormat := cfg.Get("source_format", "")
+	sourceFormat := cfg.SourceFormat.Value
+	if sourceFormat == "" {
+		sourceFormat = "All"
+	}
 	files, err := m.findAudioFiles(sourceFolder, sourceFormat)
 	if err != nil {
 		context := &common.ErrorContext{
@@ -840,7 +816,7 @@ func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetF
 
 	// Create initial target folder structure if needed
 	basePath := targetFolder
-	makeTargetFolder := cfg.GetBool("make_target_folder", false)
+	makeTargetFolder := cfg.MakeTargetFolder.Value == "true"
 	if makeTargetFolder {
 		sourceFolderBase := filepath.Base(sourceFolder)
 		basePath = filepath.Join(targetFolder, sourceFolderBase)
@@ -924,7 +900,7 @@ func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetF
 		targetFile := filepath.Join(targetPath, fileNameWithoutExt+targetExt)
 
 		// Check if target file exists and if we should skip it
-		rewriteExisting := cfg.GetBool("rewrite_existing", false)
+		rewriteExisting := cfg.RewriteExisting.Value == "true"
 		if _, err := os.Stat(targetFile); err == nil && !rewriteExisting {
 			m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatconverter.status.skipping"), filepath.Base(targetFile)))
 			skippedCount++
@@ -1598,40 +1574,6 @@ func (m *FormatConverterModule) getAudioProperties(filePath string) (bitDepth st
 	}
 
 	return bitDepth, sampleRate, errors.New(locales.Translate("formatconverter.err.noaudio"))
-}
-
-// SetDefaultConfig sets the default configuration values for the module
-func (m *FormatConverterModule) SetDefaultConfig() common.ModuleConfig {
-
-	// Create new config
-	cfg := common.NewModuleConfig()
-
-	// Set default source and target folders to empty strings
-	cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
-	cfg.SetWithDefinitionAndActions("target_folder", "", "folder", true, "exists | write", []string{"start"})
-
-	cfg.SetWithDefinitionAndActions("source_format", "All", "select", true, "none", []string{"start"})
-	cfg.SetWithDefinitionAndActions("target_format", "MP3", "select", true, "none", []string{"start"})
-
-	// Set default checkboxes
-	cfg.SetBoolWithDefinition("rewrite_existing", false, false, "none")
-	cfg.SetBoolWithDefinition("make_target_folder", false, false, "none")
-
-	// Set default MP3 settings - using technical values instead of localized texts
-	cfg.SetWithDependencyAndActions("mp3_bitrate", "320", "select", true, "target_format", "MP3", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("mp3_samplerate", "copy", "select", true, "target_format", "MP3", "none", []string{"start"})
-
-	// Set default FLAC settings - using technical values instead of localized texts
-	// For compression we use default value 12 (maximum), since "copy" is not relevant for compression
-	cfg.SetWithDependencyAndActions("flac_compression", "12", "select", true, "target_format", "FLAC", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("flac_samplerate", "copy", "select", true, "target_format", "FLAC", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("flac_bitdepth", "copy", "select", true, "target_format", "FLAC", "none", []string{"start"})
-
-	// Set default WAV settings - using technical values instead of localized texts
-	cfg.SetWithDependencyAndActions("wav_samplerate", "copy", "select", true, "target_format", "WAV", "none", []string{"start"})
-	cfg.SetWithDependencyAndActions("wav_bitdepth", "copy", "select", true, "target_format", "WAV", "none", []string{"start"})
-
-	return cfg
 }
 
 // Close releases resources held by the module (logger for ffmpeg included)

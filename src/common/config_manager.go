@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -19,32 +21,16 @@ type GlobalConfig struct {
 	Language     string
 }
 
-// ModuleConfig defines a configuration structure for individual modules.
-// Each module can define its own set of configuration fields with different types and validation rules.
-type ModuleConfig struct {
-	Fields map[string]FieldDefinition
-}
 
 // ConfigManager handles loading, saving, and managing application configuration.
 // It provides thread-safe access to both global and module-specific settings.
 type ConfigManager struct {
 	configPath    string
 	globalConfig  GlobalConfig
-	moduleConfigs map[string]ModuleConfig
-	mutex         sync.Mutex
+	cfg           *Cfg // Typed configuration structure
+	mutex sync.Mutex
 }
 
-// FieldDefinition defines the structure and validation rules for a configuration field.
-// It supports various field types, dependencies, and validation requirements.
-type FieldDefinition struct {
-	FieldType         string   // field type (folder, date, checkbox, select, playlist, file)
-	Required          bool     // whether the field is required
-	DependsOn         string   // field that this field depends on
-	ActiveWhen        string   // condition when this field is active
-	ValidationType    string   // validation type (exists, valid_date, filled, exists | write)
-	Value             string   // field value
-	ValidateOnActions []string // actions that trigger validation
-}
 
 // NewConfigManager initializes a new configuration manager instance.
 // It attempts to load existing configuration from the specified path, or creates a new one if it doesn't exist.
@@ -57,8 +43,8 @@ type FieldDefinition struct {
 //   - error: Any error that occurred during initialization
 func NewConfigManager(configPath string) (*ConfigManager, error) {
 	mgr := &ConfigManager{
-		configPath:    configPath,
-		moduleConfigs: make(map[string]ModuleConfig),
+		configPath: configPath,
+		cfg:        &Cfg{},
 	}
 
 	// Try to load the configuration. An error is not critical here if the file is simply new and empty.
@@ -67,6 +53,12 @@ func NewConfigManager(configPath string) (*ConfigManager, error) {
 		// If the file doesn't exist, it means LocateOrCreatePath failed, which is a critical error.
 		// For other errors like malformed JSON, we log it but continue, as a new config will be saved.
 		CaptureEarlyLog(SeverityInfo, "Creating a new configuration file '%s' is necessary because it does not exist in the usual location.: %v", configPath, err)
+	}
+
+	// Try to load typed configuration
+	if err := mgr.LoadCfg(); err != nil {
+		// If typed config doesn't exist, it will be created on first save
+		CaptureEarlyLog(SeverityInfo, "Typed configuration not found, will create on first save: %v", err)
 	}
 
 	return mgr, nil
@@ -92,46 +84,25 @@ func (mgr *ConfigManager) GetGlobalConfig() GlobalConfig {
 func (mgr *ConfigManager) SaveGlobalConfig(config GlobalConfig) error {
 	mgr.mutex.Lock()
 	mgr.globalConfig = config
-	mgr.mutex.Unlock()
 
-	return mgr.saveConfig()
-}
-
-// GetModuleConfig retrieves the configuration for a specific module.
-// If the module doesn't have a configuration yet, a new empty one is created.
-//
-// Parameters:
-//   - moduleName: The name of the module to get configuration for
-//
-// Returns:
-//   - ModuleConfig: The module's configuration (never nil)
-func (mgr *ConfigManager) GetModuleConfig(moduleName string) ModuleConfig {
-	mgr.mutex.Lock()
-	defer mgr.mutex.Unlock()
-
-	if config, exists := mgr.moduleConfigs[moduleName]; exists {
-		if config.Fields == nil {
-			config.Fields = make(map[string]FieldDefinition)
-			mgr.moduleConfigs[moduleName] = config
-		}
-		return config
+	// Also update typed config if it exists
+	if mgr.cfg != nil {
+		mgr.cfg.Global.DatabasePath = config.DatabasePath
+		mgr.cfg.Global.Language = config.Language
 	}
-	return NewModuleConfig()
-}
-
-// SaveModuleConfig updates and saves the configuration for a specific module.
-// The configuration is immediately persisted to disk.
-//
-// Parameters:
-//   - moduleName: The name of the module to save configuration for
-//   - config: The module configuration to save
-func (mgr *ConfigManager) SaveModuleConfig(moduleName string, config ModuleConfig) {
-	mgr.mutex.Lock()
-	mgr.moduleConfigs[moduleName] = config
 	mgr.mutex.Unlock()
 
-	mgr.saveConfig()
+	// Save both legacy and typed config
+	if mgr.cfg != nil {
+		// If typed config exists, save it (preserves typed module configs)
+		return mgr.SaveCfg()
+	} else {
+		// Fallback to legacy save if no typed config
+		return mgr.saveConfig()
+	}
 }
+
+
 
 // loadConfig loads the application configuration from the configuration file.
 // This is an internal method that is called during initialization.
@@ -154,8 +125,7 @@ func (mgr *ConfigManager) loadConfig() error {
 
 	// Parse JSON data
 	var configData struct {
-		Global  GlobalConfig            `json:"global"`
-		Modules map[string]ModuleConfig `json:"modules"`
+		Global GlobalConfig `json:"global"`
 	}
 	err = json.Unmarshal(data, &configData)
 	if err != nil {
@@ -163,7 +133,6 @@ func (mgr *ConfigManager) loadConfig() error {
 	}
 
 	mgr.globalConfig = configData.Global
-	mgr.moduleConfigs = configData.Modules
 
 	return nil
 }
@@ -187,11 +156,9 @@ func (mgr *ConfigManager) saveConfig() error {
 	}
 
 	config := struct {
-		Global  GlobalConfig            `json:"global"`
-		Modules map[string]ModuleConfig `json:"modules"`
+		Global GlobalConfig `json:"global"`
 	}{
-		Global:  mgr.globalConfig,
-		Modules: mgr.moduleConfigs,
+		Global: mgr.globalConfig,
 	}
 
 	data, err := json.MarshalIndent(config, "", "  ")
@@ -207,157 +174,202 @@ func (mgr *ConfigManager) saveConfig() error {
 	return nil
 }
 
-// NewModuleConfig creates a new empty module configuration with an initialized fields map.
-// This ensures that the Fields map is never nil when working with a new ModuleConfig.
-//
-// Returns:
-//   - ModuleConfig: A new, empty module configuration
-func NewModuleConfig() ModuleConfig {
-	return ModuleConfig{
-		Fields: make(map[string]FieldDefinition),
+
+// LoadCfg loads the typed configuration from the configuration file
+func (mgr *ConfigManager) LoadCfg() error {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	data, err := os.ReadFile(mgr.configPath)
+	if err != nil {
+		return err
 	}
+
+	var cfg Cfg
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return fmt.Errorf("ConfigManager.LoadCfg: failed to unmarshal config data: %w", err)
+	}
+
+	mgr.cfg = &cfg
+	return nil
 }
 
-// Get retrieves a string value from the module configuration.
-// If the specified key doesn't exist, it returns the provided default value.
-//
-// Parameters:
-//   - key: The configuration key to retrieve
-//   - defaultValue: The value to return if the key doesn't exist
-//
-// Returns:
-//   - string: The configuration value or the default value if not found
-func (c ModuleConfig) Get(key string, defaultValue string) string {
-	if field, exists := c.Fields[key]; exists {
-		return field.Value
+// SaveCfg saves the typed configuration to the configuration file
+func (mgr *ConfigManager) SaveCfg() error {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	if mgr.cfg == nil {
+		return fmt.Errorf("ConfigManager.SaveCfg: no typed configuration loaded")
 	}
-	return defaultValue
+
+	data, err := json.MarshalIndent(mgr.cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("ConfigManager.SaveCfg: failed to marshal config data: %w", err)
+	}
+
+	if err = os.WriteFile(mgr.configPath, data, 0644); err != nil {
+		return fmt.Errorf("ConfigManager.SaveCfg: failed to write config file %s: %w", mgr.configPath, err)
+	}
+	return nil
 }
 
-// Set stores a string value in the module configuration with a default field type of "folder".
-// This is a convenience method for simple string values without complex validation.
-//
-// Parameters:
-//   - key: The configuration key to set
-//   - value: The string value to store
-func (c *ModuleConfig) Set(key string, value string) {
-	if c.Fields == nil {
-		c.Fields = make(map[string]FieldDefinition)
+// isEmptyModuleConfig checks if a module configuration is empty or contains only empty fields
+func isEmptyModuleConfig(config interface{}) bool {
+	if config == nil {
+		return true
 	}
-	c.Fields[key] = FieldDefinition{
-		FieldType: "folder",
-		Value:     value,
+
+	// Use reflection to check if all FieldCfg values are empty
+	val := reflect.ValueOf(config)
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return true
+		}
+		val = val.Elem()
 	}
+
+	if val.Kind() != reflect.Struct {
+		return true
+	}
+
+	// Check all fields of the struct
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		if field.Kind() == reflect.Struct {
+			// Assume this is a FieldCfg struct, check its Value field
+			valueField := field.FieldByName("Value")
+			if valueField.IsValid() && valueField.Kind() == reflect.String {
+				if valueField.String() != "" {
+					return false // Found non-empty value
+				}
+			}
+		}
+	}
+
+	return true // All fields are empty
 }
 
-func (c *ModuleConfig) SetWithDefinition(key string, value string, fieldType string, required bool, validationType string) {
+// GetModuleCfg returns configuration for a specific module in typed format
+func (mgr *ConfigManager) GetModuleCfg(moduleType string, moduleName string) (interface{}, error) {
+	// If typed configuration is not loaded, try to load it first
+	if mgr.cfg == nil {
+		if err := mgr.LoadCfg(); err != nil {
+			// If loading fails, create empty typed config and use defaults
+			mgr.cfg = &Cfg{
+				Global: GlobalCfg{
+					DatabasePath: "",
+					Language:     "",
+				},
+				Modules: ModuleCfgs{},
+			}
+		}
+	}
 
-	// Save definition
-	if c.Fields == nil {
-		c.Fields = make(map[string]FieldDefinition)
+	// Get the appropriate module configuration based on type
+	var moduleConfig interface{}
+	switch strings.ToLower(moduleType) {
+	case "flacfixer":
+		moduleConfig = mgr.cfg.Modules.FlacFixer
+	case "formatconverter":
+		moduleConfig = mgr.cfg.Modules.FormatConverter
+	case "datesmaster":
+		moduleConfig = mgr.cfg.Modules.DatesMaster
+	case "dataduplicator":
+		moduleConfig = mgr.cfg.Modules.DataDuplicator
+	case "formatupdater":
+		moduleConfig = mgr.cfg.Modules.FormatUpdater
+	default:
+		return nil, fmt.Errorf("unknown module type: %s", moduleType)
 	}
-	c.Fields[key] = FieldDefinition{
-		FieldType:      fieldType,
-		Required:       required,
-		Value:          value,
-		ValidationType: validationType,
+
+	// Check if configuration is empty and return default if needed
+	if isEmptyModuleConfig(moduleConfig) {
+		defaultConfig := GetDefaultModuleCfg(strings.ToLower(moduleType))
+		if defaultConfig != nil {
+			// Save the default configuration for future use
+			mgr.SaveModuleCfg(moduleType, moduleName, defaultConfig)
+			return defaultConfig, nil
+		}
 	}
+
+	return moduleConfig, nil
 }
 
-// SetWithDefinitionAndActions stores a string value in the module configuration with field definition and validation actions
-func (cfg *ModuleConfig) SetWithDefinitionAndActions(key string, value string, fieldType string, required bool, validationType string, validateOnActions []string) {
-	if cfg.Fields == nil {
-		cfg.Fields = make(map[string]FieldDefinition)
+// SaveModuleCfg saves configuration for a specific module in typed format
+func (mgr *ConfigManager) SaveModuleCfg(moduleType string, moduleName string, config interface{}) error {
+	if mgr.cfg == nil {
+		return fmt.Errorf("typed configuration not loaded")
 	}
-	cfg.Fields[key] = FieldDefinition{
-		FieldType:         fieldType,
-		Required:          required,
-		ValidationType:    validationType,
-		Value:             value,
-		ValidateOnActions: validateOnActions,
+
+	// Update the appropriate module configuration based on type
+	switch strings.ToLower(moduleType) {
+	case "flacfixer":
+		if cfg, ok := config.(FlacFixerCfg); ok {
+			mgr.cfg.Modules.FlacFixer = cfg
+		} else {
+			return fmt.Errorf("invalid configuration type for flacfixer")
+		}
+	case "formatconverter":
+		if cfg, ok := config.(FormatConverterCfg); ok {
+			mgr.cfg.Modules.FormatConverter = cfg
+		} else {
+			return fmt.Errorf("invalid configuration type for formatconverter")
+		}
+	case "datesmaster":
+		if cfg, ok := config.(DatesMasterCfg); ok {
+			mgr.cfg.Modules.DatesMaster = cfg
+		} else {
+			return fmt.Errorf("invalid configuration type for datesmaster")
+		}
+	case "dataduplicator":
+		if cfg, ok := config.(DataDuplicatorCfg); ok {
+			mgr.cfg.Modules.DataDuplicator = cfg
+		} else {
+			return fmt.Errorf("invalid configuration type for dataduplicator")
+		}
+	case "formatupdater":
+		if cfg, ok := config.(FormatUpdaterCfg); ok {
+			mgr.cfg.Modules.FormatUpdater = cfg
+		} else {
+			return fmt.Errorf("invalid configuration type for formatupdater")
+		}
+	default:
+		return fmt.Errorf("unknown module type: %s", moduleType)
 	}
+
+	return mgr.SaveCfg()
 }
 
-// SetWithDependencyAndActions stores a string value in the module configuration with dependency and validation actions
-func (cfg *ModuleConfig) SetWithDependencyAndActions(key string, value string, fieldType string, required bool, dependsOn string, activeWhen string, validationType string, validateOnActions []string) {
-	if cfg.Fields == nil {
-		cfg.Fields = make(map[string]FieldDefinition)
-	}
-	cfg.Fields[key] = FieldDefinition{
-		FieldType:         fieldType,
-		Required:          required,
-		DependsOn:         dependsOn,
-		ActiveWhen:        activeWhen,
-		ValidationType:    validationType,
-		Value:             value,
-		ValidateOnActions: validateOnActions,
-	}
-}
-
-// GetBool retrieves a boolean value from the module configuration
-func (c ModuleConfig) GetBool(key string, defaultValue bool) bool {
-	if field, exists := c.Fields[key]; exists {
-		return field.Value == "true"
-	}
-	return defaultValue
-}
-
-func (c *ModuleConfig) SetBoolWithDefinition(key string, value bool, required bool, validationType string) {
-	if c.Fields == nil {
-		c.Fields = make(map[string]FieldDefinition)
-	}
-	c.Fields[key] = FieldDefinition{
-		FieldType:      "checkbox",
-		Required:       required,
-		Value:          fmt.Sprintf("%t", value),
-		ValidationType: validationType,
-	}
-}
-
-// SetIntWithDefinition stores an integer value in the module configuration
-func (c *ModuleConfig) SetIntWithDefinition(key string, value int, required bool) {
-	if c.Fields == nil {
-		c.Fields = make(map[string]FieldDefinition)
-	}
-	c.Fields[key] = FieldDefinition{
-		FieldType: "number", // for numeric values
-		Required:  required,
-		Value:     fmt.Sprintf("%d", value),
-	}
-}
-
-// IsNilConfig checks if a given configuration is nil
-func IsNilConfig(cfg ModuleConfig) bool {
-	return cfg.Fields == nil
-}
-
-// CreateConfigFile creates a configuration file with default settings.
-func CreateConfigFile(configPath string) error {
+// CreateCfgFile creates a configuration file with default settings for typed configuration
+func CreateCfgFile(cfgPath string) error {
 	// Ensure the directory exists before creating the config file
-	dir := filepath.Dir(configPath)
+	dir := filepath.Dir(cfgPath)
 	if err := EnsureDirectoryExists(dir); err != nil {
-		return fmt.Errorf("CreateConfigFile: failed to ensure directory %s exists: %w", dir, err)
+		return fmt.Errorf("CreateCfgFile: failed to ensure directory %s exists: %w", dir, err)
 	}
 
-	defaultConfig := struct {
-		Global  GlobalConfig            `json:"global"`
-		Modules map[string]ModuleConfig `json:"modules"`
-	}{
-		Global: GlobalConfig{
+	defaultConfig := Cfg{
+		Global: GlobalCfg{
 			DatabasePath: "",
-			Language:     "", // Set to empty string to force system language detection on first run
+			Language:     "",
 		},
-		Modules: make(map[string]ModuleConfig),
+		Modules: ModuleCfgs{
+			FormatConverter: FormatConverterCfg{},
+			DatesMaster:     DatesMasterCfg{},
+			FlacFixer:       FlacFixerCfg{},
+			DataDuplicator:  DataDuplicatorCfg{},
+			FormatUpdater:   FormatUpdaterCfg{},
+		},
 	}
 
 	data, err := json.MarshalIndent(defaultConfig, "", "  ")
 	if err != nil {
-		return fmt.Errorf("CreateConfigFile: failed to marshal default config data: %w", err)
+		return fmt.Errorf("CreateCfgFile: failed to marshal default config data: %w", err)
 	}
 
-	if err = os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("CreateConfigFile: failed to write default config file %s: %w", configPath, err)
+	if err = os.WriteFile(cfgPath, data, 0644); err != nil {
+		return fmt.Errorf("CreateCfgFile: failed to write default config file %s: %w", cfgPath, err)
 	}
-
 	return nil
 }

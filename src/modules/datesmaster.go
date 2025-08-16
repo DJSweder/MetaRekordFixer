@@ -209,7 +209,7 @@ func NewDatesMasterModule(window fyne.Window, configMgr *common.ConfigManager, d
 	m.initializeUI()
 
 	// Then load configuration
-	m.LoadConfig(m.ConfigMgr.GetModuleConfig(m.GetConfigName()))
+	m.LoadCfg()
 
 	return m
 }
@@ -289,133 +289,92 @@ func (m *DatesMasterModule) GetContent() fyne.CanvasObject {
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig loads module configuration from the provided ModuleConfig.
-// It initializes UI components with the stored values and creates default configuration if needed.
-// Parameter:
-//   - cfg: The module configuration to load
-//
-// The method sets IsLoadingConfig flag during loading to prevent triggering save operations.
-func (m *DatesMasterModule) LoadConfig(cfg common.ModuleConfig) {
+func (m *DatesMasterModule) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if configuration is nil or Fields are not initialized
-	if cfg.Fields == nil {
-		cfg = common.NewModuleConfig()
-
-		// Set default values with their definitions
-		cfg.SetWithDefinitionAndActions("custom_date", "", "date", true, "valid_date", []string{"custom"})
-		cfg.SetWithDefinitionAndActions("custom_date_folders", "", "folder", true, "exists", []string{"custom"})
-		cfg.SetWithDefinitionAndActions("exclude_folders_enabled", "false", "checkbox", false, "none", []string{"standard"})
-		cfg.SetWithDependencyAndActions("excluded_folders", "", "folder", true, "exclude_folders_enabled", "true", "filled", []string{"standard"})
-
-		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	// Load typed config from ConfigManager
+	config, err := m.ConfigMgr.GetModuleCfg("datesmaster", m.GetConfigName())
+	if err != nil {
+		// This should not happen with the updated GetModuleCfg(), but handle gracefully
+		return
 	}
 
-	// Clear existing entries
-	m.excludedFoldersEntry = nil
-	m.customDateFoldersEntry = nil
-
-	// Load excluded folders checkbox state
-	m.excludeFoldersCheck.SetChecked(cfg.GetBool("exclude_folders_enabled", false))
-
-	// Load excluded folders
-	excludedFolderPaths := []string{}
-	excludedFoldersEntry := cfg.Get("excluded_folders", "")
-	if excludedFoldersEntry != "" {
-		excludedFolderPaths = strings.Split(excludedFoldersEntry, "|")
+	// Cast to DatesMaster specific config
+	if cfg, ok := config.(common.DatesMasterCfg); ok {
+		// Update UI elements with loaded values
+		m.excludeFoldersCheck.SetChecked(cfg.ExcludeFoldersEnabled.Value == "true")
+		m.datePickerEntry.SetText(cfg.CustomDate.Value)
+		
+		// Parse excluded folders
+		excludedFolderPaths := []string{}
+		if cfg.ExcludedFolders.Value != "" {
+			excludedFolderPaths = strings.Split(cfg.ExcludedFolders.Value, "|")
+		}
+		
+		// Create excluded folders list
+		m.foldersContainer, m.excludedFoldersEntry = common.CreateDynamicEntryList(
+			m.Window,
+			excludedFolderPaths,
+			maxFolderEntries,
+			func(entries []*widget.Entry) {
+				m.excludedFoldersEntry = entries
+				m.SaveCfg()
+			},
+		)
+		
+		// Parse custom date folders
+		customFolderPaths := []string{}
+		if cfg.CustomDateFolders.Value != "" {
+			customFolderPaths = strings.Split(cfg.CustomDateFolders.Value, "|")
+		}
+		
+		// Create custom date folders list
+		m.customDateContainer, m.customDateFoldersEntry = common.CreateDynamicEntryList(
+			m.Window,
+			customFolderPaths,
+			maxFolderEntries,
+			func(entries []*widget.Entry) {
+				m.customDateFoldersEntry = entries
+				m.SaveCfg()
+			},
+		)
 	}
-
-	// Create excluded folders list
-	m.foldersContainer, m.excludedFoldersEntry = common.CreateDynamicEntryList(
-		m.Window,
-		excludedFolderPaths,
-		maxFolderEntries,
-		func(entries []*widget.Entry) {
-			m.excludedFoldersEntry = entries
-			m.SaveConfig()
-		},
-	)
-
-	// Load custom date folders
-	customFolderPaths := []string{}
-	customDateFoldersEntry := cfg.Get("custom_date_folders", "")
-	if customDateFoldersEntry != "" {
-		customFolderPaths = strings.Split(customDateFoldersEntry, "|")
-	}
-
-	// Create custom date folders list
-	m.customDateContainer, m.customDateFoldersEntry = common.CreateDynamicEntryList(
-		m.Window,
-		customFolderPaths,
-		maxFolderEntries,
-		func(entries []*widget.Entry) {
-			m.customDateFoldersEntry = entries
-			m.SaveConfig()
-		},
-	)
-
-	// Load custom date
-	m.datePickerEntry.SetText(cfg.Get("custom_date", ""))
 }
 
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
-// It collects values from all UI components and stores them in the configuration manager.
-// Returns the newly created and saved ModuleConfig.
-// The method checks IsLoadingConfig flag to prevent saving during configuration loading.
-func (m *DatesMasterModule) SaveConfig() common.ModuleConfig {
+// SaveCfg saves current UI state to typed configuration
+func (m *DatesMasterModule) SaveCfg() {
 	if m.IsLoadingConfig {
-		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
+		return // Safeguard: no save if config is being loaded
 	}
 
-	// Build fresh config
-	cfg := common.NewModuleConfig()
-
-	// Store checkbox state with definition
-	cfg.SetWithDefinitionAndActions("exclude_folders_enabled",
-		fmt.Sprintf("%t", m.excludeFoldersCheck.Checked),
-		"checkbox",
-		false,
-		"none", []string{"standard"})
-
-	// Save excluded folders with dependency
+	// Collect excluded folders
 	var excludedFoldersEntry []string
 	for _, entry := range m.excludedFoldersEntry {
 		if entry.Text != "" {
 			excludedFoldersEntry = append(excludedFoldersEntry, entry.Text)
 		}
 	}
-	cfg.SetWithDependencyAndActions("excluded_folders",
-		strings.Join(excludedFoldersEntry, "|"),
-		"folder",
-		true,
-		"exclude_folders_enabled",
-		"true",
-		"exists", []string{"standard"})
 
-	// Save custom date folders with definition
+	// Collect custom date folders
 	var customDateFoldersEntry []string
 	for _, entry := range m.customDateFoldersEntry {
 		if entry.Text != "" {
 			customDateFoldersEntry = append(customDateFoldersEntry, entry.Text)
 		}
 	}
-	cfg.SetWithDefinitionAndActions("custom_date_folders",
-		strings.Join(customDateFoldersEntry, "|"),
-		"folder",
-		true,
-		"exists", []string{"custom"})
 
-	// Save custom date with definition
-	cfg.SetWithDefinitionAndActions("custom_date",
-		m.datePickerEntry.Text,
-		"date",
-		true,
-		"valid_date", []string{"custom"})
+	// Get default configuration with all field definitions
+	cfg := common.GetDefaultDatesMasterCfg()
+	
+	// Update only the values from current UI state
+	cfg.CustomDate.Value = m.datePickerEntry.Text
+	cfg.CustomDateFolders.Value = strings.Join(customDateFoldersEntry, "|")
+	cfg.ExcludeFoldersEnabled.Value = fmt.Sprintf("%t", m.excludeFoldersCheck.Checked)
+	cfg.ExcludedFolders.Value = strings.Join(excludedFoldersEntry, "|")
 
-	// Store to config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	return cfg
+	// Save typed config via ConfigManager
+	m.ConfigMgr.SaveModuleCfg("datesmaster", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components for the module.
@@ -425,7 +384,7 @@ func (m *DatesMasterModule) initializeUI() {
 	// Create excluded folders checkbox
 	m.excludeFoldersCheck = widget.NewCheck(locales.Translate("datesmaster.chkbox.exception"),
 		m.CreateBoolChangeHandler(func() {
-			m.SaveConfig()
+			m.SaveCfg()
 		}),
 	)
 
@@ -445,7 +404,7 @@ func (m *DatesMasterModule) initializeUI() {
 			m.datePickerEntry.SetText(m.datePickerEntry.Text[:10])
 		}
 
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Create calendar button
@@ -453,12 +412,12 @@ func (m *DatesMasterModule) initializeUI() {
 		// Create dialog with calendar that will close automatically after date selection
 		calendar := NewCustomCalendar(func(selectedDate time.Time) {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
-			m.SaveConfig()
+			m.SaveCfg()
 		})
 		dlg := dialog.NewCustomWithoutButtons(locales.Translate("datesmaster.datepicker.header"), calendar, m.Window)
 		calendar.onSelected = func(selectedDate time.Time) {
 			m.datePickerEntry.SetText(selectedDate.Format("2006-01-02"))
-			m.SaveConfig()
+			m.SaveCfg()
 			dlg.Hide()
 		}
 
@@ -485,7 +444,7 @@ func (m *DatesMasterModule) initializeUI() {
 		maxFolderEntries,
 		func(entries []*widget.Entry) {
 			m.excludedFoldersEntry = entries
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 
@@ -495,7 +454,7 @@ func (m *DatesMasterModule) initializeUI() {
 		maxFolderEntries,
 		func(entries []*widget.Entry) {
 			m.customDateFoldersEntry = entries
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 }

@@ -4,7 +4,7 @@
 // Each module handles a specific task related to DJ database management and music file operations.
 
 // This module copies these metadata fields from tracks to tracks:
-// HOT CUE & Memor CUE points, play counts, addition/creation dates, color
+// HOT CUE & Memory CUE points, play counts, addition/creation dates, color
 // This is useful if the user maintains a music library in multiple formats.
 
 package modules
@@ -79,7 +79,7 @@ func NewDataDuplicatorModule(window fyne.Window, configMgr *common.ConfigManager
 	m.initializeUI()
 
 	// Load configuration
-	m.LoadConfig(m.ConfigMgr.GetModuleConfig(m.GetConfigName()))
+	m.LoadCfg()
 
 	return m
 }
@@ -198,68 +198,48 @@ func (m *DataDuplicatorModule) GetContent() fyne.CanvasObject {
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig applies the configuration to the UI components.
-// It loads all saved settings from the provided ModuleConfig and updates the UI accordingly.
-// If the configuration is nil or empty, it creates a new configuration with default values.
-//
-// Parameters:
-//   - cfg: The module configuration to load
-func (m *DataDuplicatorModule) LoadConfig(cfg common.ModuleConfig) {
+// LoadCfg loads typed configuration and sets UI elements
+func (m *DataDuplicatorModule) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if configuration is nil or Fields are not initialized
-	if cfg.Fields == nil {
-		cfg = common.NewModuleConfig()
-
-		// Set default values with their definitions
-		cfg.SetWithDefinitionAndActions("source_type", string(SourceTypeFolder), "select", true, "none", []string{"start"})
-		cfg.SetWithDefinitionAndActions("target_type", string(SourceTypeFolder), "select", true, "none", []string{"start"})
-		cfg.SetWithDependencyAndActions("source_folder", "", "folder", true, "source_type", "folder", "exists", []string{"start"})
-		cfg.SetWithDependencyAndActions("target_folder", "", "folder", true, "target_type", "folder", "exists", []string{"start"})
-		cfg.SetWithDependencyAndActions("source_playlist", "", "playlist", true, "source_type", "playlist", "filled", []string{"start"})
-		cfg.SetWithDependencyAndActions("target_playlist", "", "playlist", true, "target_type", "playlist", "filled", []string{"start"})
-
-		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	// Load typed config from ConfigManager
+	config, err := m.ConfigMgr.GetModuleCfg("dataduplicator", m.GetConfigName())
+	if err != nil {
+		// This should not happen with the updated GetModuleCfg(), but handle gracefully
+		return
 	}
 
-	// Load source type
-	sourceTypeStr := cfg.Get("source_type", string(SourceTypeFolder))
-	sourceType := SourceType(sourceTypeStr)
-	m.sourceType.SetSelected(locales.Translate("dataduplicator.dropdown." + string(sourceType)))
+	// Cast to DataDuplicator specific config
+	if cfg, ok := config.(common.DataDuplicatorCfg); ok {
+		// Update UI elements with loaded values
+		m.sourceType.SetSelected(locales.Translate("dataduplicator.dropdown." + cfg.SourceType.Value))
+		m.targetType.SetSelected(locales.Translate("dataduplicator.dropdown." + cfg.TargetType.Value))
+		m.sourceFolderEntry.SetText(cfg.SourceFolder.Value)
+		m.targetFolderEntry.SetText(cfg.TargetFolder.Value)
+		m.sourcePlaylistID = cfg.SourcePlaylist.Value
+		m.targetPlaylistID = cfg.TargetPlaylist.Value
 
-	// Load target type
-	targetTypeStr := cfg.Get("target_type", string(SourceTypeFolder))
-	targetType := SourceType(targetTypeStr)
-	m.targetType.SetSelected(locales.Translate("dataduplicator.dropdown." + string(targetType)))
-
-	// Load folder paths
-	m.sourceFolderEntry.SetText(cfg.Get("source_folder", ""))
-	m.targetFolderEntry.SetText(cfg.Get("target_folder", ""))
-
-	// Save playlist IDs for later use when playlists are loaded
-	m.sourcePlaylistID = cfg.Get("source_playlist", "")
-	m.targetPlaylistID = cfg.Get("target_playlist", "")
-
-	// Load playlist selections if playlists are loaded
-	if len(m.playlists) > 0 {
-		// Find and set source playlist
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.sourcePlaylistID {
-				if i < len(m.sourcePlaylistSelect.Options) {
-					m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
+		// Load playlist selections if playlists are loaded
+		if len(m.playlists) > 0 {
+			// Find and set source playlist
+			for i, playlist := range m.playlists {
+				if playlist.ID == m.sourcePlaylistID {
+					if i < len(m.sourcePlaylistSelect.Options) {
+						m.sourcePlaylistSelect.SetSelected(m.sourcePlaylistSelect.Options[i])
+					}
+					break
 				}
-				break
 			}
-		}
 
-		// Find and set target playlist
-		for i, playlist := range m.playlists {
-			if playlist.ID == m.targetPlaylistID {
-				if i < len(m.targetPlaylistSelect.Options) {
-					m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
+			// Find and set target playlist
+			for i, playlist := range m.playlists {
+				if playlist.ID == m.targetPlaylistID {
+					if i < len(m.targetPlaylistSelect.Options) {
+						m.targetPlaylistSelect.SetSelected(m.targetPlaylistSelect.Options[i])
+					}
+					break
 				}
-				break
 			}
 		}
 	}
@@ -268,64 +248,62 @@ func (m *DataDuplicatorModule) LoadConfig(cfg common.ModuleConfig) {
 	m.updateControlsState()
 }
 
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
-// It captures the current state of all UI components and creates a configuration
-// that can be persisted and later restored with LoadConfig.
-//
-// Returns:
-//   - A ModuleConfig containing all current UI settings
-func (m *DataDuplicatorModule) SaveConfig() common.ModuleConfig {
+// SaveCfg saves current UI state to typed configuration
+func (m *DataDuplicatorModule) SaveCfg() {
 	if m.IsLoadingConfig {
-		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
+		return // Safeguard: no save if config is being loaded
 	}
 
-	cfg := common.NewModuleConfig()
-
-	// Save source type
+	// Determine source type
 	var sourceType SourceType
 	if m.sourceType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		sourceType = SourceTypeFolder
 	} else {
 		sourceType = SourceTypePlaylist
 	}
-	cfg.SetWithDefinitionAndActions("source_type", string(sourceType), "select", true, "none", []string{"start"})
 
-	// Save target type
+	// Determine target type
 	var targetType SourceType
 	if m.targetType.Selected == locales.Translate("dataduplicator.dropdown."+string(SourceTypeFolder)) {
 		targetType = SourceTypeFolder
 	} else {
 		targetType = SourceTypePlaylist
 	}
-	cfg.SetWithDefinitionAndActions("target_type", string(targetType), "select", true, "none", []string{"start"})
 
-	// Save folder paths
-	cfg.SetWithDependencyAndActions("source_folder", m.sourceFolderEntry.Text, "folder", true, "source_type", "folder", "exists", []string{"start"})
-	cfg.SetWithDependencyAndActions("target_folder", m.targetFolderEntry.Text, "folder", true, "target_type", "folder", "exists", []string{"start"})
-
-	// Save playlist selections
+	// Get playlist IDs if needed
+	sourcePlaylistID := ""
 	if sourceType == SourceTypePlaylist && m.sourcePlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.sourcePlaylistSelect.Selected {
-				cfg.SetWithDependencyAndActions("source_playlist", playlist.ID, "playlist", true, "source_type", "playlist", "filled", []string{"start"})
+				sourcePlaylistID = playlist.ID
 				break
 			}
 		}
 	}
 
+	targetPlaylistID := ""
 	if targetType == SourceTypePlaylist && m.targetPlaylistSelect.Selected != "" {
 		for _, playlist := range m.playlists {
 			if playlist.Path == m.targetPlaylistSelect.Selected {
-				cfg.SetWithDependencyAndActions("target_playlist", playlist.ID, "playlist", true, "target_type", "playlist", "filled", []string{"start"})
+				targetPlaylistID = playlist.ID
 				break
 			}
 		}
 	}
 
-	// Save config to the config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	// Get default configuration with all field definitions
+	cfg := common.GetDefaultDataDuplicatorCfg()
+	
+	// Update only the values from current UI state
+	cfg.SourceType.Value = string(sourceType)
+	cfg.SourceFolder.Value = m.sourceFolderEntry.Text
+	cfg.SourcePlaylist.Value = sourcePlaylistID
+	cfg.TargetType.Value = string(targetType)
+	cfg.TargetFolder.Value = m.targetFolderEntry.Text
+	cfg.TargetPlaylist.Value = targetPlaylistID
 
-	return cfg
+	// Save typed config via ConfigManager
+	m.ConfigMgr.SaveModuleCfg("dataduplicator", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -345,7 +323,7 @@ func (m *DataDuplicatorModule) initializeUI() {
 			sourceType = SourceTypePlaylist
 		}
 		m.updateSourceVisibility(sourceType)
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Initialize target type selector
@@ -361,32 +339,32 @@ func (m *DataDuplicatorModule) initializeUI() {
 			targetType = SourceTypePlaylist
 		}
 		m.updateTargetVisibility(targetType)
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Initialize source folder field
 	m.sourceFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
 	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.sourceFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
 		m.sourceFolderEntry,
 		m.CreateChangeHandler(func() {
-			m.SaveConfig()
+			m.SaveCfg()
 		}),
 	)
 
 	// Initialize target folder field
 	m.targetFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
 	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 	m.targetFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
 		m.targetFolderEntry,
 		m.CreateChangeHandler(func() {
-			m.SaveConfig()
+			m.SaveCfg()
 		}),
 	)
 
@@ -400,7 +378,7 @@ func (m *DataDuplicatorModule) initializeUI() {
 				break
 			}
 		}
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Initialize target playlist selector
@@ -413,7 +391,7 @@ func (m *DataDuplicatorModule) initializeUI() {
 				break
 			}
 		}
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Create a standardized submit button

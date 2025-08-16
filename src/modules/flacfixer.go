@@ -3,7 +3,7 @@
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
 
-// This module copy metadata that is stored in the database for MP3 versions of identical tracks to the FLAC track collection
+// This module copies metadata that is stored in the database for MP3 versions of identical tracks to the FLAC track collection
 
 package modules
 
@@ -63,8 +63,8 @@ func NewFlacFixerModule(window fyne.Window, configMgr *common.ConfigManager, dbM
 
 	m.initializeUI()
 
-	// Then load configuration
-	m.LoadConfig(m.ConfigMgr.GetModuleConfig(m.GetConfigName()))
+	// Load typed configuration
+	m.LoadCfg()
 
 	return m
 }
@@ -133,61 +133,41 @@ func (m *FlacFixerModule) GetContent() fyne.CanvasObject {
 	return m.CreateModuleLayoutWithStatusMessages(m.GetModuleContent())
 }
 
-// LoadConfig applies the configuration to the UI components.
-// If the configuration is nil, it creates a new one with default values.
-// It sets the source folder path and recursive checkbox state based on saved configuration.
-//
-// Parameters:
-//   - cfg: The module configuration to load
-func (m *FlacFixerModule) LoadConfig(cfg common.ModuleConfig) {
+// LoadCfg loads typed configuration and updates UI elements
+func (m *FlacFixerModule) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 
-	// Check if configuration is nil or Fields are not initialized
-	if cfg.Fields == nil {
-		cfg = common.NewModuleConfig()
-
-		// Set default values with their definitions
-		cfg.SetWithDefinitionAndActions("source_folder", "", "folder", true, "exists", []string{"start"})
-		cfg.SetBoolWithDefinition("recursive", false, false, "none")
-
-		m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
+	// Load typed config from ConfigManager
+	config, err := m.ConfigMgr.GetModuleCfg("flacfixer", m.GetConfigName())
+	if err != nil {
+		// This should not happen with the updated GetModuleCfg(), but handle gracefully
+		return
 	}
 
-	// Load source folder path
-	m.sourceFolderEntry.SetText(cfg.Get("source_folder", ""))
-
-	// Load recursive flag with default value false
-	m.recursiveCheck.SetChecked(cfg.GetBool("recursive", false))
+	// Cast to FlacFixer specific config
+	if cfg, ok := config.(common.FlacFixerCfg); ok {
+		// Update UI elements with loaded values
+		m.sourceFolderEntry.SetText(cfg.SourceFolder.Value)
+		m.recursiveCheck.SetChecked(cfg.Recursive.Value == "true")
+	}
 }
 
-// SaveConfig reads UI state and saves it into a new ModuleConfig.
-// It normalizes paths and saves boolean values for recursive processing.
-// This method is called whenever UI components change to persist user preferences.
-//
-// Returns:
-//   - A ModuleConfig containing all current UI settings
-func (m *FlacFixerModule) SaveConfig() common.ModuleConfig {
+// SaveCfg saves current UI state to typed configuration
+func (m *FlacFixerModule) SaveCfg() {
 	if m.IsLoadingConfig {
-		return common.NewModuleConfig() // Safeguard: no save if config is being loaded
+		return // Safeguard: no save if config is being loaded
 	}
 
-	// Build fresh config
-	cfg := m.ConfigMgr.GetModuleConfig(m.GetConfigName())
+	// Get default configuration with all field definitions
+	cfg := common.GetDefaultFlacFixerCfg()
+	
+	// Update only the values from current UI state
+	cfg.SourceFolder.Value = common.NormalizePath(m.sourceFolderEntry.Text)
+	cfg.Recursive.Value = fmt.Sprintf("%t", m.recursiveCheck.Checked)
 
-	// Save source folder path using NormalizePath
-	cfg.SetWithDefinitionAndActions("source_folder",
-		common.NormalizePath(m.sourceFolderEntry.Text),
-		"folder",
-		true,
-		"exists", []string{"start"})
-
-	// Save recursive flag
-	cfg.SetBoolWithDefinition("recursive", m.recursiveCheck.Checked, false, "none")
-
-	// Store to config manager
-	m.ConfigMgr.SaveModuleConfig(m.GetConfigName(), cfg)
-	return cfg
+	// Save typed config via ConfigManager
+	m.ConfigMgr.SaveModuleCfg("flacfixer", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -197,7 +177,7 @@ func (m *FlacFixerModule) initializeUI() {
 	// Initialize entry fields
 	m.sourceFolderEntry = widget.NewEntry()
 	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Initialize folder selection button using standardized function
@@ -206,14 +186,14 @@ func (m *FlacFixerModule) initializeUI() {
 		m.sourceFolderEntry,
 		func(path string) {
 			m.sourceFolderEntry.SetText(common.NormalizePath(path))
-			m.SaveConfig()
+			m.SaveCfg()
 		},
 	)
 	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
 	// Initialize recursive checkbox using standardized function
 	m.recursiveCheck = common.CreateCheckbox(locales.Translate("flacfixer.chkbox.recursive"), func(checked bool) {
-		m.SaveConfig()
+		m.SaveCfg()
 	})
 
 	// Initialize sync button

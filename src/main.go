@@ -8,6 +8,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	// "reflect"
 	"runtime/debug"
 
 	"MetaRekordFixer/assets"
@@ -160,11 +162,13 @@ func (rt *RekordboxTools) Run() {
 // initModules prepares module definitions without initializing them.
 // This allows for lazy loading of modules that require database access,
 // improving startup performance and handling cases where the database might not be available.
+// Nyní používá nový typový systém konfigurace.
 func (rt *RekordboxTools) initModules() {
 	rt.modules = []*moduleInfo{
 		{
 			createFn: func() common.Module {
 				m := modules.NewFlacFixerModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				// FlacFixer uses typed configuration directly - no fallback needed
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},
@@ -172,6 +176,8 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewDataDuplicatorModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				// Apply typed->legacy fallback loading if typed config exists
+				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
@@ -179,6 +185,8 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewDatesMasterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				// Apply typed->legacy fallback loading if typed config exists
+				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},
@@ -186,6 +194,8 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewFormatUpdaterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
+				// Apply typed->legacy fallback loading if typed config exists
+				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
@@ -193,6 +203,8 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewFormatConverterModule(rt.mainWindow, rt.configMgr, rt.errorHandler)
+				// Apply typed->legacy fallback loading if typed config exists
+				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(false, false)
 				return m
 			},

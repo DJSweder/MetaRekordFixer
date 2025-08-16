@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -37,9 +38,6 @@ func NewValidator(module Module, configMgr *ConfigManager, dbMgr *DBManager, err
 // matches one of the specified actions. If ValidateOnActions is empty, the field
 // will be validated for all actions.
 func (v *Validator) Validate(action string) error {
-	// Save configuration
-	v.module.SaveConfig()
-
 	// Get base module functionality
 	base := v.module.(interface {
 		ClearStatusMessages()
@@ -53,7 +51,7 @@ func (v *Validator) Validate(action string) error {
 	// Add initial status message
 	base.AddInfoMessage(locales.Translate("validator.status.start"))
 
-	// Validate input fields
+	// Validate input fields using new typed system
 	if err := v.validateFields(action); err != nil {
 		base.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return err
@@ -84,10 +82,12 @@ func (v *Validator) Validate(action string) error {
 }
 
 // validateFields checks all fields according to their definitions and validation rules.
+// Uses the new typed configuration system via reflection to extract FieldCfg fields.
 func (v *Validator) validateFields(action string) error {
-	// Get module configuration
-	cfg := v.configMgr.GetModuleConfig(v.module.GetConfigName())
-	if IsNilConfig(cfg) {
+	// Get typed configuration from module via ConfigManager
+	moduleType := v.module.GetConfigName()
+	typedCfg, err := v.configMgr.GetModuleCfg(moduleType, moduleType)
+	if err != nil {
 		context := &ErrorContext{
 			Module:      v.module.GetName(),
 			Operation:   "ValidateInputFields",
@@ -99,13 +99,18 @@ func (v *Validator) validateFields(action string) error {
 		return err
 	}
 
-	// Check if Fields map exists
-	if cfg.Fields == nil {
-		return nil // No fields to validate
+	if typedCfg == nil {
+		return nil // No configuration to validate
+	}
+
+	// Extract FieldCfg fields via reflection
+	fields, err := extractFieldConfigs(typedCfg)
+	if err != nil {
+		return fmt.Errorf("nepodařilo se extrahovat pole pro validaci: %w", err)
 	}
 
 	// Validate each field
-	for key, field := range cfg.Fields {
+	for _, field := range fields {
 		// Skip validation if field's ValidateOnActions doesn't include current action
 		if len(field.ValidateOnActions) > 0 {
 			actionFound := false
@@ -120,12 +125,17 @@ func (v *Validator) validateFields(action string) error {
 			}
 		}
 
-		value := cfg.Get(key, "")
+		value := field.Value
 
 		// Skip validation if field depends on another field and condition is not met
 		if field.DependsOn != "" {
-			dependentValue := cfg.Get(field.DependsOn, "")
-			if dependentValue != field.ActiveWhen {
+			// Find dependent field value in the same config
+			if dependentField, exists := fields[field.DependsOn]; exists {
+				if dependentField.Value != field.ActiveWhen {
+					continue
+				}
+			} else {
+				// Dependent field not found, skip validation
 				continue
 			}
 		}
@@ -175,7 +185,7 @@ func (v *Validator) validateFields(action string) error {
 		if !IsEmptyString(field.ValidationType) {
 			switch field.ValidationType {
 			case "exists":
-				// Use DirectoryExists for folders, FileExists pro files
+				// Use DirectoryExists for folders, FileExists for files
 				var exists bool
 				if field.FieldType == "folder" {
 					exists = DirectoryExists(value)
@@ -314,6 +324,36 @@ func IsValidDateFormat(date string) bool {
 func IsEmptyString(s string) bool {
 	return strings.TrimSpace(s) == ""
 }
+
+// extractFieldConfigs uses reflection to extract all FieldCfg fields from a given config struct.
+func extractFieldConfigs(config interface{}) (map[string]FieldCfg, error) {
+	fields := make(map[string]FieldCfg)
+	v := reflect.ValueOf(config)
+
+	// Potřebujeme pracovat s ukazatelem na strukturu nebo přímo se strukturou
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected a struct, but got %s", v.Kind())
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.Type() == reflect.TypeOf(FieldCfg{}) {
+			// Získáme JSON tag, který slouží jako klíč pole
+			jsonTag := t.Field(i).Tag.Get("json")
+			if jsonTag != "" && jsonTag != "-" {
+				fields[jsonTag] = field.Interface().(FieldCfg)
+			}
+		}
+	}
+
+	return fields, nil
+}
+
 
 // backupDatabase creates a backup of the database.
 // It uses DBManager to create a backup of the current database file.

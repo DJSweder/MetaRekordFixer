@@ -36,15 +36,16 @@ type Module interface {
 	GetIcon() fyne.Resource
 	// GetContent returns the complete UI of the module including status messages
 	GetContent() fyne.CanvasObject
-	// LoadConfig loads module configuration from the provided config object
-	LoadConfig(config ModuleConfig)
-	// SaveConfig saves the current module state to a configuration object
-	SaveConfig() ModuleConfig
+	// LoadCfg loads module configuration using the new typed system
+	LoadCfg()
+	// SaveCfg saves the current module configuration using the new typed system
+	SaveCfg()
 	// GetDatabaseRequirements returns the database access requirements for this module
 	GetDatabaseRequirements() DatabaseRequirements
 	// SetDatabaseRequirements configures the database access requirements for this module
 	SetDatabaseRequirements(needs bool, immediate bool)
 }
+
 
 // ModuleBase provides common functionality for all modules.
 // It implements shared behavior and serves as a base struct for specific module implementations.
@@ -62,7 +63,7 @@ type ModuleBase struct {
 	Logger           *Logger                    // Logger for recording events
 	StatusMessages   *StatusMessagesContainer   // Container for status messages
 	dbRequirements   DatabaseRequirements       // Database access requirements
-	fieldDefinitions map[string]FieldDefinition // Field definitions for validation
+	Cfg              interface{}                // Typed configuration field for type-safe configuration
 }
 
 // DatabaseRequirements defines how a module uses the database.
@@ -162,29 +163,25 @@ func (m *ModuleBase) GetIcon() fyne.Resource {
 	return nil
 }
 
-// LoadConfig loads module configuration from the provided config object.
+// LoadCfg loads module configuration using the new typed system.
 // This is a placeholder implementation that should be overridden by specific modules.
 // Modules should implement this method to restore their state from saved configuration.
 // When implementing this method, modules should set IsLoadingConfig to true at the start
 // and false at the end to prevent unwanted save operations during loading.
-func (m *ModuleBase) LoadConfig(cfg ModuleConfig) {
+func (m *ModuleBase) LoadCfg() {
 	m.IsLoadingConfig = true
 	defer func() { m.IsLoadingConfig = false }()
 }
 
-// SaveConfig saves the current module state to a configuration object.
+// SaveCfg saves the current module configuration using the new typed system.
 // This is a placeholder implementation that should be overridden by specific modules.
 // Modules should implement this method to store their current state for later restoration.
-// The base implementation returns an empty configuration object and includes a safety check
-// to prevent saving during configuration loading.
-//
-// Returns:
-//   - A ModuleConfig object containing the module's configuration
-func (m *ModuleBase) SaveConfig() ModuleConfig {
+// The base implementation includes a safety check to prevent saving during configuration loading.
+func (m *ModuleBase) SaveCfg() {
 	if m.IsLoadingConfig {
-		return NewModuleConfig()
+		return
 	}
-	return NewModuleConfig()
+	// Placeholder - specific modules should override this method
 }
 
 // ShowProgressDialog displays a progress dialog with stop button and optional cancel callback.
