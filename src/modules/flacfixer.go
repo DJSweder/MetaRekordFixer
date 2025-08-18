@@ -174,21 +174,20 @@ func (m *FlacFixerModule) SaveCfg() {
 // It creates and configures the entry fields, checkboxes, and buttons,
 // and sets up their event handlers to respond to user interactions.
 func (m *FlacFixerModule) initializeUI() {
-	// Initialize entry fields
-	m.sourceFolderEntry = widget.NewEntry()
-	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
-
 	// Initialize folder selection field using standardized function
 	m.folderSelectionField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.sourceFolderEntry,
-		func(path string) {
-			m.sourceFolderEntry.SetText(common.NormalizePath(path))
+		nil,
+		m.CreateChangeHandler(func() {
 			m.SaveCfg()
-		},
+		}),
 	)
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.folderSelectionField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.sourceFolderEntry = entry
+		}
+	}
 
 	// Initialize recursive checkbox using standardized function
 	m.recursiveCheck = common.CreateCheckbox(locales.Translate("flacfixer.chkbox.recursive"), func(checked bool) {

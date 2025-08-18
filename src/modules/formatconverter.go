@@ -377,37 +377,35 @@ func (m *FormatConverterModule) initializeUI() {
 		m.SaveCfg()
 	})
 
-	// Initialize source folder entry first
-	m.sourceFolderEntry = widget.NewEntry()
-	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
-
 	// Source folder selection - store reference for UI usage
 	m.sourceFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.sourceFolderEntry,
-		func(path string) {
-			m.sourceFolderEntry.SetText(common.NormalizePath(path))
+		nil,
+		m.CreateChangeHandler(func() {
 			m.SaveCfg()
-		},
+		}),
 	)
-
-	// Initialize target folder entry first
-	m.targetFolderEntry = widget.NewEntry()
-	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.sourceFolderField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.sourceFolderEntry = entry
+		}
+	}
 
 	// Target folder selection - store reference for UI usage
 	m.targetFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.targetFolderEntry,
-		func(path string) {
-			m.targetFolderEntry.SetText(common.NormalizePath(path))
+		nil,
+		m.CreateChangeHandler(func() {
 			m.SaveCfg()
-		},
+		}),
 	)
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.targetFolderField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.targetFolderEntry = entry
+		}
+	}
 
 	// Checkboxes
 	m.rewriteExistingCheckbox = common.CreateCheckbox(locales.Translate("formatconverter.chkbox.rewrite"), nil)

@@ -239,10 +239,6 @@ func (m *FormatUpdaterModule) initializeUI() {
 	if container, ok := m.folderSelectionField.(*fyne.Container); ok && len(container.Objects) > 0 {
 		if entry, ok := container.Objects[0].(*widget.Entry); ok {
 			m.folderEntry = entry
-			// Set up change handler for the entry
-			m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
-				m.SaveCfg()
-			})
 		}
 	}
 
