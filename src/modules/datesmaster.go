@@ -494,7 +494,7 @@ func (m *DatesMasterModule) Start(mode string) {
 func (m *DatesMasterModule) processStandardUpdate() {
 
 	// Execute standard date sync
-	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
+	m.StartProcessing(locales.Translate("common.status.updating"))
 	m.AddInfoMessage(locales.Translate("common.status.updating"))
 	updatedCount, err := m.setStandardDates()
 	if err != nil {
@@ -511,10 +511,9 @@ func (m *DatesMasterModule) processStandardUpdate() {
 	}
 
 	// Update progress with count
-	m.UpdateProgressStatus(0.9, fmt.Sprintf(locales.Translate("common.status.progress"), updatedCount, updatedCount))
 
 	// Update progress and complete dialog with final count
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
+	m.CompleteProcessing(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
 	m.CompleteProgressDialog()
 
@@ -540,7 +539,7 @@ func (m *DatesMasterModule) processCustomUpdate() {
 	}
 
 	// Execute custom date sync
-	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
+	m.StartProcessing(locales.Translate("common.status.updating"))
 	m.AddInfoMessage(locales.Translate("common.status.updating"))
 	updatedCount, err := m.setCustomDates(customDateFolders, customDate)
 	if err != nil {
@@ -562,10 +561,9 @@ func (m *DatesMasterModule) processCustomUpdate() {
 	}
 
 	// Update progress with count
-	m.UpdateProgressStatus(0.9, fmt.Sprintf(locales.Translate("common.status.progress"), updatedCount, updatedCount))
 
 	// Update progress and complete dialog with final count
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
+	m.CompleteProcessing(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), updatedCount))
 	m.CompleteProgressDialog()
 

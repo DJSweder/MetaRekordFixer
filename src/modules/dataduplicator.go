@@ -71,10 +71,6 @@ func NewDataDuplicatorModule(window fyne.Window, configMgr *common.ConfigManager
 		dbMgr:      dbMgr,
 	}
 
-	// Initialize variables before UI
-	m.sourceFolderEntry = widget.NewEntry()
-	m.targetFolderEntry = widget.NewEntry()
-
 	// Initialize UI components
 	m.initializeUI()
 
@@ -343,30 +339,36 @@ func (m *DataDuplicatorModule) initializeUI() {
 	})
 
 	// Initialize source folder field
-	m.sourceFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
-	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
 	m.sourceFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.sourceFolderEntry,
+		nil,
 		m.CreateChangeHandler(func() {
 			m.SaveCfg()
 		}),
 	)
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.sourceFolderField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.sourceFolderEntry = entry
+			m.sourceFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
+		}
+	}
 
 	// Initialize target folder field
-	m.targetFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
-	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
 	m.targetFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.targetFolderEntry,
+		nil,
 		m.CreateChangeHandler(func() {
 			m.SaveCfg()
 		}),
 	)
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.targetFolderField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.targetFolderEntry = entry
+			m.targetFolderEntry.TextStyle = fyne.TextStyle{Monospace: true}
+		}
+	}
 
 	// Initialize source playlist selector
 	m.sourcePlaylistSelect = common.CreatePlaylistSelect(nil, "common.select.plsplacehldrinact")
@@ -667,7 +669,7 @@ func (m *DataDuplicatorModule) getTargetTracks(sourceTrack common.TrackItem) ([]
 //   - error: An error if playlist loading failed
 func (m *DataDuplicatorModule) loadPlaylists() error {
 	// Update UI to show loading state
-	m.UpdateProgressStatus(0, locales.Translate("common.status.playlistload"))
+	m.StartProcessing(locales.Translate("common.status.playlistload"))
 
 	// Get playlists from database
 	playlists, err := m.dbMgr.GetPlaylists()
@@ -881,7 +883,6 @@ func (m *DataDuplicatorModule) processUpdate() {
 	}
 
 	// Update progress
-	m.UpdateProgressStatus(0.1, locales.Translate("common.status.reading"))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("dataduplicator.status.srctrackscount"), len(sourceTracks)))
 
 	// Track successful and skipped files
@@ -889,7 +890,6 @@ func (m *DataDuplicatorModule) processUpdate() {
 	skippedCount := 0
 
 	// Update progress before processing
-	m.UpdateProgressStatus(0.2, locales.Translate("common.status.updating"))
 	m.AddInfoMessage(locales.Translate("common.status.updating"))
 
 	// Process each source track
@@ -922,8 +922,7 @@ func (m *DataDuplicatorModule) processUpdate() {
 		}
 
 		// Update progress
-		progress := 0.2 + (float64(processedCount+1) / float64(len(sourceTracks)) * 0.8)
-		m.UpdateProgressStatus(progress, fmt.Sprintf("%s: %d/%d", locales.Translate("dataduplicator.diagstatus.process"), processedCount+1, len(sourceTracks)))
+		m.UpdateProcessingProgress(processedCount, len(sourceTracks), fmt.Sprintf("%s: %d/%d", locales.Translate("dataduplicator.diagstatus.process"), processedCount+1, len(sourceTracks)))
 
 		// Process target tracks
 		for _, targetTrack := range targetTracks {
@@ -971,7 +970,7 @@ func (m *DataDuplicatorModule) processUpdate() {
 	}
 
 	// Update progress and status
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("dataduplicator.status.completed"), processedCount, skippedCount))
+	m.CompleteProcessing(fmt.Sprintf(locales.Translate("dataduplicator.status.completed"), processedCount, skippedCount))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("dataduplicator.status.completed"), processedCount, skippedCount))
 
 	// Complete progress dialog and update button

@@ -223,6 +223,39 @@ func (m *ModuleBase) ShowProgressDialog(title string, onCancel ...func()) {
 	m.ProgressDialog.Show()
 }
 
+// Progress phase constants for standardized progress reporting
+const (
+	ProgressPhaseInit     = 0.1  // Initialization phase
+	ProgressPhaseComplete = 1.0  // Completion phase
+)
+
+// StartProcessing initializes the progress dialog with the initialization phase.
+// This should be called at the beginning of any processing operation.
+func (m *ModuleBase) StartProcessing(message string) {
+	m.UpdateProgressStatus(ProgressPhaseInit, message)
+}
+
+// UpdateProcessingProgress updates progress during the main processing phase.
+// It automatically calculates progress between initialization and completion phases.
+// Parameters:
+//   - current: current item being processed (0-based)
+//   - total: total number of items to process
+//   - message: status message to display
+func (m *ModuleBase) UpdateProcessingProgress(current, total int, message string) {
+	if total == 0 {
+		return
+	}
+	// Calculate progress between init phase (0.1) and complete phase (1.0)
+	progress := ProgressPhaseInit + (float64(current)/float64(total))*(ProgressPhaseComplete-ProgressPhaseInit)
+	m.UpdateProgressStatus(progress, message)
+}
+
+// CompleteProcessing sets the progress to completion phase.
+// This should be called when processing is finished.
+func (m *ModuleBase) CompleteProcessing(message string) {
+	m.UpdateProgressStatus(ProgressPhaseComplete, message)
+}
+
 // UpdateProgressStatus updates the progress bar and status text
 func (m *ModuleBase) UpdateProgressStatus(progress float64, statusText string) {
 	m.mutex.Lock()

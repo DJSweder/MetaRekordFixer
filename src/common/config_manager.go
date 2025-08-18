@@ -148,11 +148,14 @@ func (mgr *ConfigManager) saveConfig() error {
 	defer mgr.mutex.Unlock()
 
 	// Ensure default values
+	// Note: Empty strings are intentional for DatabasePath and Language
+	// DatabasePath: Lazy loading - path is determined at runtime when user selects database
+	// Language: Lazy loading - language is auto-detected from system locale on first run
 	if mgr.globalConfig.DatabasePath == "" {
-		mgr.globalConfig.DatabasePath = "" // Set default value
+		mgr.globalConfig.DatabasePath = "" // Intentionally empty - lazy loading
 	}
 	if mgr.globalConfig.Language == "" {
-		mgr.globalConfig.Language = "" // Default language
+		mgr.globalConfig.Language = "" // Intentionally empty - lazy loading
 	}
 
 	config := struct {

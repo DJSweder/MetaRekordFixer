@@ -32,7 +32,7 @@ type FormatUpdaterModule struct {
 	dbMgr             *common.DBManager
 	playlistSelect    *widget.Select
 	folderEntry       *widget.Entry
-	folderSelect      *widget.Button
+	folderSelectionField fyne.CanvasObject
 	submitBtn         *widget.Button
 	playlists         []common.PlaylistItem
 	pendingPlaylistID string // Temporary storage for playlist ID
@@ -55,9 +55,6 @@ func NewFormatUpdaterModule(window fyne.Window, configMgr *common.ConfigManager,
 		ModuleBase: common.NewModuleBase(window, configMgr, errorHandler),
 		dbMgr:      dbMgr,
 	}
-
-	// Initialize variables before initializeUI
-	m.folderEntry = widget.NewEntry()
 
 	// Initialize UI components first
 	m.initializeUI()
@@ -95,7 +92,7 @@ func (m *FormatUpdaterModule) GetModuleContent() fyne.CanvasObject {
 	form := &widget.Form{
 		Items: []*widget.FormItem{
 			{Text: locales.Translate("formatupdater.label.replaced"), Widget: m.playlistSelect},
-			{Text: locales.Translate("formatupdater.label.newfiles"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.folderEntry)},
+			{Text: locales.Translate("formatupdater.label.newfiles"), Widget: m.folderSelectionField},
 		},
 	}
 
@@ -209,11 +206,7 @@ func (m *FormatUpdaterModule) SaveCfg() {
 // It creates and configures all UI elements including the playlist selector,
 // folder selection field, and submit button, and sets up their event handlers.
 func (m *FormatUpdaterModule) initializeUI() {
-	// Create a text entry for the user to input the folder path.
-	// When the user changes the text in the entry, save the config.
-	m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
-		m.SaveCfg()
-	})
+	// Initialize folder selection field first, then extract entry for event handling
 
 	// Create a disabled select widget for the user to choose a playlist.
 	// When the user chooses a playlist, save the config.
@@ -235,17 +228,23 @@ func (m *FormatUpdaterModule) initializeUI() {
 	// When the user clicks the button, open a file dialog for the user to choose a folder.
 	// When the user chooses a folder, set the text entry to the path of the chosen folder
 	// and save the config.
-	folderSelectionField := common.CreateFolderSelectionField(
+	m.folderSelectionField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		m.folderEntry,
+		nil,
 		func(path string) {
-			m.folderEntry.SetText(path)
 			m.SaveCfg()
 		},
 	)
-
-	// Store the button reference for backward compatibility
-	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
+	// Extract the entry widget from the container for direct access
+	if container, ok := m.folderSelectionField.(*fyne.Container); ok && len(container.Objects) > 0 {
+		if entry, ok := container.Objects[0].(*widget.Entry); ok {
+			m.folderEntry = entry
+			// Set up change handler for the entry
+			m.folderEntry.OnChanged = m.CreateChangeHandler(func() {
+				m.SaveCfg()
+			})
+		}
+	}
 
 	// Create a disabled submit button using the standardized function.
 	// The submit button is disabled to prevent the user from starting the module
@@ -404,7 +403,7 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Get the selected playlist.
-	m.UpdateProgressStatus(0.3, locales.Translate("common.status.playlistload"))
+	m.StartProcessing(locales.Translate("common.status.playlistload"))
 	selectedPlaylist := ""
 	for _, p := range m.playlists {
 		if p.Path == m.playlistSelect.Selected {
@@ -425,7 +424,6 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Get the tracks from the playlist.
-	m.UpdateProgressStatus(0.4, locales.Translate("formatupdater.status.gettrackspls"))
 	rows, err := m.dbMgr.Query(`
 		SELECT c.ID, c.FileNameL
 		FROM djmdContent c
@@ -471,7 +469,6 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Report playlist track count
-	m.UpdateProgressStatus(0.5, fmt.Sprintf(locales.Translate("formatupdater.tracks.playlistcount"), len(tracks)))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.tracks.playlistcount"), len(tracks)))
 
 	// Check if operation was cancelled
@@ -482,7 +479,6 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Get all files in target folder
-	m.UpdateProgressStatus(0.6, locales.Translate("formatupdater.tracks.gettracksfldr"))
 	files, err := common.ListFilesWithExtensions(m.folderEntry.Text, nil, false)
 	if err != nil {
 		m.CloseProgressDialog()
@@ -519,7 +515,6 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}, 0)
 
 	// Match files and prepare updates
-	m.UpdateProgressStatus(0.7, locales.Translate("formatupdater.status.matching"))
 	for _, track := range tracks {
 		baseName := strings.TrimSuffix(track.FileName, filepath.Ext(track.FileName))
 		newFiles, err := filepath.Glob(filepath.Join(m.folderEntry.Text, baseName+".*"))
@@ -576,7 +571,6 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Update tracks in database
-	m.UpdateProgressStatus(0.8, locales.Translate("formatupdater.tracks.starting"))
 	for _, updateTrack := range updateTracks {
 		if err := m.dbMgr.Execute(`
 			UPDATE djmdContent
@@ -598,8 +592,7 @@ func (m *FormatUpdaterModule) processUpdate() {
 		}
 
 		updateCount++
-		progress := float64(updateCount) / float64(len(updateTracks))
-		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("formatupdater.status.progress"), updateCount, len(updateTracks)))
+		m.UpdateProcessingProgress(updateCount-1, len(updateTracks), fmt.Sprintf(locales.Translate("formatupdater.status.progress"), updateCount, len(updateTracks)))
 
 		// Check if operation was cancelled
 		if m.IsCancelled() {
@@ -610,7 +603,7 @@ func (m *FormatUpdaterModule) processUpdate() {
 	}
 
 	// Update progress and status
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("formatupdater.status.completed"), updateCount))
+	m.CompleteProcessing(fmt.Sprintf(locales.Translate("formatupdater.status.completed"), updateCount))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("formatupdater.status.completed"), updateCount))
 
 	// Mark the progress dialog as completed

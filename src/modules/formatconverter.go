@@ -43,8 +43,10 @@ type FormatConverterModule struct {
 	// Source and target settings
 	makeTargetFolderCheckbox *widget.Check
 	sourceFolderEntry        *widget.Entry
+	sourceFolderField        fyne.CanvasObject
 	sourceFormatSelect       *widget.Select
 	targetFolderEntry        *widget.Entry
+	targetFolderField        fyne.CanvasObject
 	targetFormatSelect       *widget.Select
 	rewriteExistingCheckbox  *widget.Check
 
@@ -120,13 +122,8 @@ func NewFormatConverterModule(window fyne.Window, configMgr *common.ConfigManage
 	}
 
 	// Initialize UI and load config
-	m.IsLoadingConfig = true
 	m.initializeUI()
 	m.LoadCfg()
-	m.IsLoadingConfig = false
-
-	// Save initial configuration with default values
-	m.SaveCfg()
 
 	return m
 }
@@ -380,27 +377,37 @@ func (m *FormatConverterModule) initializeUI() {
 		m.SaveCfg()
 	})
 
-	// Source folder selection
-	sourceFolderField := common.CreateFolderSelectionField(
+	// Initialize source folder entry first
+	m.sourceFolderEntry = widget.NewEntry()
+	m.sourceFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveCfg()
+	})
+
+	// Source folder selection - store reference for UI usage
+	m.sourceFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		nil, // Entry will create inside function
+		m.sourceFolderEntry,
 		func(path string) {
 			m.sourceFolderEntry.SetText(common.NormalizePath(path))
 			m.SaveCfg()
 		},
 	)
-	m.sourceFolderEntry = sourceFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
 
-	// Target folder selection
-	targetFolderField := common.CreateFolderSelectionField(
+	// Initialize target folder entry first
+	m.targetFolderEntry = widget.NewEntry()
+	m.targetFolderEntry.OnChanged = m.CreateChangeHandler(func() {
+		m.SaveCfg()
+	})
+
+	// Target folder selection - store reference for UI usage
+	m.targetFolderField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
-		nil, // Entry will create inside function
+		m.targetFolderEntry,
 		func(path string) {
 			m.targetFolderEntry.SetText(common.NormalizePath(path))
 			m.SaveCfg()
 		},
 	)
-	m.targetFolderEntry = targetFolderField.(*fyne.Container).Objects[0].(*widget.Entry)
 
 	// Checkboxes
 	m.rewriteExistingCheckbox = common.CreateCheckbox(locales.Translate("formatconverter.chkbox.rewrite"), nil)
@@ -574,21 +581,15 @@ func (m *FormatConverterModule) updateFormatSettings(format string) {
 		if m.MP3SettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.MP3SettingsContainer)
 
-		} else {
-
 		}
 	case "FLAC":
 		if m.FLACSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.FLACSettingsContainer)
 
-		} else {
-
 		}
 	case "WAV":
 		if m.WAVSettingsContainer != nil {
 			m.formatSettingsContainer.Add(m.WAVSettingsContainer)
-
-		} else {
 
 		}
 	default:

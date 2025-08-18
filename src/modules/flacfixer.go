@@ -34,8 +34,8 @@ type FlacFixerModule struct {
 	dbMgr *common.DBManager
 	// sourceFolderEntry is the entry field for source folder path
 	sourceFolderEntry *widget.Entry
-	// folderSelect is the folder selection button
-	folderSelect *widget.Button
+	// folderSelectionField contains the complete folder selection UI component
+	folderSelectionField fyne.CanvasObject
 	// recursiveCheck determines if the sync should process subfolders
 	recursiveCheck *widget.Check
 	// submitBtn triggers the synchronization process
@@ -95,7 +95,7 @@ func (m *FlacFixerModule) GetModuleContent() fyne.CanvasObject {
 	// Create form with folder selection field
 	form := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: locales.Translate("flacfixer.label.source"), Widget: container.NewBorder(nil, nil, nil, m.folderSelect, m.sourceFolderEntry)},
+			{Text: locales.Translate("flacfixer.label.source"), Widget: m.folderSelectionField},
 		},
 	}
 
@@ -180,8 +180,8 @@ func (m *FlacFixerModule) initializeUI() {
 		m.SaveCfg()
 	})
 
-	// Initialize folder selection button using standardized function
-	folderSelectionField := common.CreateFolderSelectionField(
+	// Initialize folder selection field using standardized function
+	m.folderSelectionField = common.CreateFolderSelectionField(
 		locales.Translate("common.entry.placeholderpath"),
 		m.sourceFolderEntry,
 		func(path string) {
@@ -189,7 +189,6 @@ func (m *FlacFixerModule) initializeUI() {
 			m.SaveCfg()
 		},
 	)
-	m.folderSelect = folderSelectionField.(*fyne.Container).Objects[1].(*widget.Button)
 
 	// Initialize recursive checkbox using standardized function
 	m.recursiveCheck = common.CreateCheckbox(locales.Translate("flacfixer.chkbox.recursive"), func(checked bool) {
@@ -383,15 +382,14 @@ func (m *FlacFixerModule) processFlacFixer(sourcePath string) {
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
 
 	// Process each MP3 file and update corresponding FLAC files
-	m.UpdateProgressStatus(0.3, locales.Translate("common.status.updating"))
+	m.StartProcessing(locales.Translate("common.status.updating"))
 
 	// Add status message about starting the update process
 	m.AddInfoMessage(locales.Translate("common.status.updating"))
 
 	for i, mp3File := range mp3Files {
 		// Update progress
-		progress := 0.3 + (float64(i+1) / float64(totalDbFiles) * 0.7)
-		m.UpdateProgressStatus(progress, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
+		m.UpdateProcessingProgress(i, totalDbFiles, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
 
 		// Check if cancelled
 		if m.IsCancelled() {
@@ -437,7 +435,7 @@ func (m *FlacFixerModule) processFlacFixer(sourcePath string) {
 	}
 
 	// Update progress to completion
-	m.UpdateProgressStatus(1.0, fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
+	m.CompleteProcessing(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
 	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
 
 	// Mark the progress dialog as completed and update button
