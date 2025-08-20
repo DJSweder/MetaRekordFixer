@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 
-	// "reflect"
 	"runtime/debug"
 
 	"MetaRekordFixer/assets"
@@ -36,7 +35,7 @@ type RekordboxTools struct {
 	logger          *common.Logger
 	errorHandler    *common.ErrorHandler
 	tabContainer    *container.AppTabs
-	configInitError error // Store any error that occurs during config initialization (Phase 1 Refactor)
+	configInitError error
 }
 
 // moduleInfo holds information about a module and its UI representation.
@@ -52,6 +51,7 @@ type moduleInfo struct {
 // It sets up logging, configuration, error handling, and the main window.
 // Any critical errors during initialization are stored and displayed after the UI is ready.
 func NewRekordboxTools() *RekordboxTools {
+
 	// Phase 1: Initialize Logger
 	logPath, err := common.LocateOrCreatePath("metarekordfixer_app.log", "log")
 	if err != nil {

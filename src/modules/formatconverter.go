@@ -356,12 +356,7 @@ func (m *FormatConverterModule) SaveCfg() {
 // checkboxes, and buttons, and sets up their event handlers.
 func (m *FormatConverterModule) initializeUI() {
 	// Source format selection
-	sourceFormats := []string{
-		locales.Translate("formatconverter.srcformats.all"),
-		"MP3",
-		"FLAC",
-		"WAV",
-	}
+	sourceFormats := sourceFormatParams.GetLocalizedValues()
 	m.sourceFormatSelect = widget.NewSelect(sourceFormats, func(format string) {
 		m.onSourceFormatChanged(format)
 	})
@@ -774,6 +769,7 @@ func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetF
 	if sourceFormat == "" {
 		sourceFormat = "All"
 	}
+
 	files, err := m.findAudioFiles(sourceFolder, sourceFormat)
 	if err != nil {
 		context := &common.ErrorContext{
@@ -1111,54 +1107,14 @@ func (m *FormatConverterModule) convertFile(sourcePath, targetPath, targetFormat
 	}
 
 	// Create a sorted slice of metadata items to ensure consistent order
-	type metadataItem struct {
-		key   string
-		value string
-	}
 	var metadataItems []metadataItem
 
-	// Map metadata from source to target format
-	for internalName, targetField := range metadataMap.InternalToMP3 {
-		// Find a matching metadata field in the source
-		var foundValue string
-		var found bool
+	// Detect source format from file extension
+	sourceFormat := detectSourceFormat(sourcePath)
 
-		// First try to find a matching field in the source
-		for sourceField, value := range metadata {
-			if strings.EqualFold(sourceField, internalName) {
-				foundValue = value
-				found = true
-				break
-			}
-		}
-
-		// Special case for album_artist, which may be in different formats
-		if !found && (strings.EqualFold(internalName, "ALBUMARTIST") || strings.EqualFold(internalName, "album_artist")) {
-			// Check for different possible formats
-			for sourceField, value := range metadata {
-				if strings.EqualFold(sourceField, "ALBUMARTIST") ||
-					strings.EqualFold(sourceField, "album_artist") ||
-					strings.EqualFold(sourceField, "ALBUM_ARTIST") ||
-					strings.EqualFold(sourceField, "AlbumArtist") {
-					foundValue = value
-					found = true
-					break
-				}
-			}
-		}
-
-		if found {
-			// Escape special characters in the value part
-			escapedValue := foundValue
-			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
-			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
-
-			// Add to metadata items slice
-			metadataItems = append(metadataItems, metadataItem{
-				key:   targetField,
-				value: escapedValue,
-			})
-		}
+	// Map metadata from source to target format using proper CSV mapping
+	if err := m.mapMetadataUsingCSV(sourceFormat, targetFormat, metadata, metadataMap, &metadataItems); err != nil {
+		return fmt.Errorf("%s: %w", locales.Translate("formatconverter.err.metadatamapping"), err)
 	}
 
 	// Sort metadata items by key to ensure consistent order
@@ -1220,6 +1176,12 @@ type MetadataMap struct {
 	InternalToFLAC map[string]string
 	// InternalToWAV maps internal field names to WAV field names
 	InternalToWAV map[string]string
+}
+
+// metadataItem represents a metadata key-value pair for ffmpeg
+type metadataItem struct {
+	key   string
+	value string
 }
 
 // ConversionParameter represents a single parameter option for conversion.
@@ -1580,4 +1542,99 @@ func (m *FormatConverterModule) Close() {
 	if m.ffmpegLogger != nil {
 		_ = m.ffmpegLogger.Close()
 	}
+}
+
+// detectSourceFormat detects the audio format from file extension
+func detectSourceFormat(filePath string) string {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	switch ext {
+	case ".mp3":
+		return "MP3"
+	case ".flac":
+		return "FLAC"
+	case ".wav":
+		return "WAV"
+	default:
+		return "MP3" // Default fallback
+	}
+}
+
+// mapMetadataUsingCSV maps metadata from source format to target format using CSV mapping rules.
+// It iterates through the CSV metadata map and finds matching source fields,
+// then maps them to the appropriate target format fields.
+//
+// Parameters:
+//   - sourceFormat: Source audio format (MP3, FLAC, WAV)
+//   - targetFormat: Target audio format (MP3, FLAC, WAV)  
+//   - sourceMetadata: Metadata extracted from source file
+//   - metadataMap: CSV-based mapping rules
+//   - metadataItems: Slice to append mapped metadata items
+//
+// Returns:
+//   - error if mapping fails, nil otherwise
+func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat string, sourceMetadata map[string]string, metadataMap *MetadataMap, metadataItems *[]metadataItem) error {
+	// Get the appropriate source and target mapping based on formats
+	var sourceMap, targetMap map[string]string
+	
+	// Select source format mapping
+	switch sourceFormat {
+	case "MP3":
+		sourceMap = metadataMap.InternalToMP3
+	case "FLAC":
+		sourceMap = metadataMap.InternalToFLAC
+	case "WAV":
+		sourceMap = metadataMap.InternalToWAV
+	default:
+		return fmt.Errorf("unsupported source format: %s", sourceFormat)
+	}
+	
+	// Select target format mapping
+	switch targetFormat {
+	case "MP3":
+		targetMap = metadataMap.InternalToMP3
+	case "FLAC":
+		targetMap = metadataMap.InternalToFLAC
+	case "WAV":
+		targetMap = metadataMap.InternalToWAV
+	default:
+		return fmt.Errorf("unsupported target format: %s", targetFormat)
+	}
+	
+	// Iterate through all internal field names in CSV
+	for internalName := range sourceMap {
+		sourceFieldName := sourceMap[internalName]
+		targetFieldName := targetMap[internalName]
+		
+		// Skip empty field names (not supported in this format)
+		if sourceFieldName == "" || targetFieldName == "" {
+			continue
+		}
+		
+		// Look for the source field in the extracted metadata
+		var foundValue string
+		var found bool
+		
+		for sourceField, value := range sourceMetadata {
+			if strings.EqualFold(sourceField, sourceFieldName) {
+				foundValue = value
+				found = true
+				break
+			}
+		}
+		
+		if found {
+			// Escape special characters in the value
+			escapedValue := foundValue
+			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
+			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
+			
+			// Add to metadata items
+			*metadataItems = append(*metadataItems, metadataItem{
+				key:   targetFieldName,
+				value: escapedValue,
+			})
+		}
+	}
+	
+	return nil
 }
