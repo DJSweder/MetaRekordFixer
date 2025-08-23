@@ -181,8 +181,6 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewDataDuplicatorModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
-				// Apply typed->legacy fallback loading if typed config exists
-				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
@@ -190,8 +188,6 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewDatesMasterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
-				// Apply typed->legacy fallback loading if typed config exists
-				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},
@@ -199,8 +195,6 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewFormatUpdaterModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
-				// Apply typed->legacy fallback loading if typed config exists
-				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(true, true)
 				return m
 			},
@@ -208,8 +202,6 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewFormatConverterModule(rt.mainWindow, rt.configMgr, rt.errorHandler)
-				// Apply typed->legacy fallback loading if typed config exists
-				// rt.applyConfigFallback(m) // DISABLED: Prevents overwriting FlacFixer typed config
 				m.SetDatabaseRequirements(false, false)
 				return m
 			},
