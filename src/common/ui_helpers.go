@@ -580,3 +580,34 @@ func CreateDynamicEntryList(
 
 	return entryContainer, entries
 }
+
+// CreateActionButton creates a standardized action button that changes state after execution.
+// Used for buttons that perform an action and show completion state with an icon.
+//
+// Parameters:
+//   - initialText: Text to display initially (without icon)
+//   - onAction: Function to call when button is clicked
+//   - completedText: Text to display after action completion (if empty, original text is preserved)
+//   - completedIcon: Icon to display after action completion
+//
+// Returns:
+//   - A button configured with HighImportance that can change state
+func CreateActionButton(initialText string, onAction func(), completedText string, completedIcon fyne.Resource) *widget.Button {
+	btn := widget.NewButton(initialText, nil)
+	btn.Importance = widget.HighImportance
+	
+	// Set the actual handler that will change state after execution
+	btn.OnTapped = func() {
+		if onAction != nil {
+			onAction()
+		}
+		// Change button to completed state
+		if completedText != "" {
+			btn.SetText(completedText)
+		}
+		btn.SetIcon(completedIcon)
+	}
+	
+	return btn
+}
+

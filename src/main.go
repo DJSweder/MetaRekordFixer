@@ -105,6 +105,11 @@ func NewRekordboxTools() *RekordboxTools {
 		rt.logger.Warning("ConfigManager not available. Skipping language detection. Default language will be used.")
 	}
 
+	// Phase 4.5: Database path autodetection (after localization, before UI creation)
+	if rt.configMgr != nil {
+		common.AutodetectAndSaveDatabasePath(rt.configMgr, rt.logger)
+	}
+
 	// Phase 5: Create Main Window but do not show it yet
 	mainWindow := fyneApp.NewWindow(locales.Translate("main.app.title"))
 	mainWindow.Resize(fyne.NewSize(1000, 700))
@@ -294,7 +299,7 @@ func (rt *RekordboxTools) createMainContent() fyne.CanvasObject {
 // These buttons open modal windows for application settings and help information.
 func (rt *RekordboxTools) createMenuBar() fyne.CanvasObject {
 	settingsButton := widget.NewButton(locales.Translate("settings.win.title"), func() {
-		ui.ShowSettingsWindow(rt.mainWindow, rt.configMgr)
+		ui.ShowSettingsWindow(rt.mainWindow, rt.configMgr, rt.errorHandler)
 	})
 	helpButton := widget.NewButton(locales.Translate("main.menu.help"), func() {
 		ui.ShowHelpWindow(rt.mainWindow)

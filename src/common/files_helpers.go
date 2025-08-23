@@ -4,6 +4,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,17 @@ type FileInfo struct {
 	Size      int64     // file size in bytes
 	ModTime   time.Time // last modification time
 	IsDir     bool      // whether this is a directory
+}
+
+// FileDetector provides configuration for file detection operations.
+// This structure allows for flexible and configurable file detection with
+// standardized logging and error handling across the application.
+type FileDetector struct {
+	Description    string   // Human-readable description for logging
+	SearchPaths    []string // List of paths to check (supports environment variables)
+	RequiredAccess string   // "read", "write", or "readwrite"
+	LogSuccess     bool     // Whether to log successful detection
+	LogFailure     bool     // Whether to log failed detection
 }
 
 // NormalizePath normalizes a file system path for consistent comparison and usage.
@@ -440,4 +452,164 @@ func IsDirWritable(dirPath string) error {
 	}
 
 	return nil
+}
+
+// DetectFile attempts to find a file using the provided FileDetector configuration.
+// Returns the full path to the file if found and accessible, or an error if not found.
+// This function provides standardized file detection with configurable logging and error handling.
+//
+// Parameters:
+//   - detector: FileDetector configuration specifying search criteria
+//
+// Returns:
+//   - string: Full path to the detected file if successful
+//   - error: Detailed error information if detection fails
+func DetectFile(detector FileDetector) (string, error) {
+	if len(detector.SearchPaths) == 0 {
+		err := errors.New("no search paths provided")
+		if detector.LogFailure {
+			CaptureEarlyLog(SeverityWarning, "FileDetector: %s - %v", detector.Description, err)
+		}
+		return "", err
+	}
+
+	var lastErr error
+	for _, searchPath := range detector.SearchPaths {
+		// Expand environment variables in the path
+		expandedPath := os.ExpandEnv(searchPath)
+
+		// Use os.Stat instead of FileExists to avoid directory creation issues
+		info, err := os.Stat(expandedPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				lastErr = fmt.Errorf("file not found at path '%s'", expandedPath)
+				continue
+			}
+			// Other error (permissions, etc.)
+			lastErr = fmt.Errorf("failed to access file at path '%s': %w", expandedPath, err)
+			continue
+		}
+
+		// Check if it's actually a file, not a directory
+		if info.IsDir() {
+			lastErr = fmt.Errorf("path '%s' is a directory, not a file", expandedPath)
+			continue
+		}
+
+		// Check required access permissions
+		if detector.RequiredAccess != "" {
+			if err := checkFileAccess(expandedPath, detector.RequiredAccess); err != nil {
+				lastErr = fmt.Errorf("file '%s' access check failed: %w", expandedPath, err)
+				continue
+			}
+		}
+
+		// File found and accessible
+		if detector.LogSuccess {
+			CaptureEarlyLog(SeverityInfo, "FileDetector: %s - successfully detected at '%s'", detector.Description, expandedPath)
+		}
+		return expandedPath, nil
+	}
+
+	// No file found in any search path
+	if lastErr == nil {
+		lastErr = errors.New("no valid file found in search paths")
+	}
+
+	if detector.LogFailure {
+		CaptureEarlyLog(SeverityWarning, "FileDetector: %s - detection failed: %v", detector.Description, lastErr)
+	}
+
+	return "", lastErr
+}
+
+// checkFileAccess verifies that a file has the required access permissions.
+// This is a helper function for DetectFile to check read/write access.
+//
+// Parameters:
+//   - filePath: The path to the file to check
+//   - requiredAccess: "read", "write", or "readwrite"
+//
+// Returns:
+//   - nil if the file has the required access
+//   - An error if the access check fails
+func checkFileAccess(filePath, requiredAccess string) error {
+	switch requiredAccess {
+	case "read":
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("read access denied: %w", err)
+		}
+		file.Close()
+	case "write":
+		file, err := os.OpenFile(filePath, os.O_WRONLY, 0)
+		if err != nil {
+			return fmt.Errorf("write access denied: %w", err)
+		}
+		file.Close()
+	case "readwrite":
+		file, err := os.OpenFile(filePath, os.O_RDWR, 0)
+		if err != nil {
+			return fmt.Errorf("read/write access denied: %w", err)
+		}
+		file.Close()
+	default:
+		return fmt.Errorf("invalid access type '%s', must be 'read', 'write', or 'readwrite'", requiredAccess)
+	}
+	return nil
+}
+
+// DetectRekordboxDatabase attempts to find the standard Rekordbox database file.
+// Uses FileDetector abstraction for consistent behavior and logging.
+//
+// Returns:
+//   - string: Full path to the database if found and accessible
+//   - error: Detailed error information if detection fails
+func DetectRekordboxDatabase() (string, error) {
+	appData := os.Getenv("APPDATA")
+	if appData == "" {
+		return "", errors.New("APPDATA environment variable not set")
+	}
+
+	// Build the standard Rekordbox database path
+	dbPath := filepath.Join(appData, "Pioneer", "rekordbox", "master.db")
+
+	// Configure FileDetector for Rekordbox database detection
+	detector := FileDetector{
+		Description:    "Rekordbox Database",
+		SearchPaths:    []string{dbPath},
+		RequiredAccess: "read",
+		LogSuccess:     false,
+		LogFailure:     false,
+	}
+
+	return DetectFile(detector)
+}
+
+// AutodetectAndSaveDatabasePath attempts to detect and save Rekordbox database path if not configured.
+// This function checks if the database path is empty, performs autodetection, and saves the result.
+// It's designed to be called during application initialization when both ConfigManager and Logger are available.
+//
+// Parameters:
+//   - configMgr: Configuration manager for loading/saving database path
+//   - logger: Logger for recording autodetection results
+func AutodetectAndSaveDatabasePath(configMgr *ConfigManager, logger *Logger) {
+	// Only perform autodetection if database path is empty
+	globalConfig := configMgr.GetGlobalConfig()
+	if globalConfig.DatabasePath != "" {
+		return // Database path already configured
+	}
+
+	detectedPath, err := DetectRekordboxDatabase()
+	if err != nil {
+		// Log warning but don't propagate error - application must continue
+		logger.Warning("Database path auto-detection failed: %v", err)
+	} else {
+		// Success - set path and save configuration
+		logger.Info("Database path auto-detection - successfully detected at '%s'", detectedPath)
+		globalConfig.DatabasePath = detectedPath
+		if saveErr := configMgr.SaveGlobalConfig(globalConfig); saveErr != nil {
+			logger.Warning("Failed to save auto-detected database path: %v", saveErr)
+		}
+	}
 }

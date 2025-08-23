@@ -352,9 +352,12 @@ func CreateCfgFile(cfgPath string) error {
 		return fmt.Errorf("CreateCfgFile: failed to ensure directory %s exists: %w", dir, err)
 	}
 
+	// Attempt to detect Rekordbox database path
+	detectedDbPath, _ := DetectRekordboxDatabase() // Ignore error in CreateCfgFile, empty path is acceptable
+
 	defaultConfig := Cfg{
 		Global: GlobalCfg{
-			DatabasePath: "",
+			DatabasePath: detectedDbPath,
 			Language:     "",
 		},
 		Modules: ModuleCfgs{

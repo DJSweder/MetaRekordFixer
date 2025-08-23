@@ -3,9 +3,9 @@ package ui
 import (
 	"MetaRekordFixer/common"
 	"MetaRekordFixer/locales"
+	"errors"
+	"fmt"
 	"strings"
-
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	nativedialog "github.com/sqweek/dialog"
 )
 
 type languageItem struct {
@@ -22,7 +21,7 @@ type languageItem struct {
 }
 
 // ShowSettingsWindow creates and displays the settings window.
-func ShowSettingsWindow(parent fyne.Window, configMgr *common.ConfigManager) {
+func ShowSettingsWindow(parent fyne.Window, configMgr *common.ConfigManager, errorHandler *common.ErrorHandler) {
 	// Load current configuration
 	config := configMgr.GetGlobalConfig()
 
@@ -39,16 +38,32 @@ func ShowSettingsWindow(parent fyne.Window, configMgr *common.ConfigManager) {
 		}
 	}
 
-	statusLabel := widget.NewLabel("")
-	statusLabel.Alignment = fyne.TextAlignCenter
+	// Create file path entry with browse button using existing abstraction
+	dbPathContainer := common.CreateFolderSelectionField(locales.Translate("settings.browse.title"), dbPathEntry, nil)
 
-	// Create the browse button for the database path
-	dbPathBrowseButton := widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
-		filename, err := nativedialog.File().Filter(locales.Translate("settings.browse.filter"), "db").Load()
-		if err == nil && filename != "" {
-			dbPathEntry.SetText(filename)
-		}
-	})
+	// Create detect button using abstraction - empty completedText to preserve original text
+	detectButton := common.CreateActionButton(
+		locales.Translate("settings.button.autodetectdb"),
+		func() {
+			detectedPath, err := common.DetectRekordboxDatabase()
+			if err != nil {
+				// Use centralized error handling with proper error wrapping
+				context := &common.ErrorContext{
+					Module:      "Settings",
+					Operation:   "Database Autodetection",
+					Severity:    common.SeverityWarning,
+					Recoverable: true,
+				}
+				// Wrap the error with user-friendly context while preserving technical details
+				wrappedErr := fmt.Errorf("%s: %w", locales.Translate("common.err.autodetectdb"), err)
+				errorHandler.ShowStandardError(wrappedErr, context)
+			} else {
+				dbPathEntry.SetText(detectedPath)
+			}
+		},
+		"", // Prázdný text pro zachování původního textu tlačítka
+		theme.ConfirmIcon(),
+	)
 
 	// Language selection setup
 	availableLangCodes := locales.GetAvailableLanguages()
@@ -79,48 +94,59 @@ func ShowSettingsWindow(parent fyne.Window, configMgr *common.ConfigManager) {
 		}
 	}
 
-	// Create the save button with dynamic icon
-	saveButton = widget.NewButtonWithIcon(locales.Translate("settings.write.settings"), nil, func() {
-		// Update and save config
-		config.DatabasePath = dbPathEntry.Text
+	// Create save button using abstraction
+	saveButton = common.CreateActionButton(
+		locales.Translate("settings.write.settings"),
+		func() {
+			// Update and save config
+			config.DatabasePath = dbPathEntry.Text
 
-		// Find selected language code
-		for _, lang := range langItems {
-			if lang.Name == languageSelect.Selected {
-				config.Language = lang.Code
-				break
+			// Find selected language code
+			for _, lang := range langItems {
+				if lang.Name == languageSelect.Selected {
+					config.Language = lang.Code
+					break
+				}
 			}
-		}
 
-		// Save the configuration
-		err := configMgr.SaveGlobalConfig(config)
-		if err != nil {
-			log.Printf("error saving configuration: %v", err)
-			statusLabel.SetText(locales.Translate("settings.err.save"))
-			return
-		}
+			// Save the configuration
+			err := configMgr.SaveGlobalConfig(config)
+			if err != nil {
+				// Use centralized error handling for configuration save failure
+				context := &common.ErrorContext{
+					Module:      "Settings",
+					Operation:   "Save Configuration",
+					Severity:    common.SeverityError,
+					Recoverable: true,
+				}
+				wrappedErr := fmt.Errorf("%s: %w", locales.Translate("settings.err.save"), err)
+				errorHandler.ShowStandardError(wrappedErr, context)
+				return
+			}
 
-		// Show warning if database path is empty
-		if dbPathEntry.Text == "" {
-			statusLabel.SetText(locales.Translate("settings.err.missing"))
-		} else {
-			statusLabel.SetText("") // Clear status label if no error
-		}
-
-		// Change button to saved state
-		saveButton.SetIcon(theme.ConfirmIcon())
-		saveButton.SetText(locales.Translate("settings.status.saved"))
-	})
-	saveButton.Importance = widget.HighImportance
+			// Show warning if database path is empty using centralized error handling
+			if dbPathEntry.Text == "" {
+				context := &common.ErrorContext{
+					Module:      "Settings",
+					Operation:   "Database Path Validation",
+					Severity:    common.SeverityWarning,
+					Recoverable: true,
+				}
+				err := errors.New(locales.Translate("settings.err.missing"))
+				errorHandler.ShowStandardError(err, context)
+			}
+		},
+		locales.Translate("settings.status.saved"),
+		theme.ConfirmIcon(),
+	)
 
 	// Update window content
 	form := container.NewVBox(
 		widget.NewForm(
-			widget.NewFormItem(locales.Translate("settings.rbxdb.loc"), container.NewBorder(nil, nil, nil, dbPathBrowseButton, dbPathEntry)),
+			widget.NewFormItem(locales.Translate("settings.rbxdb.loc"), container.NewBorder(nil, nil, nil, detectButton, dbPathContainer)),
 			widget.NewFormItem(locales.Translate("settings.lang.sel"), languageSelect),
 		),
 		container.NewHBox(layout.NewSpacer(), saveButton),
-		statusLabel,
 	)
 
 	// Create modal dialog instead of new window
