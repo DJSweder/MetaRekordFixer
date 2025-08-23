@@ -8,7 +8,6 @@ import (
 	"MetaRekordFixer/locales"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -70,7 +69,6 @@ func NewErrorContext(module, operation string) ErrorContext {
 type ErrorHandler struct {
 	logger *Logger
 	window fyne.Window
-	mutex  sync.Mutex
 }
 
 // NewErrorHandler creates a new error handler instance.

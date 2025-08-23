@@ -34,15 +34,14 @@ func getDbPassword() string {
 // It handles encrypted Rekordbox database connections, transactions, and query execution
 // while providing error handling, logging, and thread safety through mutex locking.
 type DBManager struct {
-	db                *sql.DB       // database connection
-	dbPath            string        // path to the database file
-	isConnected       bool          // whether the connection is established
-	mutex             sync.Mutex    // mutex for thread safety
-	logger            *Logger       // logger for recording operations
-	errorHandler      *ErrorHandler // handler for database errors
-	useTransactions   bool          // whether to use transactions
-	activeTransaction *sql.Tx       // current active transaction
-	finalized         bool          // whether the manager has been finalized
+	db              *sql.DB       // database connection
+	dbPath          string        // path to the database file
+	isConnected     bool          // whether the connection is established
+	mutex           sync.Mutex    // mutex for thread safety
+	logger          *Logger       // logger for recording operations
+	errorHandler    *ErrorHandler // handler for database errors
+	useTransactions bool          // whether to use transactions
+	finalized       bool          // whether the manager has been finalized
 }
 
 // NewDBManager creates a new database manager instance for the specified database path.

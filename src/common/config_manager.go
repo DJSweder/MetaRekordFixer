@@ -21,16 +21,14 @@ type GlobalConfig struct {
 	Language     string
 }
 
-
 // ConfigManager handles loading, saving, and managing application configuration.
 // It provides thread-safe access to both global and module-specific settings.
 type ConfigManager struct {
-	configPath    string
-	globalConfig  GlobalConfig
-	cfg           *Cfg // Typed configuration structure
-	mutex sync.Mutex
+	configPath   string
+	globalConfig GlobalConfig
+	cfg          *Cfg // Typed configuration structure
+	mutex        sync.Mutex
 }
-
 
 // NewConfigManager initializes a new configuration manager instance.
 // It attempts to load existing configuration from the specified path, or creates a new one if it doesn't exist.
@@ -73,7 +71,7 @@ func (mgr *ConfigManager) GetGlobalConfig() GlobalConfig {
 	return mgr.globalConfig
 }
 
-// SaveGlobalConfig updates and saves the global configuration.
+// SaveGlobalConfig updates and saves the global configuration using the typed configuration system.
 // This operation is thread-safe and will persist changes to disk.
 //
 // Parameters:
@@ -92,17 +90,8 @@ func (mgr *ConfigManager) SaveGlobalConfig(config GlobalConfig) error {
 	}
 	mgr.mutex.Unlock()
 
-	// Save both legacy and typed config
-	if mgr.cfg != nil {
-		// If typed config exists, save it (preserves typed module configs)
-		return mgr.SaveCfg()
-	} else {
-		// Fallback to legacy save if no typed config
-		return mgr.saveConfig()
-	}
+	return mgr.SaveCfg()
 }
-
-
 
 // loadConfig loads the application configuration from the configuration file.
 // This is an internal method that is called during initialization.
@@ -137,48 +126,8 @@ func (mgr *ConfigManager) loadConfig() error {
 	return nil
 }
 
-// saveConfig saves the current configuration to the configuration file.
-// This is an internal method that handles the actual file I/O operations.
-// It ensures the configuration is properly formatted and includes default values.
-//
-// Returns:
-//   - error: Any error that occurred during the save operation
-func (mgr *ConfigManager) saveConfig() error {
-	mgr.mutex.Lock()
-	defer mgr.mutex.Unlock()
-
-	// Ensure default values
-	// Note: Empty strings are intentional for DatabasePath and Language
-	// DatabasePath: Lazy loading - path is determined at runtime when user selects database
-	// Language: Lazy loading - language is auto-detected from system locale on first run
-	if mgr.globalConfig.DatabasePath == "" {
-		mgr.globalConfig.DatabasePath = "" // Intentionally empty - lazy loading
-	}
-	if mgr.globalConfig.Language == "" {
-		mgr.globalConfig.Language = "" // Intentionally empty - lazy loading
-	}
-
-	config := struct {
-		Global GlobalConfig `json:"global"`
-	}{
-		Global: mgr.globalConfig,
-	}
-
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("ConfigManager.saveConfig: failed to marshal config data: %w", err)
-	}
-
-	// The directory and file should already exist, so we just write to it.
-	if err = os.WriteFile(mgr.configPath, data, 0644); err != nil {
-		return fmt.Errorf("ConfigManager.saveConfig: failed to write config file %s: %w", mgr.configPath, err)
-	}
-
-	return nil
-}
-
-
-// LoadCfg loads the typed configuration from the configuration file
+// LoadCfg loads the typed configuration from the configuration file.
+// This is the primary configuration loading method used by the application.
 func (mgr *ConfigManager) LoadCfg() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
@@ -197,7 +146,8 @@ func (mgr *ConfigManager) LoadCfg() error {
 	return nil
 }
 
-// SaveCfg saves the typed configuration to the configuration file
+// SaveCfg saves the typed configuration to the configuration file.
+// This is the primary configuration saving method used by the application.
 func (mgr *ConfigManager) SaveCfg() error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
