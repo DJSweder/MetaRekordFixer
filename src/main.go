@@ -53,7 +53,7 @@ type moduleInfo struct {
 func NewRekordboxTools() *RekordboxTools {
 
 	// Phase 1: Initialize Logger
-	logPath, err := common.LocateOrCreatePath("metarekordfixer_app.log", "log")
+	logPath, err := common.LocateOrCreatePath(common.FileNameLog, "log")
 	if err != nil {
 		// This is a critical failure, as we cannot log anything without a logger.
 		// We capture the error in early log buffer and exit.
@@ -69,7 +69,7 @@ func NewRekordboxTools() *RekordboxTools {
 
 	// Phase 2: Initialize Core Application Components
 	// Create and set up our Fyne application
-	fyneApp := app.NewWithID("com.example.metarekordfixer")
+	fyneApp := app.NewWithID(common.AppID)
 	fyneApp.SetIcon(assets.ResourceAppLogo)
 	fyneApp.Settings().SetTheme(theme.NewCustomTheme())
 
@@ -80,7 +80,7 @@ func NewRekordboxTools() *RekordboxTools {
 	}
 
 	// Phase 3: Initialize Configuration Manager
-	configPath, configInitError := common.LocateOrCreatePath("settings.conf", "") // Empty subDir for config at MetaRekordFixer/settings.conf
+	configPath, configInitError := common.LocateOrCreatePath(common.FileNameSettings, "") // Empty subDir for config at MetaRekordFixer/settings.conf
 	if configInitError != nil {
 		rt.configInitError = fmt.Errorf("failed to determine path for config file: %w", configInitError)
 		logger.Error("%s", rt.configInitError.Error())
@@ -173,7 +173,6 @@ func (rt *RekordboxTools) initModules() {
 		{
 			createFn: func() common.Module {
 				m := modules.NewFlacFixerModule(rt.mainWindow, rt.configMgr, rt.getDBManager(), rt.errorHandler)
-				// FlacFixer uses typed configuration directly - no fallback needed
 				m.SetDatabaseRequirements(true, false)
 				return m
 			},

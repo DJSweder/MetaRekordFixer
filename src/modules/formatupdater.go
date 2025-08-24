@@ -29,13 +29,13 @@ import (
 type FormatUpdaterModule struct {
 	// ModuleBase provides common module functionality like error handling and UI components
 	*common.ModuleBase
-	dbMgr             *common.DBManager
-	playlistSelect    *widget.Select
-	folderEntry       *widget.Entry
+	dbMgr                *common.DBManager
+	playlistSelect       *widget.Select
+	folderEntry          *widget.Entry
 	folderSelectionField fyne.CanvasObject
-	submitBtn         *widget.Button
-	playlists         []common.PlaylistItem
-	pendingPlaylistID string // Temporary storage for playlist ID
+	submitBtn            *widget.Button
+	playlists            []common.PlaylistItem
+	pendingPlaylistID    string // Temporary storage for playlist ID
 }
 
 // NewFormatUpdaterModule creates a new instance of FormatUpdaterModule.
@@ -74,7 +74,7 @@ func (m *FormatUpdaterModule) GetName() string {
 // GetConfigName returns the module's configuration key.
 // This key is used to store and retrieve module-specific configuration.
 func (m *FormatUpdaterModule) GetConfigName() string {
-	return "formatupdater"
+	return common.ModuleKeyFormatUpdater
 }
 
 // GetIcon returns the module's icon resource.
@@ -172,7 +172,7 @@ func (m *FormatUpdaterModule) LoadCfg() {
 		// Update UI elements with loaded values
 		m.folderEntry.SetText(cfg.Folder.Value)
 		m.pendingPlaylistID = cfg.PlaylistID.Value
-		
+
 		// Load playlist selection if playlists are already loaded
 		if m.pendingPlaylistID != "" && len(m.playlists) > 0 {
 			for _, playlist := range m.playlists {
@@ -193,7 +193,7 @@ func (m *FormatUpdaterModule) SaveCfg() {
 
 	// Get default configuration with all field definitions
 	cfg := common.GetDefaultFormatUpdaterCfg()
-	
+
 	// Update only the values from current UI state
 	cfg.Folder.Value = m.folderEntry.Text
 	cfg.PlaylistID.Value = m.pendingPlaylistID
@@ -252,25 +252,25 @@ func (m *FormatUpdaterModule) initializeUI() {
 	)
 }
 
-// getFileType translates a file extension into a numeric identifier used in the DJ database.
+// getFileType translates a file extension into a numeric identifier used in the database.
 // This identifier is stored in the FileType field of the djmdContent table.
 //
 // Parameters:
 //   - ext: The file extension including the dot (e.g., ".mp3")
 //
 // Returns:
-//   - An integer representing the file type in the DJ database format
+//   - An integer representing the file type in the database format
 func getFileType(ext string) int {
 	switch strings.ToLower(ext) {
-	case ".mp3":
+	case common.ExtensionMP3:
 		return 1
-	case ".m4a":
+	case common.ExtensionM4A:
 		return 4
-	case ".flac":
+	case common.ExtensionFLAC:
 		return 5
-	case ".wav":
+	case common.ExtensionWAV:
 		return 11
-	case ".aiff":
+	case common.ExtensionAIFF:
 		return 12
 	default:
 		return 0

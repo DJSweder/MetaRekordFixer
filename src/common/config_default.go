@@ -13,28 +13,28 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetFolder: FieldCfg{
 			FieldType:         "folder",
 			Required:          true,
 			ValidationType:    "exists | write",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		SourceFormat: FieldCfg{
 			FieldType:         "select",
 			Required:          true,
 			ValidationType:    "none",
 			Value:             "All",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetFormat: FieldCfg{
 			FieldType:         "select",
 			Required:          true,
 			ValidationType:    "none",
 			Value:             "MP3",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		MakeTargetFolder: FieldCfg{
 			FieldType:      "checkbox",
@@ -55,7 +55,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "MP3",
 			ValidationType:    "none",
 			Value:             "320k",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		MP3Samplerate: FieldCfg{
 			FieldType:         "select",
@@ -64,7 +64,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "MP3",
 			ValidationType:    "none",
 			Value:             "copy",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		FLACBitdepth: FieldCfg{
 			FieldType:         "select",
@@ -73,7 +73,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "FLAC",
 			ValidationType:    "none",
 			Value:             "copy",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		FLACSamplerate: FieldCfg{
 			FieldType:         "select",
@@ -82,7 +82,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "FLAC",
 			ValidationType:    "none",
 			Value:             "copy",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		FLACCompression: FieldCfg{
 			FieldType:         "select",
@@ -91,7 +91,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "FLAC",
 			ValidationType:    "none",
 			Value:             "12",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		WAVBitdepth: FieldCfg{
 			FieldType:         "select",
@@ -100,7 +100,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "WAV",
 			ValidationType:    "none",
 			Value:             "copy",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		WAVSamplerate: FieldCfg{
 			FieldType:         "select",
@@ -109,7 +109,7 @@ func GetDefaultFormatConverterCfg() FormatConverterCfg {
 			ActiveWhen:        "WAV",
 			ValidationType:    "none",
 			Value:             "copy",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 	}
 }
@@ -122,14 +122,14 @@ func GetDefaultDatesMasterCfg() DatesMasterCfg {
 			Required:          true,
 			ValidationType:    "valid_date",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		CustomDateFolders: FieldCfg{
 			FieldType:         "folder",
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		ExcludeFoldersEnabled: FieldCfg{
 			FieldType:      "checkbox",
@@ -144,7 +144,7 @@ func GetDefaultDatesMasterCfg() DatesMasterCfg {
 			ActiveWhen:        "true",
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 	}
 }
@@ -157,7 +157,7 @@ func GetDefaultFlacFixerCfg() FlacFixerCfg {
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		Recursive: FieldCfg{
 			FieldType:      "checkbox",
@@ -176,7 +176,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			Required:          true,
 			ValidationType:    "none",
 			Value:             "folder",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		SourceFolder: FieldCfg{
 			FieldType:         "folder",
@@ -185,7 +185,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ActiveWhen:        "folder",
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		SourcePlaylist: FieldCfg{
 			FieldType:         "playlist",
@@ -194,14 +194,14 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ActiveWhen:        "playlist",
 			ValidationType:    "filled",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetType: FieldCfg{
 			FieldType:         "select",
 			Required:          true,
 			ValidationType:    "none",
 			Value:             "folder",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetFolder: FieldCfg{
 			FieldType:         "folder",
@@ -210,7 +210,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ActiveWhen:        "folder",
 			ValidationType:    "exists | write",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetPlaylist: FieldCfg{
 			FieldType:         "playlist",
@@ -219,7 +219,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ActiveWhen:        "playlist",
 			ValidationType:    "filled",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 	}
 }
@@ -232,14 +232,14 @@ func GetDefaultFormatUpdaterCfg() FormatUpdaterCfg {
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		PlaylistID: FieldCfg{
 			FieldType:         "playlist",
 			Required:          true,
 			ValidationType:    "filled",
 			Value:             "",
-			ValidateOnActions: []string{"start"},
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 	}
 }
@@ -247,15 +247,15 @@ func GetDefaultFormatUpdaterCfg() FormatUpdaterCfg {
 // GetDefaultModuleCfg returns default configuration for any module by type
 func GetDefaultModuleCfg(moduleType string) interface{} {
 	switch moduleType {
-	case "formatconverter":
+	case ModuleKeyFormatConverter:
 		return GetDefaultFormatConverterCfg()
-	case "datesmaster":
+	case ModuleKeyDatesMaster:
 		return GetDefaultDatesMasterCfg()
-	case "flacfixer":
+	case ModuleKeyFlacFixer:
 		return GetDefaultFlacFixerCfg()
-	case "dataduplicator":
+	case ModuleKeyDataDuplicator:
 		return GetDefaultDataDuplicatorCfg()
-	case "formatupdater":
+	case ModuleKeyFormatUpdater:
 		return GetDefaultFormatUpdaterCfg()
 	default:
 		return nil

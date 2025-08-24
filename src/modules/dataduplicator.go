@@ -30,8 +30,8 @@ import (
 type SourceType string
 
 const (
-	SourceTypeFolder   SourceType = "folder"
-	SourceTypePlaylist SourceType = "playlist"
+	SourceTypeFolder   SourceType = common.ContentTypeFolder
+	SourceTypePlaylist SourceType = common.ContentTypePlaylist
 )
 
 // DataDuplicatorModule handles hot cue synchronization between tracks.
@@ -89,7 +89,7 @@ func (m *DataDuplicatorModule) GetName() string {
 // GetConfigName returns the configuration key for this module.
 // This key is used to store and retrieve module-specific configuration.
 func (m *DataDuplicatorModule) GetConfigName() string {
-	return "dataduplicator"
+	return common.ModuleKeyDataDuplicator
 }
 
 // GetIcon returns the module's icon resource.
@@ -289,7 +289,7 @@ func (m *DataDuplicatorModule) SaveCfg() {
 
 	// Get default configuration with all field definitions
 	cfg := common.GetDefaultDataDuplicatorCfg()
-	
+
 	// Update only the values from current UI state
 	cfg.SourceType.Value = string(sourceType)
 	cfg.SourceFolder.Value = m.sourceFolderEntry.Text

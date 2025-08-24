@@ -222,15 +222,15 @@ func (mgr *ConfigManager) GetModuleCfg(moduleType string, moduleName string) (in
 	// Get the appropriate module configuration based on type
 	var moduleConfig interface{}
 	switch strings.ToLower(moduleType) {
-	case "flacfixer":
+	case ModuleKeyFlacFixer:
 		moduleConfig = mgr.cfg.Modules.FlacFixer
-	case "formatconverter":
+	case ModuleKeyFormatConverter:
 		moduleConfig = mgr.cfg.Modules.FormatConverter
-	case "datesmaster":
+	case ModuleKeyDatesMaster:
 		moduleConfig = mgr.cfg.Modules.DatesMaster
-	case "dataduplicator":
+	case ModuleKeyDataDuplicator:
 		moduleConfig = mgr.cfg.Modules.DataDuplicator
-	case "formatupdater":
+	case ModuleKeyFormatUpdater:
 		moduleConfig = mgr.cfg.Modules.FormatUpdater
 	default:
 		return nil, fmt.Errorf("unknown module type: %s", moduleType)
@@ -257,31 +257,31 @@ func (mgr *ConfigManager) SaveModuleCfg(moduleType string, moduleName string, co
 
 	// Update the appropriate module configuration based on type
 	switch strings.ToLower(moduleType) {
-	case "flacfixer":
+	case ModuleKeyFlacFixer:
 		if cfg, ok := config.(FlacFixerCfg); ok {
 			mgr.cfg.Modules.FlacFixer = cfg
 		} else {
 			return fmt.Errorf("invalid configuration type for flacfixer")
 		}
-	case "formatconverter":
+	case ModuleKeyFormatConverter:
 		if cfg, ok := config.(FormatConverterCfg); ok {
 			mgr.cfg.Modules.FormatConverter = cfg
 		} else {
 			return fmt.Errorf("invalid configuration type for formatconverter")
 		}
-	case "datesmaster":
+	case ModuleKeyDatesMaster:
 		if cfg, ok := config.(DatesMasterCfg); ok {
 			mgr.cfg.Modules.DatesMaster = cfg
 		} else {
 			return fmt.Errorf("invalid configuration type for datesmaster")
 		}
-	case "dataduplicator":
+	case ModuleKeyDataDuplicator:
 		if cfg, ok := config.(DataDuplicatorCfg); ok {
 			mgr.cfg.Modules.DataDuplicator = cfg
 		} else {
 			return fmt.Errorf("invalid configuration type for dataduplicator")
 		}
-	case "formatupdater":
+	case ModuleKeyFormatUpdater:
 		if cfg, ok := config.(FormatUpdaterCfg); ok {
 			mgr.cfg.Modules.FormatUpdater = cfg
 		} else {

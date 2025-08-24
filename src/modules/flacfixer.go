@@ -78,7 +78,7 @@ func (m *FlacFixerModule) GetName() string {
 // GetConfigName returns the configuration key for this module.
 // This key is used to store and retrieve module-specific configuration.
 func (m *FlacFixerModule) GetConfigName() string {
-	return "flacfixer"
+	return common.ModuleKeyFlacFixer
 }
 
 // GetIcon returns the module's icon resource.
@@ -244,12 +244,12 @@ func (m *FlacFixerModule) Start() {
 			return
 		}
 
-		// Process metadata synchronization
+		// Process metadata copy
 		m.processFlacFixer(sourcePath)
 	}()
 }
 
-// processFlacFixer handles the actual metadata synchronization process.
+// processFlacFixer handles the actual metadata copy process.
 // It reads MP3 files from the database, updates corresponding FLAC files with matching metadata,
 // and manages the progress dialog and status updates throughout the process.
 //

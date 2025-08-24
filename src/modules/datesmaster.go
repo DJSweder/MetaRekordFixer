@@ -223,7 +223,7 @@ func (m *DatesMasterModule) GetName() string {
 // GetConfigName returns the configuration identifier for the module.
 // This implements the Module interface method and is used for configuration storage.
 func (m *DatesMasterModule) GetConfigName() string {
-	return "datesmaster"
+	return common.ModuleKeyDatesMaster
 }
 
 // GetIcon returns the module's icon resource.

@@ -113,7 +113,7 @@ func NewFormatConverterModule(window fyne.Window, configMgr *common.ConfigManage
 	// to a separate file. This keeps the code simple and avoids unnecessary user warnings.
 	//
 	// If you ever change the log path logic or permissions, reconsider this approach.
-	ffmpegLogPath, err := common.LocateOrCreatePath("metarekordfixer_ffmpeg.log", "log")
+	ffmpegLogPath, err := common.LocateOrCreatePath(common.FileNameFFmpegLog, "log")
 	if err == nil {
 		ffmpegLogger, err := common.NewLogger(ffmpegLogPath, 10, 7)
 		if err == nil {
@@ -137,7 +137,7 @@ func (m *FormatConverterModule) GetName() string {
 // GetConfigName returns the configuration identifier for the module.
 // This key is used to store and retrieve module-specific configuration.
 func (m *FormatConverterModule) GetConfigName() string {
-	return "formatconverter"
+	return common.ModuleKeyFormatConverter
 }
 
 // GetIcon returns the module's icon resource.
