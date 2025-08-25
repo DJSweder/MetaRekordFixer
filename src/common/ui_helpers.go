@@ -367,8 +367,8 @@ func GetLogFilePath() string {
 	}
 
 	// Construct the path to the log file
-	logDir := filepath.Join(appDataDir, "MetaRekordFixer", "log")
-	logFile := filepath.Join(logDir, "metarekordfixer_app.log")
+	logDir := filepath.Join(appDataDir, AppName, FolderNameLog)
+	logFile := filepath.Join(logDir, FileNameLog)
 
 	return logFile
 }
@@ -595,7 +595,7 @@ func CreateDynamicEntryList(
 func CreateActionButton(initialText string, onAction func(), completedText string, completedIcon fyne.Resource) *widget.Button {
 	btn := widget.NewButton(initialText, nil)
 	btn.Importance = widget.HighImportance
-	
+
 	// Set the actual handler that will change state after execution
 	btn.OnTapped = func() {
 		if onAction != nil {
@@ -607,7 +607,6 @@ func CreateActionButton(initialText string, onAction func(), completedText strin
 		}
 		btn.SetIcon(completedIcon)
 	}
-	
+
 	return btn
 }
-

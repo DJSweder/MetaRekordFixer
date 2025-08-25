@@ -63,7 +63,6 @@ const (
 	ExtensionAIFF = ".aiff"
 
 	ExtensionM4A = ".m4a"
-
 )
 
 // FileNames - Constants for file names
@@ -76,6 +75,9 @@ const (
 
 	//FileNameFFmpegLog is the name of the ffmpeg log file
 	FileNameFFmpegLog = "metarekordfixer_ffmpeg.log"
+
+	//FolderNameLog is the name of the log folder
+	FolderNameLog = "log"
 )
 
 // ValidatorActions - Constants for validator actions
@@ -88,6 +90,9 @@ const (
 const (
 	// AppID is the application identifier
 	AppID = "com.metarekordfixer.app"
+
+	//AppName is the application name
+	AppName = "MetaRekordFixer"
 )
 
 // SQLFragments - Constants for frequently used SQL query fragments
