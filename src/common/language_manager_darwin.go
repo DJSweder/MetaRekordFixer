@@ -1,6 +1,7 @@
 //go:build darwin
 
 // common/language_manager_darwin.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains macOS-specific language detection functionality.
 

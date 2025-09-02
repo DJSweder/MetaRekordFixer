@@ -1,5 +1,8 @@
 // common/ui_helpers.go
 
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains helpers for GUI.
+
 package common
 
 import (

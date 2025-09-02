@@ -33,10 +33,8 @@ Autor tuto situaci vyřešil tím, že každý FLAC v jeho sbírce má svojí MP
 
 ### 2. Neukládání některých metadat u FLAC.
 
-rekordbox<sup>TM</sup> u FLAC souborů nezapisuje tyto údaje: datum vydání, intepret alba, název mixu, původní interpret. U MP3 souborů však tato data zapíše korektně. MetaRekordFixer toho využije tímto způsobem:
-- základním předpokladem je, že v databázi Rekordboxu<sup>TM</sup> jsou naimportovány MP3 ekvivalenty originálních FLAC skladeb ve stejné struktuře (viz výše)
-- metadata z těchto MP3 jsou zkopírována do databáze k položkám knihovny ve formátu FLAC
-*Důležité upozornění: soubory MP3 a FLAC musí mít stejný název (bez ohledu na příponu).*
+rekordbox<sup>TM</sup> u FLAC souborů nezapisuje tyto údaje: datum vydání, intepret alba, název mixu, původní interpret. Pokud však tyto údaje ve FLAC souborech uložené jsou, MetaRekordFixer si je načte a uloží do databáze na správné místo. Od té chvíle jsou tyto údaje součástí knihovny i exportu skladeb na vyměnitelná média.
+*Důležité upozornění: pokud v rekordboxu<sup>TM</sup> použijete funkci na obnovení tagů, dojde ke smazání takto uložených dat z databáze. V tomto případě stačí znovu použít MetaRekordFixer, který uloží datum vydání, intepreta alba, název mixu, původního interpreta znovu.*
 
 ### 3. Přenos (HOT) CUEs a dalších informací.
 

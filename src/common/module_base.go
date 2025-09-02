@@ -1,4 +1,5 @@
 // common/module_base.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains the base module implementation and related interfaces.
 

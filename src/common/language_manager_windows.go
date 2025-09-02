@@ -1,6 +1,7 @@
 //go:build windows
 
 // common/language_manager_windows.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains Windows-specific language detection functionality.
 

@@ -1,5 +1,8 @@
 // common/status_messages.go
 
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file is responsible for displaying status messages in the UI.
+
 package common
 
 import (

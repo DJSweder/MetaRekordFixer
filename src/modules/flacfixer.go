@@ -3,14 +3,14 @@
 // Package modules provides functionality for different modules in the MetaRekordFixer application.
 // Each module handles a specific task related to DJ database management and music file operations.
 
-// This module copies metadata that is stored in the database for MP3 versions of identical tracks to the FLAC track collection
+// This module reads metadata directly from FLAC files and updates the database with the extracted information
 
 package modules
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -139,7 +139,7 @@ func (m *FlacFixerModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("FlacFixer", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg(common.ModuleKeyFlacFixer, m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -167,7 +167,7 @@ func (m *FlacFixerModule) SaveCfg() {
 	cfg.Recursive.Value = fmt.Sprintf("%t", m.recursiveCheck.Checked)
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("FlacFixer", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg(common.ModuleKeyFlacFixer, m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -218,8 +218,34 @@ func (m *FlacFixerModule) Start() {
 
 	sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
 
-	// Show progress dialog with cancel support
-	m.ShowProgressDialog(locales.Translate("flacfixer.dialog.header"))
+	// Prepare cancelable context and show progress dialog with cancel support
+	ctx, cancel := context.WithCancel(context.Background())
+	// Store cancel locally via closure; when Stop is pressed, cancel context and show stopping info
+	m.ShowProgressDialog(
+		locales.Translate("flacfixer.dialog.header"),
+		func() {
+			cancel()
+			sourcePath := common.NormalizePath(m.sourceFolderEntry.Text)
+
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						context := &common.ErrorContext{
+							Module:      m.GetName(),
+							Operation:   "Metadata Sync",
+							Severity:    common.SeverityCritical,
+							Recoverable: false,
+						}
+						m.ErrorHandler.ShowStandardError(fmt.Errorf("%v", r), context)
+						m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+					}
+				}()
+
+				// Process metadata copy with cancellation context
+				m.processFlacFixer(ctx, sourcePath)
+			}()
+		},
+	)
 
 	// Start processing in a goroutine
 	go func() {
@@ -237,205 +263,100 @@ func (m *FlacFixerModule) Start() {
 			}
 		}()
 
-		// Check if cancelled
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("common.status.stopped", 0, 0)
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
-		}
-
-		// Process metadata copy
-		m.processFlacFixer(sourcePath)
+		// Process metadata copy with cancellation context
+		m.processFlacFixer(ctx, sourcePath)
 	}()
 }
 
-// processFlacFixer handles the actual metadata copy process.
-// It reads MP3 files from the database, updates corresponding FLAC files with matching metadata,
-// and manages the progress dialog and status updates throughout the process.
+// processFlacFixer handles the actual metadata processing from FLAC files.
+// It reads metadata directly from FLAC files in the specified folder and updates
+// the database with the extracted information, managing progress and status updates.
 //
 // The method performs the following steps:
-// 1. Queries the database for MP3 files in the specified folder
-// 2. For each MP3 file, finds the corresponding FLAC file by name
-// 3. Updates the FLAC file's metadata to match the MP3 file's metadata
+// 1. Finds all FLAC files in the specified folder (recursively if enabled)
+// 2. Reads metadata directly from each FLAC file
+// 3. Updates the database with artist, album, and track metadata
 // 4. Updates progress and handles cancellation throughout the process
 //
 // Parameters:
-//   - sourcePath: The folder path to process for metadata synchronization
-func (m *FlacFixerModule) processFlacFixer(sourcePath string) {
-
+//   - ctx: The context for cancellation
+//   - sourcePath: The folder path to process for metadata extraction
+func (m *FlacFixerModule) processFlacFixer(ctx context.Context, sourcePath string) {
 	defer m.dbMgr.Finalize()
+
 	// Normalize paths
 	sourcePath = common.NormalizePath(sourcePath)
 
-	// Get the last folder name from the path
-	lastFolderName := filepath.Base(sourcePath)
+	// Do not show initial generic progress; validator already provided start status,
+	// and specific progress will appear as soon as counts are known.
 
-	// Prepare a slice to hold MP3 file information
-	var mp3Files []struct {
-		FileName    string
-		AlbumID     common.NullString
-		ArtistID    common.NullString
-		OrgArtistID common.NullString
-		ReleaseDate common.NullString
-		Subtitle    common.NullString
-	}
+	// Process all FLAC files in the folder
+	summary, err := common.ProcessFolderMetadata(
+		ctx,
+		m.dbMgr,
+		sourcePath,
+		m.recursiveCheck.Checked,
+		func(total int) {
+			// Inform about files found
+			m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), total))
+		},
+		func(progress float64, updated int, total int) {
+			// Update progress with localized status
+			status := fmt.Sprintf(locales.Translate("common.status.progress"), updated, total)
+			m.UpdateProgressStatus(progress, status)
 
-	// Query to get rercords of MP3 files from database
-	var rows, err = m.dbMgr.Query(`
-        SELECT 
-            c1.FileNameL,
-            c1.AlbumID,
-            c1.ArtistID,
-            c1.OrgArtistID,
-            c1.ReleaseDate,
-            c1.Subtitle
-        FROM djmdContent c1
-        WHERE c1.FileNameL LIKE '%.mp3'
-        AND c1.FolderPath LIKE '%/' || ? || '/%' OR c1.FolderPath LIKE '%/' || ? || ''
-    `, lastFolderName, lastFolderName)
-
-	if !m.recursiveCheck.Checked {
-		// If recursive search is not checked, we close the previous result and make a new query
-		if rows != nil {
-			rows.Close()
-		}
-
-		// Search only the specified folder
-		rows, err = m.dbMgr.Query(`
-            SELECT 
-                c1.FileNameL,
-                c1.AlbumID,
-                c1.ArtistID,
-                c1.OrgArtistID,
-                c1.ReleaseDate,
-                c1.Subtitle
-            FROM djmdContent c1
-            WHERE c1.FileNameL LIKE '%.mp3'
-            AND c1.FolderPath LIKE '%/' || ? || '/' AND c1.FolderPath NOT LIKE '%/' || ? || '/%/%'
-        `, lastFolderName, lastFolderName)
-	}
+			// Check for cancellation during processing
+			if m.IsCancelled() {
+				return
+			}
+		},
+	)
 
 	if err != nil {
+		// Handle cancellation explicitly
+		if errors.Is(err, common.ErrCancelled) {
+			m.HandleProcessCancellation("common.status.stopped", summary.Updated, summary.Total)
+			common.UpdateButtonToCompleted(m.submitBtn)
+			return
+		}
 		m.CloseProgressDialog()
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
-			Operation:   "Database Query",
+			Operation:   "FLAC Metadata Processing",
 			Severity:    common.SeverityCritical,
 			Recoverable: false,
 		}
-		m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
+		m.ErrorHandler.ShowStandardError(err, context)
 		m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
 		return
 	}
-	defer rows.Close()
 
-	// Read all MP3 records from database
-	for rows.Next() {
-		var mp3File struct {
-			FileName    string
-			AlbumID     common.NullString
-			ArtistID    common.NullString
-			OrgArtistID common.NullString
-			ReleaseDate common.NullString
-			Subtitle    common.NullString
-		}
-
-		err := rows.Scan(
-			&mp3File.FileName,
-			&mp3File.AlbumID,
-			&mp3File.ArtistID,
-			&mp3File.OrgArtistID,
-			&mp3File.ReleaseDate,
-			&mp3File.Subtitle,
-		)
-
-		if err != nil {
-			m.CloseProgressDialog()
-			context := &common.ErrorContext{
-				Module:      m.GetName(),
-				Operation:   "Read Database Records",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-		mp3Files = append(mp3Files, mp3File)
-	}
-
-	// Check if we found any MP3 files in the database
-	totalDbFiles := len(mp3Files)
-	if totalDbFiles == 0 {
-		// Add error message to status
-		m.AddErrorMessage(locales.Translate("common.err.noentryfound"))
-
-		// Update progress and complete dialog
-		m.UpdateProgressStatus(1.0, locales.Translate("common.err.noentryfound"))
-		m.CompleteProgressDialog()
+	// Check if cancelled after processing
+	if m.IsCancelled() {
+		m.HandleProcessCancellation("common.status.stopped", summary.Updated, summary.Total)
 		common.UpdateButtonToCompleted(m.submitBtn)
 		return
 	}
 
-	// Add status message about number of files found
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.filesfound"), totalDbFiles))
-
-	// Process each MP3 file and update corresponding FLAC files
-	m.StartProcessing(locales.Translate("common.status.updating"))
-
-	// Add status message about starting the update process
-	m.AddInfoMessage(locales.Translate("common.status.updating"))
-
-	for i, mp3File := range mp3Files {
-		// Update progress
-		m.UpdateProcessingProgress(i, totalDbFiles, fmt.Sprintf(locales.Translate("common.status.progress"), i+1, totalDbFiles))
-
-		// Check if cancelled
-		if m.IsCancelled() {
-			m.HandleProcessCancellation("common.status.stopped", i, totalDbFiles)
-			common.UpdateButtonToCompleted(m.submitBtn)
-			return
-		}
-
-		// Generate FLAC filename from MP3 filename
-		flacFileName := strings.TrimSuffix(mp3File.FileName, filepath.Ext(mp3File.FileName)) + ".flac"
-
-		// Update the FLAC file with the metadata from the MP3 file
-		err = m.dbMgr.Execute(`
-				UPDATE djmdContent
-				SET AlbumID = CAST(? AS INTEGER),
-					ArtistID = CAST(? AS INTEGER),
-					OrgArtistID = CAST(? AS INTEGER),
-					ReleaseDate = ?,
-					Subtitle = ?
-				WHERE FileNameL = ?
-			`,
-			mp3File.AlbumID.ValueOrNil(),
-			mp3File.ArtistID.ValueOrNil(),
-			mp3File.OrgArtistID.ValueOrNil(),
-			mp3File.ReleaseDate.ValueOrNil(),
-			mp3File.Subtitle.ValueOrNil(),
-			flacFileName,
+	// Add completion status messages
+	if summary.Total == 0 {
+		m.AddErrorMessage(locales.Translate("common.err.nofiles"))
+		m.UpdateProgressStatus(1.0, locales.Translate("common.err.nofiles"))
+	} else {
+		finalMsg := fmt.Sprintf(
+			locales.Translate("flacfixer.status.summary"),
+			summary.Total,
+			summary.Updated,
+			summary.NoChange,
+			summary.SkippedZero,
+			summary.MetadataErrs,
+			summary.DbMisses,
+			summary.DbUpdateErrs,
+			summary.SkippedDirs,
 		)
-
-		if err != nil {
-			m.CloseProgressDialog()
-			context := &common.ErrorContext{
-				Module:      m.GetName(),
-				Operation:   "Update FLAC Metadata",
-				Severity:    common.SeverityCritical,
-				Recoverable: false,
-			}
-			m.ErrorHandler.ShowStandardError(err, context) // This error is not wrapped, because DBMgr provides localized message for error dialog.
-			m.AddErrorMessage(locales.Translate("common.err.statusfinal"))
-			return
-		}
-
+		m.AddInfoMessage(finalMsg)
+		m.CompleteProcessing(finalMsg)
 	}
-
-	// Update progress to completion
-	m.CompleteProcessing(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
-	m.AddInfoMessage(fmt.Sprintf(locales.Translate("common.status.completed"), totalDbFiles))
 
 	// Mark the progress dialog as completed and update button
 	m.CompleteProgressDialog()

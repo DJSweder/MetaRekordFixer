@@ -1,4 +1,5 @@
 // common/error_handler.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains error handling functionality.
 

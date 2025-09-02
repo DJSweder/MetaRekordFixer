@@ -258,7 +258,7 @@ func (m *FormatConverterModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg(common.ModuleKeyFormatConverter, m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -348,7 +348,7 @@ func (m *FormatConverterModule) SaveCfg() {
 	cfg.WAVSamplerate.Value = sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("FormatConverter", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg(common.ModuleKeyFormatConverter, m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -651,7 +651,7 @@ func (m *FormatConverterModule) startConversion() {
 	}()
 
 	// Get values from typed configuration
-	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg(common.ModuleKeyFormatConverter, m.GetConfigName())
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
@@ -738,7 +738,7 @@ func (m *FormatConverterModule) startConversion() {
 //   - formatSettings: Map of format-specific settings like bitrate, compression level, etc.
 func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
 	// Get values from typed configuration
-	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg(common.ModuleKeyFormatConverter, m.GetConfigName())
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),

@@ -294,7 +294,7 @@ func (m *DatesMasterModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("DatesMaster", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("datesmaster", m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -374,7 +374,7 @@ func (m *DatesMasterModule) SaveCfg() {
 	cfg.ExcludedFolders.Value = strings.Join(excludedFoldersEntry, "|")
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("DatesMaster", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg(common.ModuleKeyDatesMaster, m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components for the module.

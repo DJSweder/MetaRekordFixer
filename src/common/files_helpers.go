@@ -1,6 +1,8 @@
 // common/files_helpers.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains file system helper functions and structures.
+
 package common
 
 import (
@@ -226,13 +228,11 @@ func LocateOrCreatePath(fileName, subDir string) (string, error) {
 				return appDataPath, nil
 			} else {
 				// Directory exists but is not writable
-				CaptureEarlyLog(SeverityWarning, "User's folder ('%s') exists but is not writable: %v", dirPath, err)
-				CaptureEarlyLog(SeverityWarning, "Attempt to write to the application installation folder: %s", rootPath)
+				return "", fmt.Errorf("directory '%s' exists but is not writable: %w", dirPath, err)
 			}
 		} else {
 			// If the directory creation failed, we log a message and switch to fallback
-			CaptureEarlyLog(SeverityWarning, "User's folder ('%s') is not writable: %v", dirPath, err)
-			CaptureEarlyLog(SeverityWarning, "Attempt to write to the application installation folder: %s", rootPath)
+			return "", fmt.Errorf("failed to create directory '%s': %w", dirPath, err)
 		}
 	}
 
@@ -468,7 +468,7 @@ func DetectFile(detector FileDetector) (string, error) {
 	if len(detector.SearchPaths) == 0 {
 		err := errors.New("no search paths provided")
 		if detector.LogFailure {
-			CaptureEarlyLog(SeverityWarning, "FileDetector: %s - %v", detector.Description, err)
+			return "", err
 		}
 		return "", err
 	}
@@ -506,7 +506,7 @@ func DetectFile(detector FileDetector) (string, error) {
 
 		// File found and accessible
 		if detector.LogSuccess {
-			CaptureEarlyLog(SeverityInfo, "FileDetector: %s - successfully detected at '%s'", detector.Description, expandedPath)
+			return expandedPath, nil
 		}
 		return expandedPath, nil
 	}
@@ -517,7 +517,7 @@ func DetectFile(detector FileDetector) (string, error) {
 	}
 
 	if detector.LogFailure {
-		CaptureEarlyLog(SeverityWarning, "FileDetector: %s - detection failed: %v", detector.Description, lastErr)
+		return "", lastErr
 	}
 
 	return "", lastErr
@@ -587,29 +587,119 @@ func DetectRekordboxDatabase() (string, error) {
 }
 
 // AutodetectAndSaveDatabasePath attempts to detect and save Rekordbox database path if not configured.
-// This function checks if the database path is empty, performs autodetection, and saves the result.
+// This function checks if the configuration file exists to determine if this is the first run.
+// Autodetection is performed only on first run (when config file doesn't exist).
 // It's designed to be called during application initialization when both ConfigManager and Logger are available.
 //
 // Parameters:
 //   - configMgr: Configuration manager for loading/saving database path
 //   - logger: Logger for recording autodetection results
 func AutodetectAndSaveDatabasePath(configMgr *ConfigManager, logger *Logger) {
-	// Only perform autodetection if database path is empty
-	globalConfig := configMgr.GetGlobalConfig()
-	if globalConfig.DatabasePath != "" {
-		return // Database path already configured
+	// Check if configuration file exists - if it does, skip autodetection
+	// This ensures autodetection only runs on first application startup
+	if FileExists(configMgr.configPath) {
+		return // Configuration file exists, skip autodetection
 	}
 
+	// First run detected - perform autodetection
 	detectedPath, err := DetectRekordboxDatabase()
 	if err != nil {
 		// Log warning but don't propagate error - application must continue
-		logger.Warning("Database path auto-detection failed: %v", err)
+		logger.Warning("Database path auto-detection failed on first run: %v", err)
 	} else {
 		// Success - set path and save configuration
-		logger.Info("Database path auto-detection - successfully detected at '%s'", detectedPath)
+		logger.Info("Database path auto-detection on first run - successfully detected at '%s'", detectedPath)
+		globalConfig := configMgr.GetGlobalConfig()
 		globalConfig.DatabasePath = detectedPath
 		if saveErr := configMgr.SaveGlobalConfig(globalConfig); saveErr != nil {
 			logger.Warning("Failed to save auto-detected database path: %v", saveErr)
 		}
 	}
+}
+
+// ErrDirectoryNotReadable is returned when the root directory cannot be read due to permissions
+var ErrDirectoryNotReadable = errors.New("directory not readable")
+
+// GetFilesInFolder finds all files with specified extensions in a directory.
+// This version includes a logger parameter for proper error logging and is used
+// during actual processing operations.
+//
+// Parameters:
+//   - logger: Logger instance for error reporting
+//   - dirPath: The directory path to search in
+//   - extensions: File extensions to filter by (e.g., [".flac", ".mp3"])
+//   - recursive: Whether to search subdirectories recursively
+//
+// Returns:
+//   - A slice of strings containing the full paths of the found files.
+//   - A slice of strings containing the paths of skipped (inaccessible) directories when recursive is true.
+//   - An error if the directory cannot be read or another filesystem error occurs.
+func GetFilesInFolder(logger *Logger, dirPath string, extensions []string, recursive bool) ([]string, []string, error) {
+	var files []string
+	var skippedDirs []string
+
+	if !recursive {
+		// Non-recursive: Use os.ReadDir for safety against permission errors in subdirs.
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			if os.IsPermission(err) {
+				// Root directory not readable -> return sentinel error
+				return nil, nil, ErrDirectoryNotReadable
+			}
+			return nil, nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if hasValidExtension(entry.Name(), extensions) {
+				files = append(files, filepath.Join(dirPath, entry.Name()))
+			}
+		}
+		return files, nil, nil
+	}
+
+	// Recursive: Use the standard filepath.Walk.
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				// Distinguish root vs. subdirectory
+				if path == dirPath {
+					// Root not readable -> return sentinel error
+					return ErrDirectoryNotReadable
+				}
+
+				// Don't log here; just add the path to the slice. The caller is responsible for logging.
+				skippedDirs = append(skippedDirs, path)
+				return filepath.SkipDir
+			}
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if hasValidExtension(info.Name(), extensions) {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, skippedDirs, err
+	}
+	return files, skippedDirs, nil
+}
+
+// hasValidExtension checks whether file name has one of the provided extensions (case-insensitive).
+// extensions are expected to include a leading dot (e.g., ".flac").
+func hasValidExtension(name string, extensions []string) bool {
+	if len(extensions) == 0 {
+		return true // no filter
+	}
+	lower := strings.ToLower(name)
+	for _, ext := range extensions {
+		if strings.HasSuffix(lower, strings.ToLower(ext)) {
+			return true
+		}
+	}
+	return false
 }

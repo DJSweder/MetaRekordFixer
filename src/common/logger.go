@@ -1,5 +1,8 @@
 // common/logger.go
 
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file contains logging functionality.
+
 package common
 
 import (

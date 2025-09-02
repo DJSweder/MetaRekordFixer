@@ -34,12 +34,9 @@ The author solved this by ensuring that every FLAC in his collection has an MP3 
 
 ### 2. Some metadata is not saved for FLAC files. ###
 
-rekordbox<sup>TM</sup> doesn`t store metadata such as *release date, album artist, mix title,* and *original artist* for FLAC files, while it correctly saves these for MP3 files. MetaRekordFixer leverages this as follows:
+rekordbox<sup>TM</sup> doesn't store metadata such as *release date, album artist, mix title,* and *original artist* for FLAC files. However, if this data is stored in FLAC files, MetaRekordFixer will read it and save it in the database. From that moment on, this data is part of the library and when exporting songs to removable media as well.
 
-- The basic assumption is that MP3 equivalents of the original FLAC tracks are imported into the rekordbox<sup>TM</sup> database in the same structure (see above).
-- Metadata from these MP3s is copied into the database entries for the FLAC library items.
-
-*Important note: MP3 and FLAC files must have the same filename (regardless of extension).*
+*Important note: if you use the tag recovery function in rekordbox<sup>TM</sup>, the data stored in this way will be deleted from the database. In this case, you just need to use MetaRekordFixer, which will save the release date, album artist, mix title, original artist again.*
   
 ### 3. Transfer of (HOT) CUEs and other information. ###
 

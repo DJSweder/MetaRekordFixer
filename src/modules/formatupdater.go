@@ -161,7 +161,7 @@ func (m *FormatUpdaterModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("FormatUpdater", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg(common.ModuleKeyFormatUpdater, m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -199,7 +199,7 @@ func (m *FormatUpdaterModule) SaveCfg() {
 	cfg.PlaylistID.Value = m.pendingPlaylistID
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("FormatUpdater", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg(common.ModuleKeyFormatUpdater, m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.

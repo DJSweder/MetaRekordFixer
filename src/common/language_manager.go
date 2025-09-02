@@ -1,6 +1,8 @@
 // common/language_manager.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains language management functionality.
+
 package common
 
 import (

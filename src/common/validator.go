@@ -1,5 +1,8 @@
 // common/validator.go
 
+// Package common implements shared functionality used across the MetaRekordFixer application.
+// This file is responsible for validating input fields and backing up the database before any writes.
+
 package common
 
 import (
@@ -13,10 +16,10 @@ import (
 	"MetaRekordFixer/locales"
 )
 
-// Validator provides centralized validation functionality for modules.
+// Validator handles validation of module inputs and database operations.
 type Validator struct {
-	module       Module         // Reference to the module using the validator
-	configMgr    *ConfigManager // For configuration access
+	module       Module         // The module being validated
+	configMgr    *ConfigManager // For configuration management
 	dbMgr        *DBManager     // For database operations
 	errorHandler *ErrorHandler  // For error handling
 }
@@ -66,6 +69,96 @@ func (v *Validator) Validate(action string) error {
 		}
 		base.AddInfoMessage(locales.Translate("validator.status.dbconnect"))
 
+		// Generic preflight: check input folder accessibility and (optionally) presence of files by configured extensions
+		moduleKey := v.module.GetConfigName()
+		if typedCfg, err := v.configMgr.GetModuleCfg(moduleKey, moduleKey); err == nil && typedCfg != nil {
+			// Extract FieldCfg map
+			fields, _ := extractFieldConfigs(typedCfg)
+
+			// Resolve source folder (prefer sourceFolder -> folder -> any active folder field)
+			sourceFolder := ""
+			if f, ok := fields["sourceFolder"]; ok && isFieldActive(f, fields) {
+				sourceFolder = NormalizePath(f.Value)
+			} else if f, ok := fields["folder"]; ok && isFieldActive(f, fields) {
+				sourceFolder = NormalizePath(f.Value)
+			} else {
+				for _, fld := range fields {
+					if fld.FieldType == "folder" && isFieldActive(fld, fields) {
+						sourceFolder = NormalizePath(fld.Value)
+						break
+					}
+				}
+			}
+
+			// Resolve recursive flag if present
+			recursive := false
+			if r, ok := fields["recursive"]; ok {
+				recursive = strings.ToLower(strings.TrimSpace(r.Value)) == "true"
+			}
+
+			// Parse extensions if present
+			var extensions []string
+			if e, ok := fields["extensions"]; ok {
+				extensions = parseExtensionsCSV(e.Value)
+			}
+
+			if !IsEmptyString(sourceFolder) {
+				files, skippedDirs, err := GetFilesInFolder(v.dbMgr.logger, sourceFolder, extensions, recursive)
+
+				// Log any skipped directories
+				if len(skippedDirs) > 0 {
+					for _, dir := range skippedDirs {
+						v.dbMgr.logger.Warning("%s %s", fmt.Sprintf(locales.Translate("common.log.folder"), dir), locales.Translate("common.log.foldernoread"))
+					}
+				}
+
+				if err != nil {
+					// Check if the error is the specific permission error using sentinel error
+					if errors.Is(err, ErrDirectoryNotReadable) {
+						// Create localized error for root directory access issue
+						displayName := filepath.Base(sourceFolder)
+						localizedErr := fmt.Errorf(locales.Translate("common.err.noreadaccess"), displayName)
+						context := &ErrorContext{
+							Module:      v.module.GetName(),
+							Operation:   "ValidateInputFiles",
+							Severity:    SeverityCritical,
+							Recoverable: false,
+						}
+						v.errorHandler.ShowStandardError(localizedErr, context)
+						base.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+						return localizedErr
+					}
+					// For other errors, show them as-is
+					context := &ErrorContext{
+						Module:      v.module.GetName(),
+						Operation:   "ValidateInputFiles",
+						Severity:    SeverityCritical,
+						Recoverable: false,
+					}
+					v.errorHandler.ShowStandardError(err, context)
+					base.AddErrorMessage(locales.Translate("common.err.statusfinal"))
+					return err
+				}
+				// Skipped directories are logged above, no need to store them
+				if len(skippedDirs) > 0 {
+					base.AddInfoMessage(locales.Translate("common.status.foldersdeny"))
+				}
+				// If extensions are configured and no files found, treat as critical
+				if len(extensions) > 0 && len(files) == 0 {
+					context := &ErrorContext{
+						Module:      v.module.GetName(),
+						Operation:   "ValidateInputFiles",
+						Severity:    SeverityCritical,
+						Recoverable: false,
+					}
+					err := errors.New(locales.Translate("common.err.nofiles"))
+					v.errorHandler.ShowStandardError(err, context)
+					base.AddErrorMessage(locales.Translate("common.err.nofiles"))
+					return err
+				}
+			}
+		}
+
 		// Create database backup
 		if err := v.backupDatabase(); err != nil {
 			base.AddErrorMessage(locales.Translate("common.err.statusfinal"))
@@ -106,7 +199,7 @@ func (v *Validator) validateFields(action string) error {
 	// Extract FieldCfg fields via reflection
 	fields, err := extractFieldConfigs(typedCfg)
 	if err != nil {
-		return fmt.Errorf("nepodařilo se extrahovat pole pro validaci: %w", err)
+		return fmt.Errorf("failed to extract field for validation: %w", err)
 	}
 
 	// Validate each field
@@ -237,7 +330,10 @@ func (v *Validator) validateDatabase() error {
 		return err
 	}
 
-	// Test database connection if immediate access is not required
+	// Note: We only run the preflight DB connection test when the module does NOT require
+	// immediate access (NeedsImmediateAccess == false). Modules that read from the DB right
+	// after the GUI opens skip this pre-test; the first real DB call handles a lazy connect.
+	// This reduces I/O and prevents the immediate connect -> finalize -> connect sequence.
 	if !v.module.GetDatabaseRequirements().NeedsImmediateAccess {
 		if err := v.validateDatabaseConnection(); err != nil {
 			return err
@@ -326,34 +422,105 @@ func IsEmptyString(s string) bool {
 }
 
 // extractFieldConfigs uses reflection to extract all FieldCfg fields from a given config struct.
+// Keys are taken from the struct field's `json` tag (e.g., "sourceFolder", "folder", "recursive", "extensions").
 func extractFieldConfigs(config interface{}) (map[string]FieldCfg, error) {
-	fields := make(map[string]FieldCfg)
-	v := reflect.ValueOf(config)
-
-	// Potřebujeme pracovat s ukazatelem na strukturu nebo přímo se strukturou
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
+	result := make(map[string]FieldCfg)
+	if config == nil {
+		return result, nil
 	}
 
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected a struct, but got %s", v.Kind())
+	val := reflect.ValueOf(config)
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return result, nil
+		}
+		val = val.Elem()
 	}
 
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		if field.Type() == reflect.TypeOf(FieldCfg{}) {
-			// Získáme JSON tag, který slouží jako klíč pole
-			jsonTag := t.Field(i).Tag.Get("json")
-			if jsonTag != "" && jsonTag != "-" {
-				fields[jsonTag] = field.Interface().(FieldCfg)
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("extractFieldConfigs: expected struct, got %s", val.Kind().String())
+	}
+
+	typ := val.Type()
+	for i := 0; i < val.NumField(); i++ {
+		fieldVal := val.Field(i)
+		fieldType := typ.Field(i)
+
+		// Only process fields of type FieldCfg
+		if fieldVal.Kind() == reflect.Struct && fieldVal.Type().Name() == "FieldCfg" {
+			key := fieldType.Tag.Get("json")
+			if key == "" {
+				key = strings.TrimSpace(fieldType.Name)
+				key = strings.ToLower(key[:1]) + key[1:]
+			}
+			if !fieldVal.CanInterface() {
+				continue
+			}
+			if cfg, ok := fieldVal.Interface().(FieldCfg); ok {
+				result[key] = cfg
 			}
 		}
 	}
 
-	return fields, nil
+	return result, nil
 }
 
+// parseExtensionsCSV parses CSV/space/semicolon/pipe-separated extensions into normalized dot-prefixed, lowercased list.
+// Empty or whitespace-only input yields nil (meaning: no filter configured).
+func parseExtensionsCSV(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		switch r {
+		case ',', ';', ' ', '|':
+			return true
+		default:
+			return false
+		}
+	})
+	seen := make(map[string]struct{})
+	res := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(strings.ToLower(p))
+		if p == "" {
+			continue
+		}
+		if !strings.HasPrefix(p, ".") {
+			p = "." + p
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		res = append(res, p)
+	}
+	if len(res) == 0 {
+		return nil
+	}
+	return res
+}
+
+// isFieldActive returns true if the field is active based on DependsOn/ActiveWhen conditions within the same config.
+func isFieldActive(field FieldCfg, fields map[string]FieldCfg) bool {
+	if field.DependsOn == "" {
+		return true
+	}
+	if dep, ok := fields[field.DependsOn]; ok {
+		return dep.Value == field.ActiveWhen
+	}
+	// If dependency is not found, consider it active to avoid false negatives
+	return true
+}
+
+// GetSkippedDirs is no longer needed as validator doesn't store skipped directories
+// Main processing logic handles its own directory counting
+func (v *Validator) GetSkippedDirs() []string {
+	return nil
+}
+
+// ... (rest of the code remains the same)
 
 // backupDatabase creates a backup of the database.
 // It uses DBManager to create a backup of the current database file.

@@ -1,4 +1,5 @@
 // common/db_manager.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains database management functionality for accessing and manipulating Rekordbox databases.
 
