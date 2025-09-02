@@ -258,7 +258,7 @@ func (m *FormatConverterModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -348,7 +348,7 @@ func (m *FormatConverterModule) SaveCfg() {
 	cfg.WAVSamplerate.Value = sampleRateParams.GetConfigValue(m.WAVSampleRateSelect.Selected)
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("formatconverter", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg("FormatConverter", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.
@@ -651,7 +651,7 @@ func (m *FormatConverterModule) startConversion() {
 	}()
 
 	// Get values from typed configuration
-	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
@@ -1565,7 +1565,7 @@ func detectSourceFormat(filePath string) string {
 //
 // Parameters:
 //   - sourceFormat: Source audio format (MP3, FLAC, WAV)
-//   - targetFormat: Target audio format (MP3, FLAC, WAV)  
+//   - targetFormat: Target audio format (MP3, FLAC, WAV)
 //   - sourceMetadata: Metadata extracted from source file
 //   - metadataMap: CSV-based mapping rules
 //   - metadataItems: Slice to append mapped metadata items
@@ -1575,7 +1575,7 @@ func detectSourceFormat(filePath string) string {
 func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat string, sourceMetadata map[string]string, metadataMap *MetadataMap, metadataItems *[]metadataItem) error {
 	// Get the appropriate source and target mapping based on formats
 	var sourceMap, targetMap map[string]string
-	
+
 	// Select source format mapping
 	switch sourceFormat {
 	case "MP3":
@@ -1587,7 +1587,7 @@ func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat s
 	default:
 		return fmt.Errorf("unsupported source format: %s", sourceFormat)
 	}
-	
+
 	// Select target format mapping
 	switch targetFormat {
 	case "MP3":
@@ -1599,21 +1599,21 @@ func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat s
 	default:
 		return fmt.Errorf("unsupported target format: %s", targetFormat)
 	}
-	
+
 	// Iterate through all internal field names in CSV
 	for internalName := range sourceMap {
 		sourceFieldName := sourceMap[internalName]
 		targetFieldName := targetMap[internalName]
-		
+
 		// Skip empty field names (not supported in this format)
 		if sourceFieldName == "" || targetFieldName == "" {
 			continue
 		}
-		
+
 		// Look for the source field in the extracted metadata
 		var foundValue string
 		var found bool
-		
+
 		for sourceField, value := range sourceMetadata {
 			if strings.EqualFold(sourceField, sourceFieldName) {
 				foundValue = value
@@ -1621,13 +1621,13 @@ func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat s
 				break
 			}
 		}
-		
+
 		if found {
 			// Escape special characters in the value
 			escapedValue := foundValue
 			escapedValue = strings.ReplaceAll(escapedValue, "\\", "\\\\")
 			escapedValue = strings.ReplaceAll(escapedValue, "\"", "\\\"")
-			
+
 			// Add to metadata items
 			*metadataItems = append(*metadataItems, metadataItem{
 				key:   targetFieldName,
@@ -1635,6 +1635,6 @@ func (m *FormatConverterModule) mapMetadataUsingCSV(sourceFormat, targetFormat s
 			})
 		}
 	}
-	
+
 	return nil
 }

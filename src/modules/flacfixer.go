@@ -139,7 +139,7 @@ func (m *FlacFixerModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("flacfixer", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("FlacFixer", m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -161,13 +161,13 @@ func (m *FlacFixerModule) SaveCfg() {
 
 	// Get default configuration with all field definitions
 	cfg := common.GetDefaultFlacFixerCfg()
-	
+
 	// Update only the values from current UI state
 	cfg.SourceFolder.Value = common.NormalizePath(m.sourceFolderEntry.Text)
 	cfg.Recursive.Value = fmt.Sprintf("%t", m.recursiveCheck.Checked)
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("flacfixer", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg("FlacFixer", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.

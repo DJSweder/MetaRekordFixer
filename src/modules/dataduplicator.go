@@ -200,7 +200,7 @@ func (m *DataDuplicatorModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("dataduplicator", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("DataDuplicator", m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -299,7 +299,7 @@ func (m *DataDuplicatorModule) SaveCfg() {
 	cfg.TargetPlaylist.Value = targetPlaylistID
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("dataduplicator", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg("DataDuplicator", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components.

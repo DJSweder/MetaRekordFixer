@@ -294,7 +294,7 @@ func (m *DatesMasterModule) LoadCfg() {
 	defer func() { m.IsLoadingConfig = false }()
 
 	// Load typed config from ConfigManager
-	config, err := m.ConfigMgr.GetModuleCfg("datesmaster", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("DatesMaster", m.GetConfigName())
 	if err != nil {
 		// This should not happen with the updated GetModuleCfg(), but handle gracefully
 		return
@@ -305,13 +305,13 @@ func (m *DatesMasterModule) LoadCfg() {
 		// Update UI elements with loaded values
 		m.excludeFoldersCheck.SetChecked(cfg.ExcludeFoldersEnabled.Value == "true")
 		m.datePickerEntry.SetText(cfg.CustomDate.Value)
-		
+
 		// Parse excluded folders
 		excludedFolderPaths := []string{}
 		if cfg.ExcludedFolders.Value != "" {
 			excludedFolderPaths = strings.Split(cfg.ExcludedFolders.Value, "|")
 		}
-		
+
 		// Create excluded folders list
 		m.foldersContainer, m.excludedFoldersEntry = common.CreateDynamicEntryList(
 			m.Window,
@@ -322,13 +322,13 @@ func (m *DatesMasterModule) LoadCfg() {
 				m.SaveCfg()
 			},
 		)
-		
+
 		// Parse custom date folders
 		customFolderPaths := []string{}
 		if cfg.CustomDateFolders.Value != "" {
 			customFolderPaths = strings.Split(cfg.CustomDateFolders.Value, "|")
 		}
-		
+
 		// Create custom date folders list
 		m.customDateContainer, m.customDateFoldersEntry = common.CreateDynamicEntryList(
 			m.Window,
@@ -366,7 +366,7 @@ func (m *DatesMasterModule) SaveCfg() {
 
 	// Get default configuration with all field definitions
 	cfg := common.GetDefaultDatesMasterCfg()
-	
+
 	// Update only the values from current UI state
 	cfg.CustomDate.Value = m.datePickerEntry.Text
 	cfg.CustomDateFolders.Value = strings.Join(customDateFoldersEntry, "|")
@@ -374,7 +374,7 @@ func (m *DatesMasterModule) SaveCfg() {
 	cfg.ExcludedFolders.Value = strings.Join(excludedFoldersEntry, "|")
 
 	// Save typed config via ConfigManager
-	m.ConfigMgr.SaveModuleCfg("datesmaster", m.GetConfigName(), cfg)
+	m.ConfigMgr.SaveModuleCfg("DatesMaster", m.GetConfigName(), cfg)
 }
 
 // initializeUI sets up the user interface components for the module.
