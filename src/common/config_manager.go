@@ -1,4 +1,5 @@
 // common/config_manager.go
+
 // Package common implements shared functionality used across the MetaRekordFixer application.
 // This file contains configuration management functionality.
 
@@ -10,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"sync"
 )
 
@@ -221,7 +221,7 @@ func (mgr *ConfigManager) GetModuleCfg(moduleType string, moduleName string) (in
 
 	// Get the appropriate module configuration based on type
 	var moduleConfig interface{}
-	switch strings.ToLower(moduleType) {
+	switch moduleType {
 	case ModuleKeyFlacFixer:
 		moduleConfig = mgr.cfg.Modules.FlacFixer
 	case ModuleKeyFormatConverter:
@@ -238,7 +238,7 @@ func (mgr *ConfigManager) GetModuleCfg(moduleType string, moduleName string) (in
 
 	// Check if configuration is empty and return default if needed
 	if isEmptyModuleConfig(moduleConfig) {
-		defaultConfig := GetDefaultModuleCfg(strings.ToLower(moduleType))
+		defaultConfig := GetDefaultModuleCfg(moduleType)
 		if defaultConfig != nil {
 			// Save the default configuration for future use
 			mgr.SaveModuleCfg(moduleType, moduleName, defaultConfig)
@@ -256,7 +256,7 @@ func (mgr *ConfigManager) SaveModuleCfg(moduleType string, moduleName string, co
 	}
 
 	// Update the appropriate module configuration based on type
-	switch strings.ToLower(moduleType) {
+	switch moduleType {
 	case ModuleKeyFlacFixer:
 		if cfg, ok := config.(FlacFixerCfg); ok {
 			mgr.cfg.Modules.FlacFixer = cfg

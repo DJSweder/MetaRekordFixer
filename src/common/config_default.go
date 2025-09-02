@@ -122,14 +122,14 @@ func GetDefaultDatesMasterCfg() DatesMasterCfg {
 			Required:          true,
 			ValidationType:    "valid_date",
 			Value:             "",
-			ValidateOnActions: []string{ValidatorActionStart},
+			ValidateOnActions: []string{ValidatorActionCustomUpdate},
 		},
 		CustomDateFolders: FieldCfg{
 			FieldType:         "folder",
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{ValidatorActionStart},
+			ValidateOnActions: []string{ValidatorActionCustomUpdate},
 		},
 		ExcludeFoldersEnabled: FieldCfg{
 			FieldType:      "checkbox",
@@ -144,7 +144,7 @@ func GetDefaultDatesMasterCfg() DatesMasterCfg {
 			ActiveWhen:        "true",
 			ValidationType:    "exists",
 			Value:             "",
-			ValidateOnActions: []string{ValidatorActionStart},
+			ValidateOnActions: []string{ValidatorActionStandardUpdate},
 		},
 	}
 }
@@ -155,15 +155,29 @@ func GetDefaultFlacFixerCfg() FlacFixerCfg {
 		SourceFolder: FieldCfg{
 			FieldType:         "folder",
 			Required:          true,
+			DependsOn:         "",
+			ActiveWhen:        "",
 			ValidationType:    "exists",
 			Value:             "",
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		Recursive: FieldCfg{
-			FieldType:      "checkbox",
-			Required:       false,
-			ValidationType: "none",
-			Value:          "false",
+			FieldType:         "checkbox",
+			Required:          false,
+			DependsOn:         "",
+			ActiveWhen:        "",
+			ValidationType:    "none",
+			Value:             "false",
+			ValidateOnActions: []string{},
+		},
+		Extensions: FieldCfg{
+			FieldType:         "hidden",
+			Required:          false,
+			DependsOn:         "",
+			ActiveWhen:        "",
+			ValidationType:    "none",
+			Value:             ExtensionFLAC,
+			ValidateOnActions: []string{ValidatorActionStart},
 		},
 	}
 }
@@ -179,7 +193,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		SourceFolder: FieldCfg{
-			FieldType:         "folder",
+			FieldType:         ContentTypeFolder,
 			Required:          true,
 			DependsOn:         "sourceType",
 			ActiveWhen:        "folder",
@@ -188,7 +202,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		SourcePlaylist: FieldCfg{
-			FieldType:         "playlist",
+			FieldType:         ContentTypePlaylist,
 			Required:          true,
 			DependsOn:         "sourceType",
 			ActiveWhen:        "playlist",
@@ -204,7 +218,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetFolder: FieldCfg{
-			FieldType:         "folder",
+			FieldType:         ContentTypeFolder,
 			Required:          true,
 			DependsOn:         "targetType",
 			ActiveWhen:        "folder",
@@ -213,7 +227,7 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		TargetPlaylist: FieldCfg{
-			FieldType:         "playlist",
+			FieldType:         ContentTypePlaylist,
 			Required:          true,
 			DependsOn:         "targetType",
 			ActiveWhen:        "playlist",
@@ -228,14 +242,14 @@ func GetDefaultDataDuplicatorCfg() DataDuplicatorCfg {
 func GetDefaultFormatUpdaterCfg() FormatUpdaterCfg {
 	return FormatUpdaterCfg{
 		Folder: FieldCfg{
-			FieldType:         "folder",
+			FieldType:         ContentTypeFolder,
 			Required:          true,
 			ValidationType:    "exists",
 			Value:             "",
 			ValidateOnActions: []string{ValidatorActionStart},
 		},
 		PlaylistID: FieldCfg{
-			FieldType:         "playlist",
+			FieldType:         ContentTypePlaylist,
 			Required:          true,
 			ValidationType:    "filled",
 			Value:             "",

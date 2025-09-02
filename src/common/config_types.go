@@ -1,7 +1,6 @@
 // common/config_types.go
 
-// Package common provides shared types, functions, and utilities used across
-// the MetaRekordFixer application.
+// Package common provides shared types, functions, and utilities used across the MetaRekordFixer application.
 // This file includes base module functionality, Configuration management, error handling, and other common components.
 
 package common
@@ -34,13 +33,12 @@ type FieldCfg struct {
 // ModuleCfgs groups the Configurations for all available modules.
 // Each field corresponds to one module and its key in `settings.conf`.
 type ModuleCfgs struct {
-	FormatConverter FormatConverterCfg `json:"formatconverter"`
-	DatesMaster     DatesMasterCfg     `json:"datesmaster"`
-	FlacFixer       FlacFixerCfg       `json:"flacfixer"`
-	DataDuplicator  DataDuplicatorCfg  `json:"dataduplicator"`
-	FormatUpdater   FormatUpdaterCfg   `json:"formatupdater"`
+	FormatConverter FormatConverterCfg `json:"FormatConverter"`
+	DatesMaster     DatesMasterCfg     `json:"DatesMaster"`
+	FlacFixer       FlacFixerCfg       `json:"FlacFixer"`
+	DataDuplicator  DataDuplicatorCfg  `json:"DataDuplicator"`
+	FormatUpdater   FormatUpdaterCfg   `json:"FormatUpdater"`
 }
-
 
 // FormatConverterCfg defines all fields for the "Format Converter" module.
 type FormatConverterCfg struct {
@@ -71,6 +69,7 @@ type DatesMasterCfg struct {
 type FlacFixerCfg struct {
 	SourceFolder FieldCfg `json:"sourceFolder"`
 	Recursive    FieldCfg `json:"recursive"`
+	Extensions   FieldCfg `json:"extensions"`
 }
 
 // DataDuplicatorCfg defines all fields for the "Data Duplicator" module.

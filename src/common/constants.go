@@ -1,7 +1,8 @@
-// constants.go
+// common/constants.go
 
 // Package common provides shared functionality and constants for the MetaRekordFixer application.
 // This file contains constants used across the application to replace hardcoded strings.
+
 package common
 
 // ModuleKeys - Constants for module identification in configuration
@@ -84,6 +85,12 @@ const (
 const (
 	// ValidatorActionStart indicates the start validation action
 	ValidatorActionStart = "start"
+
+	// ValidatorActionStandardUpdate indicates the standard update validation action
+	ValidatorActionStandardUpdate = "standard"
+
+	// ValidatorActionCustomUpdate indicates the custom update validation action
+	ValidatorActionCustomUpdate = "custom"
 )
 
 // AppIdentifiers - Constants for application identification
