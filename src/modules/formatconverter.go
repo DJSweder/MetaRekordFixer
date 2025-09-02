@@ -738,7 +738,7 @@ func (m *FormatConverterModule) startConversion() {
 //   - formatSettings: Map of format-specific settings like bitrate, compression level, etc.
 func (m *FormatConverterModule) convertFiles(sourceFolder, targetFolder, targetFormat string, formatSettings map[string]string) {
 	// Get values from typed configuration
-	config, err := m.ConfigMgr.GetModuleCfg("formatconverter", m.GetConfigName())
+	config, err := m.ConfigMgr.GetModuleCfg("FormatConverter", m.GetConfigName())
 	if err != nil {
 		context := &common.ErrorContext{
 			Module:      m.GetName(),
