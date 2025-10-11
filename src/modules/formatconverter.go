@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 )
 
 // FormatConverterModule implements a module for converting music files between different formats.
@@ -1132,6 +1133,13 @@ func (m *FormatConverterModule) convertFile(sourcePath, targetPath, targetFormat
 
 	// Create ffmpeg command
 	cmd := exec.CommandContext(m.ctx, "tools/ffmpeg.exe", args...)
+	
+	// Hide console window on Windows to prevent flickering
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
+	
 	m.currentProcess = cmd
 
 	// Run ffmpeg and get output
@@ -1456,6 +1464,12 @@ func (m *FormatConverterModule) findAudioFiles(dir string, sourceFormat string) 
 // extractMetadata extracts metadata from an audio file using ffprobe
 func (m *FormatConverterModule) extractMetadata(filePath string) (map[string]string, error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_format", filePath)
+	
+	// Hide console window on Windows to prevent flickering
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
 
 	// Get command output
 	output, err := cmd.Output()
@@ -1481,6 +1495,12 @@ func (m *FormatConverterModule) extractMetadata(filePath string) (map[string]str
 // getAudioProperties extracts audio properties (bit depth, sample rate) from a file using ffprobe
 func (m *FormatConverterModule) getAudioProperties(filePath string) (bitDepth string, sampleRate string, err error) {
 	cmd := exec.Command("tools/ffprobe.exe", "-v", "quiet", "-print_format", "json", "-show_streams", filePath)
+	
+	// Hide console window on Windows to prevent flickering
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
 
 	// Get command output
 	output, err := cmd.Output()
